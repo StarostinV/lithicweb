@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Annotation Tool</title>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.142.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.142.0/examples/js/loaders/PLYLoader.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="fixed top-0 left-0 right-0 bg-white shadow-lg z-10 p-4 flex justify-between items-center">
+        <input type="file" id="fileInput" accept=".ply" class="border p-2 rounded">
+        <div>
+            <button id="drawMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded mr-2 hover:bg-gray-400">Draw Mode</button>
+            <button id="eraseMode" class="bg-pink-200 text-pink-800 px-4 py-2 rounded mr-2 hover:bg-pink-300">Eraser Mode</button>
+            <button id="exportAnnotations" class="bg-blue-200 text-blue-800 px-4 py-2 rounded hover:bg-blue-300">Export Annotations</button>
+        </div>
+    </div>
+    <div class="pt-20">
+        <canvas id="renderCanvas" class="w-full h-screen"></canvas>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
