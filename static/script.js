@@ -164,6 +164,8 @@ function standardizeMesh(mesh) {
         positions[i + 2] -= centerZ;
     }
 
+    mesh.position = mesh.position.subtract(center);
+
     // Apply the updated positions back to the mesh
     mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
 }
