@@ -10,45 +10,44 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.142.0/examples/js/loaders/PLYLoader.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        .hidden-file-input {
-            display: none;
-        }
-        .file-input-label {
-            display: inline-block;
-            background-color: #E2E8F0; /* bg-gray-300 */
-            color: #4A5568; /* text-gray-700 */
-            padding: 8px 16px; /* px-4 py-2 */
-            border-radius: 8px; /* rounded */
-            cursor: pointer;
-            margin-right: 8px; /* mr-2 */
-        }
-        .file-input-label:hover {
-            background-color: #CBD5E0; /* hover:bg-gray-400 */
-        }
-    </style>
-
+    <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-gray-100">
     <div class="fixed top-0 left-0 right-0 bg-white shadow-lg z-10 p-4 flex justify-between items-center">
-        <label for="fileInput" class="file-input-label">Choose File</label>
+        <label for="fileInput" class="file-input-label" title="Choose a PLY file to upload">Choose File</label>
         <input type="file" id="fileInput" accept=".ply" class="hidden-file-input">
         <span id="fileName" class="text-gray-700"></span>
         <div class="flex space-x-2">
             <button id="viewMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to View Mode">View</button>
             <button id="drawMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Draw Mode">Draw</button>
             <button id="eraseMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Erase Mode">Erase</button>
+            <button id="exportAnnotations" class="bg-blue-200 text-blue-800 px-4 py-2 rounded hover:bg-blue-300" title="Export Annotations">
+                <i class="fas fa-download"></i>
+            </button>
             <button id="updateLight" class="bg-yellow-200 text-yellow-800 px-4 py-2 rounded hover:bg-yellow-300" title="Update Light Direction">
                 <i class="fas fa-lightbulb"></i>
             </button>
-            <button id="exportAnnotations" class="bg-blue-200 text-blue-800 px-4 py-2 rounded hover:bg-blue-300" title="Export as PLY">
-                <i class="fas fa-download"></i>
+            <button id="showDoc" class="bg-green-200 text-green-800 px-4 py-2 rounded hover:bg-green-300" title="Show Documentation">
+                <i class="fas fa-book"></i>
             </button>
-        </div>    </div>
+        </div>
+    </div>
     <div class="pt-20">
         <canvas id="renderCanvas" class="w-full h-screen"></canvas>
     </div>
+
+    <!-- The Modal -->
+    <div id="docModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="docContent"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
         // Handle file input change
         document.getElementById('fileInput').addEventListener('change', (event) => {
             const fileNameSpan = document.getElementById('fileName');
@@ -59,6 +58,63 @@
                 fileNameSpan.textContent = '';
             }
         });
+
+        // Get the modal
+        var modal = document.getElementById("docModal");
+
+        // Get the button that opens the modal
+        var btn = document.getElementById("showDoc");
+
+        // Get the <span> element that closes the modal
+        var span = document.getElementsByClassName("close")[0];
+
+        // When the user clicks the button, open the modal
+        btn.onclick = function() {
+            modal.style.display = "flex";
+        }
+
+        // When the user clicks on <span> (x), close the modal
+        span.onclick = function() {
+            modal.style.display = "none";
+        }
+
+        // When the user clicks anywhere outside of the modal, close it
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+
+        // Add markdown content
+        const docContent = `
+# 3D Mesh Annotation\n\n
+
+## Overview\n
+This tool allows you to annotate 3D models and is primarily developed for annotating lithic artifacts. It will be equipped with ML-powered annotaton algorithms in the near future.
+
+## Buttons
+- **Choose File**: Upload a .PLY file from your computer for annotating.
+- **View Mode**: Allows you to rotate and zoom the 3D model. Hold left-click to rotate, hold right-click to move camera.
+- **Draw Mode**: Enables drawing annotations on the 3D model: left-click (hold for continuous drawing).
+- **Erase Mode**: Allows you to erase annotations: same as draw.
+- **Export Annotations**: Exports the annotations to a .PLY file.
+- **Update Light**: Updates the direction of the light in the scene.
+
+## Exported File Format
+The exported .PLY file has the standard format with "vertex" and "face" that contains the original mesh. Additionally, it contains 
+"labels" - a child property of the "vertex" property.
+
+## Shortcuts
+- Hold **Ctrl** (any mode): use left mouse button to shift the camera
+- Hold **Alt** (any mode): use left mouse button to rotate the camera
+- Hold right-click (any mode): move camera
+
+## Support contact
+Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.starostin@uni-tuebingen.de).
+
+`;
+        document.getElementById('docContent').innerHTML = marked.parse(docContent);
+    });
 
     </script>
     <script src="script.js"></script>
