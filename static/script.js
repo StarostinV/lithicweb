@@ -13,8 +13,8 @@ camera.wheelDeltaPercentage = 0.01; // Set to a higher value for faster zoom
 
 let mesh;
 let meshgrid;
-let drawMode = false;
-let eraseMode = false;
+let mode = 'view'; // 'view', 'draw', 'erase'
+let prevMode = 'view';
 
 // Add Axes
 function createAxis(scene, size) {
@@ -118,6 +118,9 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             mesh.material = new BABYLON.StandardMaterial("meshMaterial", scene);
             mesh.material.backFaceCulling = true;
 
+            // Enable vertex colors
+            mesh.material.vertexColorsEnabled = true;
+
             // Standardize the mesh
             standardizeMesh(mesh);
 
@@ -170,43 +173,141 @@ function standardizeMesh(mesh) {
     mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
 }
 
-
 // Toggle Draw Mode
 document.getElementById('drawMode').addEventListener('click', () => {
-    drawMode = true;
-    eraseMode = false;
-    camera.detachControl(canvas);
+    if (mode !== 'draw') {
+        prevMode = mode;
+        mode = 'draw';
+        camera.detachControl(canvas);
+    } else {
+        mode = 'view';
+        prevMode = 'view';
+        camera.attachControl(canvas, true);
+    }
 });
 
 // Toggle Erase Mode
 document.getElementById('eraseMode').addEventListener('click', () => {
-    drawMode = false;
-    eraseMode = true;
-    camera.detachControl(canvas);
+    if (mode !== 'erase') {
+        prevMode = mode;
+        mode = 'erase';
+        camera.detachControl(canvas);
+    } else {
+        mode = 'view';
+        prevMode = 'view';
+        camera.attachControl(canvas, true);
+    }
 });
+
+// Handle Alt key events
+window.addEventListener('keydown', (event) => {
+    if (event.key === 'Alt') {
+        if (mode === 'draw' || mode === 'erase') {
+            prevMode = mode;
+            mode = 'view';
+            camera.attachControl(canvas, true);
+        }
+    }
+});
+
+window.addEventListener('keyup', (event) => {
+    if (event.key === 'Alt') {
+        mode = prevMode;
+        if (mode !== 'view') {
+            camera.detachControl(canvas);
+        }
+    }
+});
+
+let isDrawing = false; // Track if the user is currently drawing
 
 // Handle drawing and erasing
 scene.onPointerObservable.add((pointerInfo) => {
-    if (!mesh) return;
+    if (!meshgrid) return;
+    
+    const handleDrawing = (pickResult) => {
+        if (pickResult.hit) {
+            const pickedPoint = pickResult.pickedPoint;
+            const faceId = pickResult.faceId;
+            console.log("hit! Face ID: ", faceId);
+
+            const positions = meshgrid.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+            const indices = meshgrid.getIndices();
+            let colors = meshgrid.getVerticesData(BABYLON.VertexBuffer.ColorKind);
+
+            if (!colors || colors.length === 0) {
+                // Initialize colors array if it's not initialized
+                colors = new Float32Array((positions.length / 3) * 4);
+                for (let i = 0; i < colors.length; i += 4) {
+                    colors[i] = 1; // R
+                    colors[i + 1] = 1; // G
+                    colors[i + 2] = 1; // B
+                    colors[i + 3] = 1; // A
+                }
+            }
+
+            const radius = 0.1; // Radius around the picked point to color
+            const radiusSquared = radius * radius;
+
+            // Function to color a face
+            const colorFace = (index, color) => {
+                for (let i = 0; i < 3; i++) {
+                    const vertexIndex = indices[index * 3 + i];
+                    colors[vertexIndex * 4] = color[0]; // R
+                    colors[vertexIndex * 4 + 1] = color[1]; // G
+                    colors[vertexIndex * 4 + 2] = color[2]; // B
+                    colors[vertexIndex * 4 + 3] = color[3]; // A
+                }
+            };
+
+            // Color the picked face
+            const drawColor = [1, 0, 0, 1]; // Red
+            const eraseColor = [0.5, 0.5, 0.5, 1]; // White
+            const targetColor = mode === 'draw' ? drawColor : eraseColor;
+
+            // Color the picked face
+            if (faceId !== -1) {
+                colorFace(faceId, targetColor);
+            }
+
+            // Color faces within the radius
+            for (let i = 0; i < indices.length; i += 3) {
+                const p1 = BABYLON.Vector3.FromArray(positions, indices[i] * 3);
+                const p2 = BABYLON.Vector3.FromArray(positions, indices[i + 1] * 3);
+                const p3 = BABYLON.Vector3.FromArray(positions, indices[i + 2] * 3);
+
+                // Check if any vertex of the face is within the radius
+                if (BABYLON.Vector3.DistanceSquared(p1, pickedPoint) <= radiusSquared ||
+                    BABYLON.Vector3.DistanceSquared(p2, pickedPoint) <= radiusSquared ||
+                    BABYLON.Vector3.DistanceSquared(p3, pickedPoint) <= radiusSquared) {
+                    colorFace(i / 3, targetColor);
+                }
+            }
+
+            // Update the colors data in the meshgrid
+            meshgrid.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
+        }
+    };
+
     switch (pointerInfo.type) {
         case BABYLON.PointerEventTypes.POINTERDOWN:
-            if (drawMode) {
-                // Implement drawing on mesh
+            if (mode === 'draw' || mode === 'erase') {
+                isDrawing = true;
                 const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-                if (pickResult.hit) {
-                    const pickedPoint = pickResult.pickedPoint;
-                    const sphere = BABYLON.MeshBuilder.CreateSphere("sphere", {diameter: 0.05}, scene);
-                    sphere.position = pickedPoint;
-                    sphere.material = new BABYLON.StandardMaterial("sphereMat", scene);
-                    sphere.material.diffuseColor = new BABYLON.Color3(1, 0, 0);
-                }
-            } else if (eraseMode) {
-                // Implement erasing on mesh
+                handleDrawing(pickResult);
+            }
+            break;
+
+        case BABYLON.PointerEventTypes.POINTERMOVE:
+            if (isDrawing && (mode === 'draw' || mode === 'erase')) {
                 const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-                if (pickResult.hit) {
-                    const pickedPoint = pickResult.pickedPoint;
-                    // Add erasing logic here
-                }
+                handleDrawing(pickResult);
+            }
+            break;
+
+        case BABYLON.PointerEventTypes.POINTERUP:
+            if (isDrawing) {
+                isDrawing = false;
             }
             break;
     }
