@@ -8,6 +8,17 @@ const camera = new BABYLON.ArcRotateCamera("camera", Math.PI / 2, Math.PI / 2, 1
 camera.attachControl(canvas, true);
 const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0), scene);
 
+// Global variables
+let rafId = null;
+let mesh;
+let coloredMesh;
+let meshgrid;
+let kdtree;
+let mode = 'view'; // 'view', 'draw', 'erase'
+let prevMode = 'view';
+let isDrawing = false; // Track if the user is currently drawing
+
+
 // Increase zoom speed
 camera.wheelDeltaPercentage = 0.01; // Set to a higher value for faster zoom
 
@@ -29,6 +40,24 @@ document.getElementById('toggleGrid').addEventListener('click', () => {
 });
 
 
+const createKDTree = (positions) => {
+    const points = [];
+    for (let i = 0; i < positions.length; i += 3) {
+        points.push({
+            x: positions[i],
+            y: positions[i + 1],
+            z: positions[i + 2],
+            index: i / 3 // Store the index of the vertex
+        });
+    }
+
+    const distance = (a, b) => {
+        return (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2;
+    };
+
+    return new kdTree(points, distance, ['x', 'y', 'z']);
+};
+
 // Add an observable to update the light direction whenever the camera moves
 // scene.onBeforeRenderObservable.add(() => {
 //     updateLightDirection();
@@ -41,23 +70,16 @@ window.addEventListener('wheel', (event) => {
         const zoomAmount = event.deltaY * camera.wheelDeltaPercentage; // Adjust this value to control zoom speed
         camera.radius += zoomAmount;
     }
-}, { passive: false });
+}, {passive: false});
 
-
-let mesh;
-let coloredMesh;
-let meshgrid;
-let mode = 'view'; // 'view', 'draw', 'erase'
-let prevMode = 'view';
-let isDrawing = false; // Track if the user is currently drawing
 
 // Add Axes
 function createAxis(scene, size) {
     // X axis
     const xAxis = BABYLON.MeshBuilder.CreateLines("xAxis", {
         points: [
-            new BABYLON.Vector3(0, 0, 0), 
-            new BABYLON.Vector3(size, 0, 0), 
+            new BABYLON.Vector3(0, 0, 0),
+            new BABYLON.Vector3(size, 0, 0),
             new BABYLON.Vector3(size * 0.95, size * 0.05, 0),
             new BABYLON.Vector3(size, 0, 0),
             new BABYLON.Vector3(size * 0.95, size * -0.05, 0)
@@ -68,8 +90,8 @@ function createAxis(scene, size) {
     // Y axis
     const yAxis = BABYLON.MeshBuilder.CreateLines("yAxis", {
         points: [
-            new BABYLON.Vector3(0, 0, 0), 
-            new BABYLON.Vector3(0, size, 0), 
+            new BABYLON.Vector3(0, 0, 0),
+            new BABYLON.Vector3(0, size, 0),
             new BABYLON.Vector3(size * -0.05, size * 0.95, 0),
             new BABYLON.Vector3(0, size, 0),
             new BABYLON.Vector3(size * 0.05, size * 0.95, 0)
@@ -80,11 +102,11 @@ function createAxis(scene, size) {
     // Z axis
     const zAxis = BABYLON.MeshBuilder.CreateLines("zAxis", {
         points: [
-            new BABYLON.Vector3(0, 0, 0), 
-            new BABYLON.Vector3(0, 0, size), 
-            new BABYLON.Vector3(0 , size * 0.05, size * 0.95),
+            new BABYLON.Vector3(0, 0, 0),
             new BABYLON.Vector3(0, 0, size),
-            new BABYLON.Vector3(0 , size * -0.05, size * 0.95)
+            new BABYLON.Vector3(0, size * 0.05, size * 0.95),
+            new BABYLON.Vector3(0, 0, size),
+            new BABYLON.Vector3(0, size * -0.05, size * 0.95)
         ]
     }, scene);
     zAxis.color = new BABYLON.Color3(0, 0, 1);
@@ -107,10 +129,12 @@ function createWireframe(mesh, scene) {
         lines.push([p1, p2, p3, p1]);
     }
 
-    const wireframe = BABYLON.MeshBuilder.CreateLineSystem("wireframe", { lines: lines }, scene);
+    const wireframe = BABYLON.MeshBuilder.CreateLineSystem("wireframe", {lines: lines}, scene);
     wireframe.color = new BABYLON.Color3(0.2, 0.2, 0.2);
     if (meshgrid) meshgrid.dispose(); // Dispose previous mesh if any
+
     meshgrid = wireframe;
+    meshgrid.isVisible = false;
 }
 
 // Function to enable vertex colors on a mesh
@@ -157,7 +181,8 @@ function createColoredMesh(originalMesh, scene) {
 
     // Apply the material to the mesh
     coloredMesh.material = material;
-    
+
+    kdtree = createKDTree(positions);
     return coloredMesh;
 }
 
@@ -320,13 +345,13 @@ document.getElementById('viewMode').addEventListener('click', () => {
 // Initial call to set the correct button state on page load
 updateButtonStates();
 
-
 const handleDrawing = (pickResult) => {
     if (pickResult.hit) {
         const pickedPoint = pickResult.pickedPoint;
 
-        const positions = coloredMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+        console.time("getVerticesData")
         let colors = coloredMesh.getVerticesData(BABYLON.VertexBuffer.ColorKind);
+        console.timeEnd("getVerticesData");
 
         // Color the picked vertex
         const drawColor = [1, 0.6, 0.2, 1]; // Orange
@@ -341,19 +366,16 @@ const handleDrawing = (pickResult) => {
             colors[vertexIndex * 4 + 3] = color[3]; // A
         };
 
-        // Find the closest vertex
-        let closestVertexIndex = -1;
-        let minDistanceSquared = Infinity;
+        // Find the closest vertex using KD-Tree
+        console.time('kdTree nearest search');
+        const nearest = kdtree.nearest({
+            x: pickedPoint.x,
+            y: pickedPoint.y,
+            z: pickedPoint.z
+        }, 1)[0];
+        console.timeEnd('kdTree nearest search');
 
-        for (let i = 0; i < positions.length / 3; i++) {
-            const vertexPosition = BABYLON.Vector3.FromArray(positions, i * 3);
-            const distanceSquared = BABYLON.Vector3.DistanceSquared(pickedPoint, vertexPosition);
-
-            if (distanceSquared < minDistanceSquared) {
-                minDistanceSquared = distanceSquared;
-                closestVertexIndex = i;
-            }
-        }
+        const closestVertexIndex = nearest[0].index;
 
         // Color the closest vertex
         if (closestVertexIndex !== -1) {
@@ -361,10 +383,23 @@ const handleDrawing = (pickResult) => {
         }
 
         // Update the colors data in the mesh
+        console.time('setVerticesData');
         coloredMesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors, true);
+        console.timeEnd('setVerticesData');
     }
 };
 
+
+const drawLoop = () => {
+    if (isDrawing) {
+        const pickResult = scene.pick(scene.pointerX, scene.pointerY);
+        handleDrawing(pickResult);
+        rafId = requestAnimationFrame(drawLoop);
+    } else {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+    }
+};
 
 // Handle drawing and erasing
 scene.onPointerObservable.add((pointerInfo) => {
@@ -377,6 +412,7 @@ scene.onPointerObservable.add((pointerInfo) => {
                     isDrawing = true;
                     const pickResult = scene.pick(scene.pointerX, scene.pointerY);
                     handleDrawing(pickResult);
+                    rafId = requestAnimationFrame(drawLoop);
                 }
             } else if (pointerInfo.event.button === 2) { // Right mouse button
                 if (mode === 'draw' || mode === 'erase') {
@@ -390,8 +426,7 @@ scene.onPointerObservable.add((pointerInfo) => {
 
         case BABYLON.PointerEventTypes.POINTERMOVE:
             if (isDrawing && (mode === 'draw' || mode === 'erase')) { // Left mouse button
-                const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-                handleDrawing(pickResult);
+                // Drawing is now handled in drawLoop
             }
             break;
 
@@ -481,7 +516,7 @@ end_header
     const plyContent = header + vertexData + faceData;
 
     // Create a Blob from the PLY content
-    const blob = new Blob([plyContent], { type: 'text/plain' });
+    const blob = new Blob([plyContent], {type: 'text/plain'});
     const url = URL.createObjectURL(blob);
 
     // Create a link element and trigger the download
