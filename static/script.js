@@ -289,6 +289,7 @@ scene.onPointerObservable.add((pointerInfo) => {
     const handleDrawing = (pickResult) => {
         if (pickResult.hit) {
             const pickedPoint = pickResult.pickedPoint;
+            const faceId = pickResult.faceId;
 
             const positions = coloredMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
             const indices = coloredMesh.getIndices();
@@ -298,9 +299,6 @@ scene.onPointerObservable.add((pointerInfo) => {
             const drawColor = [1, 0, 0, 1]; // Red
             const eraseColor = [0.5, 0.5, 0.5, 1]; // Gray
             const targetColor = mode === 'draw' ? drawColor : eraseColor;
-            
-            const radius = 1; // Radius around the picked point to color
-            const radiusSquared = radius * radius;
 
             // Function to color a face
             const colorFace = (index, color) => {
@@ -313,26 +311,35 @@ scene.onPointerObservable.add((pointerInfo) => {
                 }
             };
 
-            // Color faces within the radius
+            // Find the closest face
+            let closestFaceIndex = -1;
+            let minDistanceSquared = Infinity;
+
             for (let i = 0; i < indices.length; i += 3) {
-                const bbox = getBoundingBox(positions, indices, i / 3);
+                const p1 = BABYLON.Vector3.FromArray(positions, indices[i] * 3);
+                const p2 = BABYLON.Vector3.FromArray(positions, indices[i + 1] * 3);
+                const p3 = BABYLON.Vector3.FromArray(positions, indices[i + 2] * 3);
 
-                if (isPointInBoundingBox(pickedPoint, bbox)) {
-                    const p1 = BABYLON.Vector3.FromArray(positions, indices[i] * 3);
-                    const p2 = BABYLON.Vector3.FromArray(positions, indices[i + 1] * 3);
-                    const p3 = BABYLON.Vector3.FromArray(positions, indices[i + 2] * 3);
+                // Calculate the centroid of the face
+                const centroid = p1.add(p2).add(p3).scale(1 / 3);
 
-                    // Check if any vertex of the face is within the radius
-                    if (BABYLON.Vector3.DistanceSquared(p1, pickedPoint) <= radiusSquared ||
-                        BABYLON.Vector3.DistanceSquared(p2, pickedPoint) <= radiusSquared ||
-                        BABYLON.Vector3.DistanceSquared(p3, pickedPoint) <= radiusSquared) {
-                        colorFace(i / 3, targetColor);
-                    }
+                // Calculate the distance from the picked point to the centroid
+                const distanceSquared = BABYLON.Vector3.DistanceSquared(pickedPoint, centroid);
+
+                if (distanceSquared < minDistanceSquared) {
+                    minDistanceSquared = distanceSquared;
+                    closestFaceIndex = i / 3;
                 }
             }
 
+            // Color the closest face
+            if (closestFaceIndex !== -1) {
+                console.log(closestFaceIndex, faceId, Math.floor(faceId / 3));
+                colorFace(closestFaceIndex, targetColor);
+            }
+
             // Update the colors data in the mesh
-            coloredMesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
+            coloredMesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors, true);
         }
     };
 
