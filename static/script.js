@@ -270,8 +270,8 @@ scene.onPointerObservable.add((pointerInfo) => {
     const handleDrawing = (pickResult) => {
         if (pickResult.hit) {
             const pickedPoint = pickResult.pickedPoint;
-            console.log(pickResult);
-            const faceId = pickResult.faceId;
+
+            // const faceId = pickResult.faceId;
             // console.log("hit! Face ID: ", faceId);
 
             const positions = meshgrid.getVerticesData(BABYLON.VertexBuffer.PositionKind);
@@ -304,10 +304,10 @@ scene.onPointerObservable.add((pointerInfo) => {
             // }
 
             // Create a bounding box for the picked point's radius
-            const pickedBBox = {
-                center: pickedPoint,
-                halfSize: new BABYLON.Vector3(radius, radius, radius)
-            };
+            // const pickedBBox = {
+            //     center: pickedPoint,
+            //     halfSize: new BABYLON.Vector3(radius, radius, radius)
+            // };
 
             // Color faces within the radius
             for (let i = 0; i < indices.length; i += 3) {
