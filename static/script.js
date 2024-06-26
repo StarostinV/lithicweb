@@ -358,8 +358,65 @@ scene.onPointerObservable.add((pointerInfo) => {
 
 // Export Annotations
 document.getElementById('exportAnnotations').addEventListener('click', () => {
-    // Implement export functionality
+    // Check if coloredMesh exists
+    if (!coloredMesh) {
+        console.error("No colored mesh to export.");
+        return;
+    }
+
+    // Extract vertex data
+    const positions = coloredMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+    const indices = coloredMesh.getIndices();
+    const colors = coloredMesh.getVerticesData(BABYLON.VertexBuffer.ColorKind);
+
+    // PLY file header
+    const header = `ply
+format ascii 1.0
+element vertex ${positions.length / 3}
+property float x
+property float y
+property float z
+property int labels
+element face ${indices.length / 3}
+property list uchar int vertex_indices
+end_header
+`;
+
+    // Vertex data
+    let vertexData = '';
+    for (let i = 0; i < positions.length / 3; i++) {
+        const x = positions[i * 3];
+        const y = positions[i * 3 + 1];
+        const z = positions[i * 3 + 2];
+        const label = colors[i * 4] === 1 ? 1 : 0; // Check if red component is 1 for the label
+        vertexData += `${x} ${y} ${z} ${label}\n`;
+    }
+
+    // Face data
+    let faceData = '';
+    for (let i = 0; i < indices.length; i += 3) {
+        const i1 = indices[i];
+        const i2 = indices[i + 1];
+        const i3 = indices[i + 2];
+        faceData += `3 ${i1} ${i2} ${i3}\n`;
+    }
+
+    // Combine header, vertex data, and face data
+    const plyContent = header + vertexData + faceData;
+
+    // Create a Blob from the PLY content
+    const blob = new Blob([plyContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+
+    // Create a link element and trigger the download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'mesh.ply';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 });
+
 
 engine.runRenderLoop(() => {
     scene.render();
