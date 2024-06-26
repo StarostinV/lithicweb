@@ -13,25 +13,30 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-gray-100">
-    <div class="fixed top-0 left-0 right-0 bg-white shadow-lg z-10 p-4 flex justify-between items-center">
+<div class="fixed top-0 left-0 right-0 bg-white shadow-lg z-10 p-4 flex justify-between items-center">
+    <div class="flex items-center space-x-2">
+        <button id="showDoc" class="bg-green-200 text-green-800 px-4 py-2 rounded hover:bg-green-300" title="Show Documentation">
+            <i class="fas fa-book"></i>
+        </button>
         <label for="fileInput" class="file-input-label" title="Choose a PLY file to upload">Choose File</label>
         <input type="file" id="fileInput" accept=".ply" class="hidden-file-input">
         <span id="fileName" class="text-gray-700"></span>
-        <div class="flex space-x-2">
-            <button id="viewMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to View Mode">View</button>
-            <button id="drawMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Draw Mode">Draw</button>
-            <button id="eraseMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Erase Mode">Erase</button>
-            <button id="exportAnnotations" class="bg-blue-200 text-blue-800 px-4 py-2 rounded hover:bg-blue-300" title="Export Annotations">
-                <i class="fas fa-download"></i>
-            </button>
-            <button id="updateLight" class="bg-yellow-200 text-yellow-800 px-4 py-2 rounded hover:bg-yellow-300" title="Update Light Direction">
-                <i class="fas fa-lightbulb"></i>
-            </button>
-            <button id="showDoc" class="bg-green-200 text-green-800 px-4 py-2 rounded hover:bg-green-300" title="Show Documentation">
-                <i class="fas fa-book"></i>
-            </button>
-        </div>
     </div>
+    <div class="flex space-x-2">
+        <button id="viewMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to View Mode">View</button>
+        <button id="drawMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Draw Mode">Draw</button>
+        <button id="eraseMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Erase Mode">Erase</button>
+        <button id="updateLight" class="bg-yellow-200 text-yellow-800 px-4 py-2 rounded hover:bg-yellow-300" title="Update Light Direction">
+            <i class="fas fa-lightbulb"></i>
+        </button>
+        <button id="toggleGrid" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Show/hide grid">
+            <i class="fas fa-table-cells"></i>
+        </button>
+        <button id="exportAnnotations" class="bg-blue-200 text-blue-800 px-4 py-2 rounded hover:bg-blue-300" title="Export Annotations">
+            <i class="fas fa-download"></i>
+        </button>
+    </div>
+</div>
     <div class="pt-20">
         <canvas id="renderCanvas" class="w-full h-screen"></canvas>
     </div>
@@ -97,8 +102,9 @@ This tool allows you to annotate 3D models and is primarily developed for annota
 - **View Mode**: Allows you to rotate and zoom the 3D model. Hold left-click to rotate, hold right-click to move camera.
 - **Draw Mode**: Enables drawing annotations on the 3D model: left-click (hold for continuous drawing).
 - **Erase Mode**: Allows you to erase annotations: same as draw.
-- **Export Annotations**: Exports the annotations to a .PLY file.
 - **Update Light**: Updates the direction of the light in the scene.
+- **Toggle Grid**: Shows/hides the mesh grid on the object.
+- **Export Annotations**: Exports the annotations to a .PLY file.
 
 ## Exported File Format
 The exported .PLY file has the standard format with "vertex" and "face" that contains the original mesh. Additionally, it contains 

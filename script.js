@@ -24,6 +24,11 @@ updateLightDirection();
 
 document.getElementById('updateLight').addEventListener('click', updateLightDirection);
 
+document.getElementById('toggleGrid').addEventListener('click', () => {
+    meshgrid.isVisible = !meshgrid.isVisible;
+});
+
+
 // Add an observable to update the light direction whenever the camera moves
 // scene.onBeforeRenderObservable.add(() => {
 //     updateLightDirection();
