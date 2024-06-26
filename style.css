@@ -1,3 +1,7 @@
+body {
+    overflow: hidden; /* Remove scrolling */
+}
+
 .hidden-file-input {
     display: none;
 }
