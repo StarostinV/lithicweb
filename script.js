@@ -330,17 +330,6 @@ const handleDrawing = (pickResult) => {
 };
 
 
-const drawLoop = () => {
-    if (isDrawing) {
-        const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-        handleDrawing(pickResult);
-        rafId = requestAnimationFrame(drawLoop);
-    } else {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-    }
-};
-
 // Handle drawing and erasing
 scene.onPointerObservable.add((pointerInfo) => {
     if (!mesh) return;
@@ -350,9 +339,10 @@ scene.onPointerObservable.add((pointerInfo) => {
             if (pointerInfo.event.button === 0) { // Left mouse button
                 if (mode === 'draw' || mode === 'erase') {
                     isDrawing = true;
+                    console.time('scene.pick');
                     const pickResult = scene.pick(scene.pointerX, scene.pointerY);
+                    console.timeEnd('scene.pick');
                     handleDrawing(pickResult);
-                    rafId = requestAnimationFrame(drawLoop);
                 }
             } else if (pointerInfo.event.button === 2) { // Right mouse button
                 if (mode === 'draw' || mode === 'erase') {
@@ -366,7 +356,8 @@ scene.onPointerObservable.add((pointerInfo) => {
 
         case BABYLON.PointerEventTypes.POINTERMOVE:
             if (isDrawing && (mode === 'draw' || mode === 'erase')) { // Left mouse button
-                // Drawing is now handled in drawLoop
+                const pickResult = scene.pick(scene.pointerX, scene.pointerY);
+                handleDrawing(pickResult);
             }
             break;
 
