@@ -58,6 +58,7 @@ function createAxis(scene, size) {
 
 // Call createAxis to add axes to the scene
 createAxis(scene, 10);
+
 // Function to create a wireframe overlay
 function createWireframe(mesh, scene) {
     const vertexData = BABYLON.VertexData.ExtractFromMesh(mesh);
@@ -76,16 +77,28 @@ function createWireframe(mesh, scene) {
     wireframe.color = new BABYLON.Color3(0.5, 0.5, 0.5);
     if (meshgrid) meshgrid.dispose(); // Dispose previous mesh if any
     meshgrid = wireframe;
+}
+
+// Function to enable vertex colors on a mesh
+function enableVertexColors(mesh) {
+    const vertexData = BABYLON.VertexData.ExtractFromMesh(mesh);
+    const positions = vertexData.positions;
+    const indices = vertexData.indices;
 
     // Initialize colors array
-    const colors = new Float32Array((indices.length / 3) * 16);
+    const colors = new Float32Array((positions.length / 3) * 4);
     for (let i = 0; i < colors.length; i += 4) {
         colors[i] = 0.5; // R
         colors[i + 1] = 0.5; // G
         colors[i + 2] = 0.5; // B
         colors[i + 3] = 1; // A
     }
-    meshgrid.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
+    mesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
+
+    // Enable vertex colors
+    mesh.material = new BABYLON.StandardMaterial("meshMaterial", scene);
+    mesh.material.backFaceCulling = true;
+    mesh.material.vertexColorsEnabled = true;
 }
 
 // File input handling
@@ -124,15 +137,11 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             if (mesh) mesh.dispose();  // Dispose previous mesh if any
             mesh = babylonMesh;
 
-            // Enable backface culling
-            mesh.material = new BABYLON.StandardMaterial("meshMaterial", scene);
-            mesh.material.backFaceCulling = true;
-
-            // Enable vertex colors
-            mesh.material.vertexColorsEnabled = true;
-
             // Standardize the mesh
             standardizeMesh(mesh);
+
+            // Enable vertex colors
+            enableVertexColors(mesh);
 
             // Create wireframe
             createWireframe(mesh, scene);
@@ -143,11 +152,8 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
 
 // Function to standardize the mesh
 function standardizeMesh(mesh) {
-    // console.log("Standardizing mesh");
-
-    // Get vertex positions
     const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-    
+
     if (!positions) {
         console.error("No vertex data available.");
         return;
@@ -168,7 +174,6 @@ function standardizeMesh(mesh) {
     centerZ /= totalVertices;
 
     const center = new BABYLON.Vector3(centerX, centerY, centerZ);
-    console.log("center of mass: ", center);
 
     // Translate vertices to center them at the origin
     for (let i = 0; i < positions.length; i += 3) {
@@ -211,7 +216,7 @@ document.getElementById('eraseMode').addEventListener('click', () => {
 
 // Handle Alt key events
 window.addEventListener('keydown', (event) => {
-    if (event.key === 'Alt') {
+    if (event.key === 'Alt' || event.key === 'Control') {
         if (mode === 'draw' || mode === 'erase') {
             prevMode = mode;
             mode = 'view';
@@ -221,7 +226,7 @@ window.addEventListener('keydown', (event) => {
 });
 
 window.addEventListener('keyup', (event) => {
-    if (event.key === 'Alt') {
+    if (event.key === 'Alt' || event.key === 'Control') {
         mode = prevMode;
         if (mode !== 'view') {
             camera.detachControl(canvas);
@@ -265,26 +270,22 @@ function isPointInBoundingBox(point, bbox) {
 
 // Handle drawing and erasing
 scene.onPointerObservable.add((pointerInfo) => {
-    if (!meshgrid) return;
+    if (!mesh) return;
 
     const handleDrawing = (pickResult) => {
         if (pickResult.hit) {
             const pickedPoint = pickResult.pickedPoint;
 
-            // const faceId = pickResult.faceId;
-            // console.log("hit! Face ID: ", faceId);
-
-            const positions = meshgrid.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-            const indices = meshgrid.getIndices();
-            let colors = meshgrid.getVerticesData(BABYLON.VertexBuffer.ColorKind);
-
+            const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+            const indices = mesh.getIndices();
+            let colors = mesh.getVerticesData(BABYLON.VertexBuffer.ColorKind);
 
             // Color the picked face
             const drawColor = [1, 0, 0, 1]; // Red
-            const eraseColor = [0.5, 0.5, 0.5, 0.5]; // Gray
+            const eraseColor = [0.5, 0.5, 0.5, 1]; // Gray
             const targetColor = mode === 'draw' ? drawColor : eraseColor;
             
-            const radius = 1; // Radius around the picked point to color
+            const radius = 0.1; // Radius around the picked point to color
             const radiusSquared = radius * radius;
 
             // Function to color a face
@@ -297,17 +298,6 @@ scene.onPointerObservable.add((pointerInfo) => {
                     colors[vertexIndex * 4 + 3] = color[3]; // A
                 }
             };
-
-            // Color the picked face
-            // if (faceId !== -1) {
-            //     colorFace(faceId, targetColor);
-            // }
-
-            // Create a bounding box for the picked point's radius
-            // const pickedBBox = {
-            //     center: pickedPoint,
-            //     halfSize: new BABYLON.Vector3(radius, radius, radius)
-            // };
 
             // Color faces within the radius
             for (let i = 0; i < indices.length; i += 3) {
@@ -327,8 +317,8 @@ scene.onPointerObservable.add((pointerInfo) => {
                 }
             }
 
-            // Update the colors data in the meshgrid
-            meshgrid.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
+            // Update the colors data in the mesh
+            mesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
         }
     };
 
@@ -355,7 +345,6 @@ scene.onPointerObservable.add((pointerInfo) => {
             break;
     }
 });
-
 
 // Export Annotations
 document.getElementById('exportAnnotations').addEventListener('click', () => {
