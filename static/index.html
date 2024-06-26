@@ -10,22 +10,57 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.142.0/examples/js/loaders/PLYLoader.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .hidden-file-input {
+            display: none;
+        }
+        .file-input-label {
+            display: inline-block;
+            background-color: #E2E8F0; /* bg-gray-300 */
+            color: #4A5568; /* text-gray-700 */
+            padding: 8px 16px; /* px-4 py-2 */
+            border-radius: 8px; /* rounded */
+            cursor: pointer;
+            margin-right: 8px; /* mr-2 */
+        }
+        .file-input-label:hover {
+            background-color: #CBD5E0; /* hover:bg-gray-400 */
+        }
+    </style>
+
 </head>
 <body class="bg-gray-100">
     <div class="fixed top-0 left-0 right-0 bg-white shadow-lg z-10 p-4 flex justify-between items-center">
-        <input type="file" id="fileInput" accept=".ply" class="border p-2 rounded">
+        <label for="fileInput" class="file-input-label">Choose File</label>
+        <input type="file" id="fileInput" accept=".ply" class="hidden-file-input">
+        <span id="fileName" class="text-gray-700"></span>
         <div class="flex space-x-2">
-            <button id="viewMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">View</button>
-            <button id="drawMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">Draw</button>
-            <button id="eraseMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">Erase</button>
-            <button id="exportAnnotations" class="bg-blue-200 text-blue-800 px-4 py-2 rounded hover:bg-blue-300">
+            <button id="viewMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to View Mode">View</button>
+            <button id="drawMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Draw Mode">Draw</button>
+            <button id="eraseMode" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Erase Mode">Erase</button>
+            <button id="updateLight" class="bg-yellow-200 text-yellow-800 px-4 py-2 rounded hover:bg-yellow-300" title="Update Light Direction">
+                <i class="fas fa-lightbulb"></i>
+            </button>
+            <button id="exportAnnotations" class="bg-blue-200 text-blue-800 px-4 py-2 rounded hover:bg-blue-300" title="Export as PLY">
                 <i class="fas fa-download"></i>
             </button>
-        </div>
-    </div>
+        </div>    </div>
     <div class="pt-20">
         <canvas id="renderCanvas" class="w-full h-screen"></canvas>
     </div>
+    <script>
+        // Handle file input change
+        document.getElementById('fileInput').addEventListener('change', (event) => {
+            const fileNameSpan = document.getElementById('fileName');
+            const file = event.target.files[0];
+            if (file) {
+                fileNameSpan.textContent = file.name;
+            } else {
+                fileNameSpan.textContent = '';
+            }
+        });
+
+    </script>
     <script src="script.js"></script>
 </body>
 </html>

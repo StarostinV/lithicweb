@@ -21,6 +21,9 @@ const updateLightDirection = () => {
 // Update the light direction initially
 updateLightDirection();
 
+
+document.getElementById('updateLight').addEventListener('click', updateLightDirection);
+
 // Add an observable to update the light direction whenever the camera moves
 // scene.onBeforeRenderObservable.add(() => {
 //     updateLightDirection();
@@ -100,7 +103,7 @@ function createWireframe(mesh, scene) {
     }
 
     const wireframe = BABYLON.MeshBuilder.CreateLineSystem("wireframe", { lines: lines }, scene);
-    wireframe.color = new BABYLON.Color3(0.5, 0.5, 0.5);
+    wireframe.color = new BABYLON.Color3(0.2, 0.2, 0.2);
     if (meshgrid) meshgrid.dispose(); // Dispose previous mesh if any
     meshgrid = wireframe;
 }
