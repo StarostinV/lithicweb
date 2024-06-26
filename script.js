@@ -321,88 +321,54 @@ document.getElementById('viewMode').addEventListener('click', () => {
 updateButtonStates();
 
 
-// Utility function to get bounding box center and half-size
-function getBoundingBox(vertices, indices, faceIndex) {
-    let min = new BABYLON.Vector3(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
-    let max = new BABYLON.Vector3(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+const handleDrawing = (pickResult) => {
+    if (pickResult.hit) {
+        const pickedPoint = pickResult.pickedPoint;
 
-    for (let i = 0; i < 3; i++) {
-        const vertexIndex = indices[faceIndex * 3 + i];
-        const x = vertices[vertexIndex * 3];
-        const y = vertices[vertexIndex * 3 + 1];
-        const z = vertices[vertexIndex * 3 + 2];
-        
-        min.x = Math.min(min.x, x);
-        min.y = Math.min(min.y, y);
-        min.z = Math.min(min.z, z);
-        
-        max.x = Math.max(max.x, x);
-        max.y = Math.max(max.y, y);
-        max.z = Math.max(max.z, z);
+        const positions = coloredMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+        let colors = coloredMesh.getVerticesData(BABYLON.VertexBuffer.ColorKind);
+
+        // Color the picked vertex
+        const drawColor = [1, 0.6, 0.2, 1]; // Orange
+        const eraseColor = [0.5, 0.5, 0.5, 1]; // Gray
+        const targetColor = mode === 'draw' ? drawColor : eraseColor;
+
+        // Function to color a vertex
+        const colorVertex = (vertexIndex, color) => {
+            colors[vertexIndex * 4] = color[0]; // R
+            colors[vertexIndex * 4 + 1] = color[1]; // G
+            colors[vertexIndex * 4 + 2] = color[2]; // B
+            colors[vertexIndex * 4 + 3] = color[3]; // A
+        };
+
+        // Find the closest vertex
+        let closestVertexIndex = -1;
+        let minDistanceSquared = Infinity;
+
+        for (let i = 0; i < positions.length / 3; i++) {
+            const vertexPosition = BABYLON.Vector3.FromArray(positions, i * 3);
+            const distanceSquared = BABYLON.Vector3.DistanceSquared(pickedPoint, vertexPosition);
+
+            if (distanceSquared < minDistanceSquared) {
+                minDistanceSquared = distanceSquared;
+                closestVertexIndex = i;
+            }
+        }
+
+        // Color the closest vertex
+        if (closestVertexIndex !== -1) {
+            colorVertex(closestVertexIndex, targetColor);
+        }
+
+        // Update the colors data in the mesh
+        coloredMesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors, true);
     }
+};
 
-    const center = min.add(max).scale(0.5);
-    const halfSize = max.subtract(min).scale(0.5);
-
-    return { center, halfSize };
-}
-
-// Utility function to check if a point is within a bounding box
-function isPointInBoundingBox(point, bbox) {
-    const { center, halfSize } = bbox;
-    return Math.abs(point.x - center.x) <= halfSize.x &&
-           Math.abs(point.y - center.y) <= halfSize.y &&
-           Math.abs(point.z - center.z) <= halfSize.z;
-}
 
 // Handle drawing and erasing
 scene.onPointerObservable.add((pointerInfo) => {
     if (!coloredMesh) return;
-
-    const handleDrawing = (pickResult) => {
-        if (pickResult.hit) {
-            const pickedPoint = pickResult.pickedPoint;
-
-            const positions = coloredMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-            const indices = coloredMesh.getIndices();
-            let colors = coloredMesh.getVerticesData(BABYLON.VertexBuffer.ColorKind);
-
-            // Color the picked vertex
-            const drawColor = [1, 0.6, 0.2, 1]; // Orange
-            const eraseColor = [0.5, 0.5, 0.5, 1]; // Gray
-            const targetColor = mode === 'draw' ? drawColor : eraseColor;
-
-            // Function to color a vertex
-            const colorVertex = (vertexIndex, color) => {
-                colors[vertexIndex * 4] = color[0]; // R
-                colors[vertexIndex * 4 + 1] = color[1]; // G
-                colors[vertexIndex * 4 + 2] = color[2]; // B
-                colors[vertexIndex * 4 + 3] = color[3]; // A
-            };
-
-            // Find the closest vertex
-            let closestVertexIndex = -1;
-            let minDistanceSquared = Infinity;
-
-            for (let i = 0; i < positions.length / 3; i++) {
-                const vertexPosition = BABYLON.Vector3.FromArray(positions, i * 3);
-                const distanceSquared = BABYLON.Vector3.DistanceSquared(pickedPoint, vertexPosition);
-
-                if (distanceSquared < minDistanceSquared) {
-                    minDistanceSquared = distanceSquared;
-                    closestVertexIndex = i;
-                }
-            }
-
-            // Color the closest vertex
-            if (closestVertexIndex !== -1) {
-                colorVertex(closestVertexIndex, targetColor);
-            }
-
-            // Update the colors data in the mesh
-            coloredMesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors, true);
-        }
-    };
 
     switch (pointerInfo.type) {
         case BABYLON.PointerEventTypes.POINTERDOWN:
