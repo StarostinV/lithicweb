@@ -3,6 +3,10 @@ const canvas = document.getElementById("renderCanvas");
 const engine = new BABYLON.Engine(canvas, true);
 const scene = new BABYLON.Scene(engine);
 
+const drawColor = [1, 0.6, 0.2, 1]; // Orange
+const objectColor = [0.5, 0.5, 0.5, 1]; // Gray
+
+
 // Create a basic BJS Scene
 const camera = new BABYLON.ArcRotateCamera("camera", Math.PI / 2, Math.PI / 2, 10, BABYLON.Vector3.Zero(), scene);
 camera.attachControl(canvas, true);
@@ -11,8 +15,7 @@ const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0)
 // Global variables
 let rafId = null;
 let mesh;
-let coloredMesh;
-let meshgrid;
+let meshColors;
 let kdtree;
 let mode = 'view'; // 'view', 'draw', 'erase'
 let prevMode = 'view';
@@ -34,10 +37,6 @@ updateLightDirection();
 
 
 document.getElementById('updateLight').addEventListener('click', updateLightDirection);
-
-document.getElementById('toggleGrid').addEventListener('click', () => {
-    meshgrid.isVisible = !meshgrid.isVisible;
-});
 
 
 const createKDTree = (positions) => {
@@ -115,76 +114,7 @@ function createAxis(scene, size) {
 // Call createAxis to add axes to the scene
 createAxis(scene, 10);
 
-// Function to create a wireframe overlay
-function createWireframe(mesh, scene) {
-    const vertexData = BABYLON.VertexData.ExtractFromMesh(mesh);
-    const positions = vertexData.positions;
-    const indices = vertexData.indices;
-
-    const lines = [];
-    for (let i = 0; i < indices.length; i += 3) {
-        const p1 = BABYLON.Vector3.FromArray(positions, indices[i] * 3);
-        const p2 = BABYLON.Vector3.FromArray(positions, indices[i + 1] * 3);
-        const p3 = BABYLON.Vector3.FromArray(positions, indices[i + 2] * 3);
-        lines.push([p1, p2, p3, p1]);
-    }
-
-    const wireframe = BABYLON.MeshBuilder.CreateLineSystem("wireframe", {lines: lines}, scene);
-    wireframe.color = new BABYLON.Color3(0.2, 0.2, 0.2);
-    if (meshgrid) meshgrid.dispose(); // Dispose previous mesh if any
-
-    meshgrid = wireframe;
-    meshgrid.isVisible = false;
-}
-
 // Function to enable vertex colors on a mesh
-function createColoredMesh(originalMesh, scene) {
-    const vertexData = BABYLON.VertexData.ExtractFromMesh(originalMesh);
-    const positions = vertexData.positions;
-    const indices = vertexData.indices;
-
-    // Create a new mesh for coloring
-    const coloredMesh = new BABYLON.Mesh("coloredMesh", scene);
-    const newVertexData = new BABYLON.VertexData();
-    newVertexData.positions = positions;
-    newVertexData.indices = indices;
-
-    // Initialize colors array
-    const colors = new Float32Array((positions.length / 3) * 4);
-    for (let i = 0; i < colors.length; i += 4) {
-        colors[i] = 0.5; // R
-        colors[i + 1] = 0.5; // G
-        colors[i + 2] = 0.5; // B
-        colors[i + 3] = 1; // A
-    }
-    newVertexData.colors = colors;
-
-    newVertexData.applyToMesh(coloredMesh);
-
-    // Enable vertex colors
-    // Create a new StandardMaterial and apply it to the mesh
-    const material = new BABYLON.StandardMaterial("coloredMeshMaterial", scene);
-    material.backFaceCulling = true;
-    material.vertexColorsEnabled = true;
-
-    // Reduce reflection intensity
-    if (material.reflectionTexture) {
-        material.reflectionTexture.level = 0.05;  // Adjust this value to control reflection intensity
-    }
-
-    if (material.reflectivityTexture) {
-        material.reflectivityTexture.level = 0.05;
-    }
-
-    // Reduce specular highlights
-    material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);  // Adjust this value to control specular intensity
-
-    // Apply the material to the mesh
-    coloredMesh.material = material;
-
-    kdtree = createKDTree(positions);
-    return coloredMesh;
-}
 
 // File input handling
 document.getElementById('fileInput').addEventListener('change', (event) => {
@@ -211,7 +141,7 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
 
             const babylonMesh = new BABYLON.Mesh("mesh", scene);
             const vertexData = new BABYLON.VertexData();
-            vertexData.positions = positions;
+            vertexData.positions = standardizePositions(positions);
             vertexData.indices = indices;
 
             // Recalculate normals
@@ -220,34 +150,55 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             vertexData.applyToMesh(babylonMesh);
 
             if (mesh) mesh.dispose();  // Dispose previous mesh if any
-            if (coloredMesh) coloredMesh.dispose();  // Dispose previous coloredMesh if any
-
             mesh = babylonMesh;
 
-            // Standardize the mesh
-            standardizeMesh(mesh);
+            // Enable backface culling
+            mesh.material = new BABYLON.StandardMaterial("meshMaterial", scene);
+            mesh.material.backFaceCulling = true;
 
-            // Create colored mesh
-            coloredMesh = createColoredMesh(mesh, scene);
+            // Enable vertex colors
+            mesh.material.vertexColorsEnabled = true;
 
-            // Create wireframe
-            createWireframe(mesh, scene);
+            meshColors = new Float32Array((positions.length / 3) * 4);
 
-            // Remove the original mesh from the scene
-            mesh.dispose();
+            for (let i = 0; i < meshColors.length; i += 4) {
+                meshColors[i] = objectColor[0]; // R
+                meshColors[i + 1] = objectColor[1]; // G
+                meshColors[i + 2] = objectColor[2]; // B
+                meshColors[i + 3] = objectColor[3]; // A
+            }
+
+            mesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, meshColors, true); // Set true for updatable
+
+            // Enable vertex colors
+            // Create a new StandardMaterial and apply it to the mesh
+            const material = new BABYLON.StandardMaterial("meshMaterial", scene);
+            material.backFaceCulling = true;
+            material.vertexColorsEnabled = true;
+
+            // Reduce reflection intensity
+            if (material.reflectionTexture) {
+                material.reflectionTexture.level = 0.05;  // Adjust this value to control reflection intensity
+            }
+
+            if (material.reflectivityTexture) {
+                material.reflectivityTexture.level = 0.05;
+            }
+
+            // Reduce specular highlights
+            material.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);  // Adjust this value to control specular intensity
+
+            // Apply the material to the mesh
+            mesh.material = material;
+
+            kdtree = createKDTree(positions);
         };
         reader.readAsArrayBuffer(file);
     }
 });
 
 // Function to standardize the mesh
-function standardizeMesh(mesh) {
-    const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-
-    if (!positions) {
-        console.error("No vertex data available.");
-        return;
-    }
+function standardizePositions(positions) {
 
     // Calculate the center of mass
     let centerX = 0, centerY = 0, centerZ = 0;
@@ -263,8 +214,6 @@ function standardizeMesh(mesh) {
     centerY /= totalVertices;
     centerZ /= totalVertices;
 
-    const center = new BABYLON.Vector3(centerX, centerY, centerZ);
-
     // Translate vertices to center them at the origin
     for (let i = 0; i < positions.length; i += 3) {
         positions[i] -= centerX;
@@ -272,10 +221,7 @@ function standardizeMesh(mesh) {
         positions[i + 2] -= centerZ;
     }
 
-    mesh.position = mesh.position.subtract(center);
-
-    // Apply the updated positions back to the mesh
-    mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
+    return positions;
 }
 
 // Utility function to update button states
@@ -345,35 +291,29 @@ document.getElementById('viewMode').addEventListener('click', () => {
 // Initial call to set the correct button state on page load
 updateButtonStates();
 
+const colorVertex = (vertexIndex, color) => {
+    meshColors[vertexIndex * 4] = color[0]; // R
+    meshColors[vertexIndex * 4 + 1] = color[1]; // G
+    meshColors[vertexIndex * 4 + 2] = color[2]; // B
+    meshColors[vertexIndex * 4 + 3] = color[3]; // A
+};
+
+
 const handleDrawing = (pickResult) => {
     if (pickResult.hit) {
         const pickedPoint = pickResult.pickedPoint;
 
-        console.time("getVerticesData")
-        let colors = coloredMesh.getVerticesData(BABYLON.VertexBuffer.ColorKind);
-        console.timeEnd("getVerticesData");
-
         // Color the picked vertex
-        const drawColor = [1, 0.6, 0.2, 1]; // Orange
-        const eraseColor = [0.5, 0.5, 0.5, 1]; // Gray
-        const targetColor = mode === 'draw' ? drawColor : eraseColor;
-
-        // Function to color a vertex
-        const colorVertex = (vertexIndex, color) => {
-            colors[vertexIndex * 4] = color[0]; // R
-            colors[vertexIndex * 4 + 1] = color[1]; // G
-            colors[vertexIndex * 4 + 2] = color[2]; // B
-            colors[vertexIndex * 4 + 3] = color[3]; // A
-        };
+        const targetColor = mode === 'draw' ? drawColor : objectColor;
 
         // Find the closest vertex using KD-Tree
-        console.time('kdTree nearest search');
+        // console.time('kdTree nearest search');
         const nearest = kdtree.nearest({
             x: pickedPoint.x,
             y: pickedPoint.y,
             z: pickedPoint.z
         }, 1)[0];
-        console.timeEnd('kdTree nearest search');
+        // console.timeEnd('kdTree nearest search');
 
         const closestVertexIndex = nearest[0].index;
 
@@ -384,7 +324,7 @@ const handleDrawing = (pickResult) => {
 
         // Update the colors data in the mesh
         console.time('setVerticesData');
-        coloredMesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors, true);
+        mesh.updateVerticesData(BABYLON.VertexBuffer.ColorKind, meshColors);
         console.timeEnd('setVerticesData');
     }
 };
@@ -403,7 +343,7 @@ const drawLoop = () => {
 
 // Handle drawing and erasing
 scene.onPointerObservable.add((pointerInfo) => {
-    if (!coloredMesh) return;
+    if (!mesh) return;
 
     switch (pointerInfo.type) {
         case BABYLON.PointerEventTypes.POINTERDOWN:
@@ -469,16 +409,15 @@ window.addEventListener('keyup', (event) => {
 
 // Export Annotations
 document.getElementById('exportAnnotations').addEventListener('click', () => {
-    // Check if coloredMesh exists
-    if (!coloredMesh) {
+    // Check if mesh exists
+    if (!mesh) {
         console.error("No colored mesh to export.");
         return;
     }
 
     // Extract vertex data
-    const positions = coloredMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-    const indices = coloredMesh.getIndices();
-    const colors = coloredMesh.getVerticesData(BABYLON.VertexBuffer.ColorKind);
+    const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+    const indices = mesh.getIndices();
 
     // PLY file header
     const header = `ply
@@ -499,7 +438,7 @@ end_header
         const x = positions[i * 3];
         const y = positions[i * 3 + 1];
         const z = positions[i * 3 + 2];
-        const label = colors[i * 4] === 1 ? 1 : 0; // Check if red component is 1 for the label
+        const label = meshColors[i * 4] === 1 ? 1 : 0; // Check if red component is 1 for the label
         vertexData += `${x} ${y} ${z} ${label}\n`;
     }
 
