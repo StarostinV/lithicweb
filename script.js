@@ -259,6 +259,19 @@ function updateButtonStates() {
             button.classList.add('bg-gray-300', 'text-gray-700');
         }
     });
+    updateCursor();
+}
+
+function updateCursor() {
+    const body = document.body;
+    body.classList.remove('view-cursor', 'draw-cursor', 'erase-cursor');
+    if (mode === 'view') {
+        body.classList.add('view-cursor');
+    } else if (mode === 'draw') {
+        body.classList.add('draw-cursor');
+    } else if (mode === 'erase') {
+        body.classList.add('erase-cursor');
+    }
 }
 
 // Toggle Draw Mode

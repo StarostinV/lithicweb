@@ -66,3 +66,18 @@
     padding: 0.2em 0.4em;
     border-radius: 4px;
 }
+
+/* Default cursor for view mode */
+.view-cursor {
+    cursor: default;
+}
+
+/* Orange circle cursor for draw mode */
+.draw-cursor {
+    cursor: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMCIgY3k9IjEwIiByPSI1IiBzdHJva2U9Im9yYW5nZSIgc3Ryb2tlLXdpZHRoPSI1Ii8+PC9zdmc+'), auto;
+}
+
+/* White circle cursor for erase mode */
+.erase-cursor {
+    cursor: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMCIgY3k9IjEwIiByPSI1IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjUiLz48L3N2Zz4='), auto;
+}
