@@ -12,6 +12,7 @@ const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0)
 camera.wheelDeltaPercentage = 0.01; // Set to a higher value for faster zoom
 
 let mesh;
+let coloredMesh;
 let meshgrid;
 let mode = 'view'; // 'view', 'draw', 'erase'
 let prevMode = 'view';
@@ -80,10 +81,16 @@ function createWireframe(mesh, scene) {
 }
 
 // Function to enable vertex colors on a mesh
-function enableVertexColors(mesh) {
-    const vertexData = BABYLON.VertexData.ExtractFromMesh(mesh);
+function createColoredMesh(originalMesh, scene) {
+    const vertexData = BABYLON.VertexData.ExtractFromMesh(originalMesh);
     const positions = vertexData.positions;
     const indices = vertexData.indices;
+
+    // Create a new mesh for coloring
+    const coloredMesh = new BABYLON.Mesh("coloredMesh", scene);
+    const newVertexData = new BABYLON.VertexData();
+    newVertexData.positions = positions;
+    newVertexData.indices = indices;
 
     // Initialize colors array
     const colors = new Float32Array((positions.length / 3) * 4);
@@ -93,12 +100,16 @@ function enableVertexColors(mesh) {
         colors[i + 2] = 0.5; // B
         colors[i + 3] = 1; // A
     }
-    mesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
+    newVertexData.colors = colors;
+
+    newVertexData.applyToMesh(coloredMesh);
 
     // Enable vertex colors
-    mesh.material = new BABYLON.StandardMaterial("meshMaterial", scene);
-    mesh.material.backFaceCulling = true;
-    mesh.material.vertexColorsEnabled = true;
+    coloredMesh.material = new BABYLON.StandardMaterial("coloredMeshMaterial", scene);
+    coloredMesh.material.backFaceCulling = true;
+    coloredMesh.material.vertexColorsEnabled = true;
+
+    return coloredMesh;
 }
 
 // File input handling
@@ -140,11 +151,14 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             // Standardize the mesh
             standardizeMesh(mesh);
 
-            // Enable vertex colors
-            enableVertexColors(mesh);
+            // Create colored mesh
+            coloredMesh = createColoredMesh(mesh, scene);
 
             // Create wireframe
             createWireframe(mesh, scene);
+
+            // Remove the original mesh from the scene
+            mesh.dispose();
         };
         reader.readAsArrayBuffer(file);
     }
@@ -216,7 +230,7 @@ document.getElementById('eraseMode').addEventListener('click', () => {
 
 // Handle Alt key events
 window.addEventListener('keydown', (event) => {
-    if (event.key === 'Alt' || event.key === 'Control') {
+    if (event.key === 'Alt') {
         if (mode === 'draw' || mode === 'erase') {
             prevMode = mode;
             mode = 'view';
@@ -226,7 +240,7 @@ window.addEventListener('keydown', (event) => {
 });
 
 window.addEventListener('keyup', (event) => {
-    if (event.key === 'Alt' || event.key === 'Control') {
+    if (event.key === 'Alt') {
         mode = prevMode;
         if (mode !== 'view') {
             camera.detachControl(canvas);
@@ -270,22 +284,22 @@ function isPointInBoundingBox(point, bbox) {
 
 // Handle drawing and erasing
 scene.onPointerObservable.add((pointerInfo) => {
-    if (!mesh) return;
+    if (!coloredMesh) return;
 
     const handleDrawing = (pickResult) => {
         if (pickResult.hit) {
             const pickedPoint = pickResult.pickedPoint;
 
-            const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-            const indices = mesh.getIndices();
-            let colors = mesh.getVerticesData(BABYLON.VertexBuffer.ColorKind);
+            const positions = coloredMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+            const indices = coloredMesh.getIndices();
+            let colors = coloredMesh.getVerticesData(BABYLON.VertexBuffer.ColorKind);
 
             // Color the picked face
             const drawColor = [1, 0, 0, 1]; // Red
             const eraseColor = [0.5, 0.5, 0.5, 1]; // Gray
             const targetColor = mode === 'draw' ? drawColor : eraseColor;
             
-            const radius = 0.1; // Radius around the picked point to color
+            const radius = 1; // Radius around the picked point to color
             const radiusSquared = radius * radius;
 
             // Function to color a face
@@ -318,7 +332,7 @@ scene.onPointerObservable.add((pointerInfo) => {
             }
 
             // Update the colors data in the mesh
-            mesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
+            coloredMesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
         }
     };
 
