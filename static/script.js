@@ -15,6 +15,7 @@ let mesh;
 let meshgrid;
 let mode = 'view'; // 'view', 'draw', 'erase'
 let prevMode = 'view';
+let isDrawing = false; // Track if the user is currently drawing
 
 // Add Axes
 function createAxis(scene, size) {
@@ -57,7 +58,6 @@ function createAxis(scene, size) {
 
 // Call createAxis to add axes to the scene
 createAxis(scene, 10);
-
 // Function to create a wireframe overlay
 function createWireframe(mesh, scene) {
     const vertexData = BABYLON.VertexData.ExtractFromMesh(mesh);
@@ -72,10 +72,20 @@ function createWireframe(mesh, scene) {
         lines.push([p1, p2, p3, p1]);
     }
 
-    const wireframe = BABYLON.MeshBuilder.CreateLineSystem("wireframe", {lines: lines}, scene);
+    const wireframe = BABYLON.MeshBuilder.CreateLineSystem("wireframe", { lines: lines }, scene);
     wireframe.color = new BABYLON.Color3(0.5, 0.5, 0.5);
-    if (meshgrid) meshgrid.dispose();  // Dispose previous mesh if any
+    if (meshgrid) meshgrid.dispose(); // Dispose previous mesh if any
     meshgrid = wireframe;
+
+    // Initialize colors array
+    const colors = new Float32Array((indices.length / 3) * 16);
+    for (let i = 0; i < colors.length; i += 4) {
+        colors[i] = 0.5; // R
+        colors[i + 1] = 0.5; // G
+        colors[i + 2] = 0.5; // B
+        colors[i + 3] = 1; // A
+    }
+    meshgrid.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
 }
 
 // File input handling
@@ -219,34 +229,62 @@ window.addEventListener('keyup', (event) => {
     }
 });
 
-let isDrawing = false; // Track if the user is currently drawing
+// Utility function to get bounding box center and half-size
+function getBoundingBox(vertices, indices, faceIndex) {
+    let min = new BABYLON.Vector3(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
+    let max = new BABYLON.Vector3(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+
+    for (let i = 0; i < 3; i++) {
+        const vertexIndex = indices[faceIndex * 3 + i];
+        const x = vertices[vertexIndex * 3];
+        const y = vertices[vertexIndex * 3 + 1];
+        const z = vertices[vertexIndex * 3 + 2];
+        
+        min.x = Math.min(min.x, x);
+        min.y = Math.min(min.y, y);
+        min.z = Math.min(min.z, z);
+        
+        max.x = Math.max(max.x, x);
+        max.y = Math.max(max.y, y);
+        max.z = Math.max(max.z, z);
+    }
+
+    const center = min.add(max).scale(0.5);
+    const halfSize = max.subtract(min).scale(0.5);
+
+    return { center, halfSize };
+}
+
+// Utility function to check if a point is within a bounding box
+function isPointInBoundingBox(point, bbox) {
+    const { center, halfSize } = bbox;
+    return Math.abs(point.x - center.x) <= halfSize.x &&
+           Math.abs(point.y - center.y) <= halfSize.y &&
+           Math.abs(point.z - center.z) <= halfSize.z;
+}
 
 // Handle drawing and erasing
 scene.onPointerObservable.add((pointerInfo) => {
     if (!meshgrid) return;
-    
+
     const handleDrawing = (pickResult) => {
         if (pickResult.hit) {
             const pickedPoint = pickResult.pickedPoint;
+            console.log(pickResult);
             const faceId = pickResult.faceId;
-            console.log("hit! Face ID: ", faceId);
+            // console.log("hit! Face ID: ", faceId);
 
             const positions = meshgrid.getVerticesData(BABYLON.VertexBuffer.PositionKind);
             const indices = meshgrid.getIndices();
             let colors = meshgrid.getVerticesData(BABYLON.VertexBuffer.ColorKind);
 
-            if (!colors || colors.length === 0) {
-                // Initialize colors array if it's not initialized
-                colors = new Float32Array((positions.length / 3) * 4);
-                for (let i = 0; i < colors.length; i += 4) {
-                    colors[i] = 1; // R
-                    colors[i + 1] = 1; // G
-                    colors[i + 2] = 1; // B
-                    colors[i + 3] = 1; // A
-                }
-            }
 
-            const radius = 0.1; // Radius around the picked point to color
+            // Color the picked face
+            const drawColor = [1, 0, 0, 1]; // Red
+            const eraseColor = [0.5, 0.5, 0.5, 0.5]; // Gray
+            const targetColor = mode === 'draw' ? drawColor : eraseColor;
+            
+            const radius = 1; // Radius around the picked point to color
             const radiusSquared = radius * radius;
 
             // Function to color a face
@@ -261,26 +299,31 @@ scene.onPointerObservable.add((pointerInfo) => {
             };
 
             // Color the picked face
-            const drawColor = [1, 0, 0, 1]; // Red
-            const eraseColor = [0.5, 0.5, 0.5, 1]; // White
-            const targetColor = mode === 'draw' ? drawColor : eraseColor;
+            // if (faceId !== -1) {
+            //     colorFace(faceId, targetColor);
+            // }
 
-            // Color the picked face
-            if (faceId !== -1) {
-                colorFace(faceId, targetColor);
-            }
+            // Create a bounding box for the picked point's radius
+            const pickedBBox = {
+                center: pickedPoint,
+                halfSize: new BABYLON.Vector3(radius, radius, radius)
+            };
 
             // Color faces within the radius
             for (let i = 0; i < indices.length; i += 3) {
-                const p1 = BABYLON.Vector3.FromArray(positions, indices[i] * 3);
-                const p2 = BABYLON.Vector3.FromArray(positions, indices[i + 1] * 3);
-                const p3 = BABYLON.Vector3.FromArray(positions, indices[i + 2] * 3);
+                const bbox = getBoundingBox(positions, indices, i / 3);
 
-                // Check if any vertex of the face is within the radius
-                if (BABYLON.Vector3.DistanceSquared(p1, pickedPoint) <= radiusSquared ||
-                    BABYLON.Vector3.DistanceSquared(p2, pickedPoint) <= radiusSquared ||
-                    BABYLON.Vector3.DistanceSquared(p3, pickedPoint) <= radiusSquared) {
-                    colorFace(i / 3, targetColor);
+                if (isPointInBoundingBox(pickedPoint, bbox)) {
+                    const p1 = BABYLON.Vector3.FromArray(positions, indices[i] * 3);
+                    const p2 = BABYLON.Vector3.FromArray(positions, indices[i + 1] * 3);
+                    const p3 = BABYLON.Vector3.FromArray(positions, indices[i + 2] * 3);
+
+                    // Check if any vertex of the face is within the radius
+                    if (BABYLON.Vector3.DistanceSquared(p1, pickedPoint) <= radiusSquared ||
+                        BABYLON.Vector3.DistanceSquared(p2, pickedPoint) <= radiusSquared ||
+                        BABYLON.Vector3.DistanceSquared(p3, pickedPoint) <= radiusSquared) {
+                        colorFace(i / 3, targetColor);
+                    }
                 }
             }
 
@@ -312,6 +355,7 @@ scene.onPointerObservable.add((pointerInfo) => {
             break;
     }
 });
+
 
 // Export Annotations
 document.getElementById('exportAnnotations').addEventListener('click', () => {
