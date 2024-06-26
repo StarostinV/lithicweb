@@ -11,6 +11,31 @@ const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0)
 // Increase zoom speed
 camera.wheelDeltaPercentage = 0.01; // Set to a higher value for faster zoom
 
+
+// Function to update light direction to match the camera's forward direction
+const updateLightDirection = () => {
+    const forward = camera.getForwardRay().direction;
+    light.direction = forward.negate();
+};
+
+// Update the light direction initially
+updateLightDirection();
+
+// Add an observable to update the light direction whenever the camera moves
+// scene.onBeforeRenderObservable.add(() => {
+//     updateLightDirection();
+// });
+
+
+window.addEventListener('wheel', (event) => {
+    if (event.ctrlKey) {
+        event.preventDefault();
+        const zoomAmount = event.deltaY * camera.wheelDeltaPercentage; // Adjust this value to control zoom speed
+        camera.radius += zoomAmount;
+    }
+}, { passive: false });
+
+
 let mesh;
 let coloredMesh;
 let meshgrid;
@@ -105,10 +130,26 @@ function createColoredMesh(originalMesh, scene) {
     newVertexData.applyToMesh(coloredMesh);
 
     // Enable vertex colors
-    coloredMesh.material = new BABYLON.StandardMaterial("coloredMeshMaterial", scene);
-    coloredMesh.material.backFaceCulling = true;
-    coloredMesh.material.vertexColorsEnabled = true;
+    // Create a new StandardMaterial and apply it to the mesh
+    const material = new BABYLON.StandardMaterial("coloredMeshMaterial", scene);
+    material.backFaceCulling = true;
+    material.vertexColorsEnabled = true;
 
+    // Reduce reflection intensity
+    if (material.reflectionTexture) {
+        material.reflectionTexture.level = 0.05;  // Adjust this value to control reflection intensity
+    }
+
+    if (material.reflectivityTexture) {
+        material.reflectivityTexture.level = 0.05;
+    }
+
+    // Reduce specular highlights
+    material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);  // Adjust this value to control specular intensity
+
+    // Apply the material to the mesh
+    coloredMesh.material = material;
+    
     return coloredMesh;
 }
 
@@ -146,6 +187,8 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             vertexData.applyToMesh(babylonMesh);
 
             if (mesh) mesh.dispose();  // Dispose previous mesh if any
+            if (coloredMesh) coloredMesh.dispose();  // Dispose previous coloredMesh if any
+
             mesh = babylonMesh;
 
             // Standardize the mesh
@@ -202,6 +245,19 @@ function standardizeMesh(mesh) {
     mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
 }
 
+// Utility function to update button states
+function updateButtonStates() {
+    const buttons = document.querySelectorAll('.toggle-button');
+    buttons.forEach(button => {
+        button.classList.remove('bg-blue-500', 'text-white');
+        if (button.id === `${mode}Mode`) {
+            button.classList.add('bg-blue-500', 'text-white');
+        } else {
+            button.classList.add('bg-gray-300', 'text-gray-700');
+        }
+    });
+}
+
 // Toggle Draw Mode
 document.getElementById('drawMode').addEventListener('click', () => {
     if (mode !== 'draw') {
@@ -213,6 +269,7 @@ document.getElementById('drawMode').addEventListener('click', () => {
         prevMode = 'view';
         camera.attachControl(canvas, true);
     }
+    updateButtonStates();
 });
 
 // Toggle Erase Mode
@@ -226,27 +283,22 @@ document.getElementById('eraseMode').addEventListener('click', () => {
         prevMode = 'view';
         camera.attachControl(canvas, true);
     }
+    updateButtonStates();
 });
 
-// Handle Alt key events
-window.addEventListener('keydown', (event) => {
-    if (event.key === 'Alt') {
-        if (mode === 'draw' || mode === 'erase') {
-            prevMode = mode;
-            mode = 'view';
-            camera.attachControl(canvas, true);
-        }
+// Toggle View Mode
+document.getElementById('viewMode').addEventListener('click', () => {
+    if (mode !== 'view') {
+        prevMode = mode;
+        mode = 'view';
+        camera.attachControl(canvas, true);
     }
+    updateButtonStates();
 });
 
-window.addEventListener('keyup', (event) => {
-    if (event.key === 'Alt') {
-        mode = prevMode;
-        if (mode !== 'view') {
-            camera.detachControl(canvas);
-        }
-    }
-});
+// Initial call to set the correct button state on page load
+updateButtonStates();
+
 
 // Utility function to get bounding box center and half-size
 function getBoundingBox(vertices, indices, faceIndex) {
@@ -283,7 +335,6 @@ function isPointInBoundingBox(point, bbox) {
 }
 
 // Handle drawing and erasing
-// Handle drawing and erasing
 scene.onPointerObservable.add((pointerInfo) => {
     if (!coloredMesh) return;
 
@@ -296,7 +347,7 @@ scene.onPointerObservable.add((pointerInfo) => {
             let colors = coloredMesh.getVerticesData(BABYLON.VertexBuffer.ColorKind);
 
             // Color the picked vertex
-            const drawColor = [1, 0, 0, 1]; // Red
+            const drawColor = [1, 0.6, 0.2, 1]; // Orange
             const eraseColor = [0.5, 0.5, 0.5, 1]; // Gray
             const targetColor = mode === 'draw' ? drawColor : eraseColor;
 
@@ -334,25 +385,63 @@ scene.onPointerObservable.add((pointerInfo) => {
 
     switch (pointerInfo.type) {
         case BABYLON.PointerEventTypes.POINTERDOWN:
-            if (mode === 'draw' || mode === 'erase') {
-                isDrawing = true;
-                const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-                handleDrawing(pickResult);
+            if (pointerInfo.event.button === 0) { // Left mouse button
+                if (mode === 'draw' || mode === 'erase') {
+                    isDrawing = true;
+                    const pickResult = scene.pick(scene.pointerX, scene.pointerY);
+                    handleDrawing(pickResult);
+                }
+            } else if (pointerInfo.event.button === 2) { // Right mouse button
+                if (mode === 'draw' || mode === 'erase') {
+                    prevMode = mode;
+                    mode = 'view';
+                    camera.attachControl(canvas, true);
+                    updateButtonStates();
+                }
             }
             break;
 
         case BABYLON.PointerEventTypes.POINTERMOVE:
-            if (isDrawing && (mode === 'draw' || mode === 'erase')) {
+            if (isDrawing && (mode === 'draw' || mode === 'erase')) { // Left mouse button
                 const pickResult = scene.pick(scene.pointerX, scene.pointerY);
                 handleDrawing(pickResult);
             }
             break;
 
         case BABYLON.PointerEventTypes.POINTERUP:
-            if (isDrawing) {
-                isDrawing = false;
+            if (pointerInfo.event.button === 0) { // Left mouse button
+                if (isDrawing) {
+                    isDrawing = false;
+                }
+            } else if (pointerInfo.event.button === 2) { // Right mouse button
+                mode = prevMode;
+                if (mode !== 'view') {
+                    camera.detachControl(canvas);
+                    updateButtonStates();
+                }
             }
             break;
+    }
+});
+
+window.addEventListener('keydown', (event) => {
+    if (event.key === 'Alt' || event.key === 'Control') {
+        if (mode === 'draw' || mode === 'erase') {
+            prevMode = mode;
+            mode = 'view';
+            camera.attachControl(canvas, true);
+            updateButtonStates();
+        }
+    }
+});
+
+window.addEventListener('keyup', (event) => {
+    if (event.key === 'Alt' || event.key === 'Control') {
+        mode = prevMode;
+        if (mode !== 'view') {
+            camera.detachControl(canvas);
+            updateButtonStates();
+        }
     }
 });
 
