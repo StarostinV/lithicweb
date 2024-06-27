@@ -8,7 +8,7 @@ The web page is deployed [here](https://fanciful-treacle-652e25.netlify.app/).
 
 ## TODO list
 
-- [ ] Support exported files with annotations
+- [x] Support exported files with annotations
 - [ ] Automated edge identification algorithms
 - [ ] Segmentation: algorithm and visualization mode
 - [ ] Annotation with arrows
