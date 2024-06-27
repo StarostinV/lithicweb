@@ -25,8 +25,9 @@ function updateCursor(mode) {
 
 export function handleModeSwitch(event, mode, prevMode, camera, canvas) {
     if (mode !== event.target.id.replace('Mode', '')) {
-        prevMode = mode;
         mode = event.target.id.replace('Mode', '');
+        prevMode = mode; // when we click the button, we forget about the prev mode
+
         if (mode === 'view') {
             camera.attachControl(canvas, true);
         } else {
