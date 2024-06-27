@@ -27,7 +27,7 @@ export function handleModeSwitch(event, mode, prevMode, camera, canvas) {
     if (mode !== event.target.id.replace('Mode', '')) {
         mode = event.target.id.replace('Mode', '');
         prevMode = mode; // when we click the button, we forget about the prev mode
-
+        console.log(`Switched to ${mode} mode`);
         if (mode === 'view') {
             camera.attachControl(canvas, true);
         } else {
