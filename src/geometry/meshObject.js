@@ -68,6 +68,8 @@ export class MeshObject {
 
         let material = new THREE.MeshLambertMaterial({
             vertexColors: true, // Enable per-vertex coloring
+            transparent: true, // Enable transparency
+            opacity: 0.95, // Fully opaque initially
         });
 
         // Create mesh with the new geometry and material
