@@ -10,6 +10,8 @@
     "author": "Vladimir Starostin",
     "license": "MIT",
     "dependencies": {
+        "webpack": "^5.51.1",
+        "webpack-cli": "^4.8.0",
         "serve": "^14.2.3",
         "three": "^0.166.0",
         "three-mesh-bvh": "^0.7.5"
@@ -19,8 +21,6 @@
         "@babel/preset-env": "^7.15.0",
         "babel-loader": "^8.2.2",
         "html-webpack-plugin": "^5.6.0",
-        "webpack": "^5.51.1",
-        "webpack-cli": "^4.8.0",
         "webpack-dev-server": "^4.0.0"
     }
 }
