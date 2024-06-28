@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export class ClosestVertexFinder {
+export class IntersectFinder {
     constructor(camera, canvas) {
         this.camera = camera;
         this.canvas = canvas;
@@ -21,7 +21,7 @@ export class ClosestVertexFinder {
         return this.raycaster.intersectObject(mesh, true);
     }
 
-    findClosestVertex(mesh, event) {
+    getClickedPoint(mesh, event) {
         // Set up mouse position
         this.getMousePosition(event);
 
@@ -32,7 +32,24 @@ export class ClosestVertexFinder {
         }
 
         // Get the intersection point
-        const intersectPoint = intersects[0].point;
+        return intersects[0].point;
+    }
+
+    getClickedFace(mesh, event) {
+        const intersectPoint = this.getClickedPoint(mesh, event);
+        if (intersectPoint === -1) {
+            return -1;
+        }
+        return mesh.geometry.boundsTree.closestPointToPoint(intersectPoint).faceIndex;
+    }
+
+    getClosestVertexIndex(mesh, event) {
+        // Get the intersection point
+        const intersectPoint = this.getClickedPoint(mesh, event);
+
+        if (intersectPoint === -1) {
+            return -1;
+        }
 
         const faceIndex = mesh.geometry.boundsTree.closestPointToPoint(intersectPoint).faceIndex;
 

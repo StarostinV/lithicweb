@@ -14,33 +14,31 @@ export function updateButtonStates(mode) {
 function updateCursor(mode) {
     const body = document.body;
     body.classList.remove('view-cursor', 'draw-cursor', 'erase-cursor');
-    if (mode === 'view') {
+    if (mode == 'view' || mode == 'arrow') {
         body.classList.add('view-cursor');
-    } else if (mode === 'draw') {
+    } else if (mode == 'draw') {
         body.classList.add('draw-cursor');
-    } else if (mode === 'erase') {
+    } else if (mode == 'erase') {
         body.classList.add('erase-cursor');
     }
 }
 
-export function handleModeSwitch(event, mode, prevMode, controls) {
+export function handleModeSwitch(event, mode, controls) {
     if (mode !== event.target.id.replace('Mode', '')) {
-        mode = event.target.id.replace('Mode', '');
-        prevMode = mode; // when we click the button, we forget about the prev mode
-        console.log(`Switched to ${mode} mode`);
-        if (mode === 'view') {
+        mode.setMode(event.target.id.replace('Mode', ''), true);
+        if (mode == 'view') {
             controls.enabled = true;
         } else {
             controls.enabled = false;
         }
+        console.log("handleModeSwitch", mode);
         updateButtonStates(mode);
     }
-    return [mode, prevMode];
 }
 
 export function handleDrawing(closestVertexIndex, mode, mesh, meshColors, drawColor, objectColor) {
     // Color the picked vertex
-    const targetColor = mode === 'draw' ? drawColor : objectColor;
+    const targetColor = mode == 'draw' ? drawColor : objectColor;
 
     // Color the closest vertex
     if (closestVertexIndex !== -1) {
