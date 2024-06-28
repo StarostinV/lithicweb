@@ -133,6 +133,34 @@ export class ArrowDrawer {
         this.canvas.addEventListener('contextmenu', (event) => event.preventDefault()); // Prevent context menu
     }
 
+    clear() {
+        while (this.arrows.length > 0) {
+            const arrow = this.arrows.pop();
+            this.mesh().remove(arrow.arrowGroup);
+        }
+    }
+
+    load(arrows) {
+        arrows.forEach(arrow => {
+            this.loadArrowFromArray(arrow);
+        });
+    }
+
+    loadArrowFromArray(data) {
+        const startIndex = data.startIndex;
+        const endIndex = data.endIndex;
+        const startPoint = this.meshObject.indexToVertex(startIndex);
+        const startNormal = this.meshObject.getVertexNormal(startIndex);
+        const endPoint = this.meshObject.indexToVertex(endIndex);
+        const endNormal = this.meshObject.getVertexNormal(endIndex);
+        const arrow = new Arrow(
+            startPoint, startNormal, startIndex, this.offset, 0xff0000, 0.02, 0.05, 0.2
+        )
+        this.mesh().add(arrow.arrowGroup);
+        arrow.updateArrow(endPoint, endNormal, endNormal);
+        this.arrows.push(arrow);
+    }
+
 
     mesh() {
         return this.meshObject.mesh;

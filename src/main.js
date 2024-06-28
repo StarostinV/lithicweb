@@ -39,7 +39,10 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             const data = event.target.result;
             const loader = new CustomPLYLoader();
             const geometry = loader.parse(data);
+            const arrows = geometry.userData.arrows ? geometry.userData.arrows : [];
             meshObject.setMesh(geometry);
+            arrowDrawer.clear();
+            arrowDrawer.load(arrows);
         };
         reader.readAsArrayBuffer(file);
     }
