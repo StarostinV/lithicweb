@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 
 export class IntersectFinder {
-    constructor(camera, canvas) {
-        this.camera = camera;
-        this.canvas = canvas;
+    constructor(scene) {
+        this.scene = scene;
+        this.camera = scene.camera;
+        this.canvas = scene.canvas;
         this.raycaster = new THREE.Raycaster();
         this.raycaster.firstHitOnly = true;
         this.mouse = new THREE.Vector2();
@@ -48,13 +49,13 @@ export class IntersectFinder {
         const intersectPoint = this.getClickedPoint(mesh, event);
 
         if (intersectPoint === -1) {
-            return -1;
+            return [-1, -1, -1];
         }
 
         const faceIndex = mesh.geometry.boundsTree.closestPointToPoint(intersectPoint).faceIndex;
 
         if (faceIndex === -1) {
-            return -1;
+            return [-1, -1, -1];
         }
 
         const [a, b, c, vertexA, vertexB, vertexC] = getFaceVertices(mesh, faceIndex);
@@ -71,7 +72,7 @@ export class IntersectFinder {
             }
         });
 
-        return closestVertexIndex;
+        return [intersectPoint, faceIndex, closestVertexIndex];
     }
 }
 
