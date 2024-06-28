@@ -1,0 +1,34 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Run Dev Server",
+        "type": "shell",
+        "command": "npm start",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": [],
+        "detail": "Run webpack development server"
+      },
+      {
+        "label": "Build Project",
+        "type": "shell",
+        "command": "npm run build",
+        "group": "build",
+        "problemMatcher": ["$tsc"],
+        "detail": "Build the project using npm"
+      },
+      {
+        "label": "Run Python Server",
+        "type": "shell",
+        "command": "python",
+        "args": ["-m", "http.server", "8000"],
+        "group": "build",
+        "problemMatcher": [],
+        "detail": "Run a Python HTTP server on port 8000"
+      }
+    ]
+  }
+  
