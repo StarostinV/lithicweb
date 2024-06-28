@@ -5,16 +5,46 @@ import { handleModeSwitch, handleDrawing, updateButtonStates } from './component
 import CustomPLYLoader from './loaders/customPLYLoader.js';
 import { standardizePositions } from './utils/standardizePositions.js';
 import { updateLightDirection } from './utils/updateLight.js';
+import * as THREE from 'three';
 
 const canvas = document.getElementById("renderCanvas");
-const engine = new BABYLON.Engine(canvas, true);
-const scene = new BABYLON.Scene(engine);
+const renderer = new THREE.WebGLRenderer({ canvas });
+renderer.setClearColor(0xD3D3D3); // Set the background color of the canvas to light gray
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
 
-const drawColor = [1, 0.6, 0.2, 1]; // Orange
-const objectColor = [0.5, 0.5, 0.5, 1]; // Gray
+const scene = new THREE.Scene();
+
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(0, 10, 0); // Position of the light source
+light.castShadow = true; // Enable shadow casting
+light.shadow.mapSize.width = 1024; // Shadow texture width
+light.shadow.mapSize.height = 1024; // Shadow texture height
+light.shadow.camera.near = 0.5; // Near plane of the shadow camera
+light.shadow.camera.far = 500; // Far plane of the shadow camera
+light.shadow.camera.left = -200; // Left bound of the light's view frustum
+light.shadow.camera.right = 200; // Right bound of the light's view frustum
+light.shadow.camera.top = 200; // Top bound of the light's view frustum
+light.shadow.camera.bottom = -200; // Bottom bound of the light's view frustum
+scene.add(light);
+
+const drawColor = new THREE.Color(1, 0.6, 0.2); // Orange
+const objectColor = new THREE.Color(0.5, 0.5, 0.5); // Gray
 
 const camera = createCamera(scene, canvas);
-const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0), scene);
+
+const ambientLight = new THREE.AmbientLight(0x0c0c0c);
+scene.add(ambientLight);
+
+// const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+// light.position.set(1, 1, 0);
+// scene.add(light);
+
+// Add additional light for better visibility
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+directionalLight.position.set(0, 10, 10).normalize();
+scene.add(directionalLight);
 
 let mesh, meshColors, kdtree, mode = 'view', prevMode = 'view', isDrawing = false;
 
@@ -29,61 +59,78 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             const loader = new CustomPLYLoader();
             const geometry = loader.parse(data);
 
-            const positions = geometry.attributes.position.array;
-            const labels = geometry.attributes.labels ? geometry.attributes.labels.array : [];
-            let indices = Array.from({ length: geometry.index.count }, (_, i) => geometry.index.array[i]);
+            console.log(geometry);
 
+            let positions = geometry.attributes.position.array;
+            positions = standardizePositions(positions); // Apply standardization
+            const labels = geometry.attributes.labels ? geometry.attributes.labels.array : [];
+            const indices = Array.from({ length: geometry.index.count }, (_, i) => geometry.index.array[i]);
+
+            // Ensure indices define polygons correctly
             for (let i = 0; i < indices.length; i += 3) {
                 let temp = indices[i + 1];
                 indices[i + 1] = indices[i + 2];
                 indices[i + 2] = temp;
             }
 
-            const babylonMesh = new BABYLON.Mesh("mesh", scene);
-            const vertexData = new BABYLON.VertexData();
-            vertexData.positions = standardizePositions(positions);
-            vertexData.indices = indices;
+            // Remove existing mesh if it exists
+            if (mesh) {
+                scene.remove(mesh);
+                mesh.geometry.dispose();
+                mesh.material.dispose();
+            }
 
-            BABYLON.VertexData.ComputeNormals(vertexData.positions, vertexData.indices, vertexData.normals = []);
-            vertexData.applyToMesh(babylonMesh);
-
-            if (mesh) mesh.dispose();
-            mesh = babylonMesh;
-            mesh.material = new BABYLON.StandardMaterial("meshMaterial", scene);
-            mesh.material.backFaceCulling = true;
-            mesh.material.vertexColorsEnabled = true;
+            // Create new BufferGeometry and set attributes
+            const standardizedGeometry = new THREE.BufferGeometry();
+            standardizedGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            standardizedGeometry.setIndex(indices);
 
             meshColors = new Float32Array((positions.length / 3) * 4);
-            if (labels) {
+            if (labels.length) {
                 for (let i = 0; i < meshColors.length; i += 4) {
                     if (labels[Math.floor(i / 4)] === 1) {
-                        meshColors[i] = drawColor[0];
-                        meshColors[i + 1] = drawColor[1];
-                        meshColors[i + 2] = drawColor[2];
-                        meshColors[i + 3] = drawColor[3];
+                        meshColors[i] = drawColor.r;
+                        meshColors[i + 1] = drawColor.g;
+                        meshColors[i + 2] = drawColor.b;
+                        meshColors[i + 3] = 1.0;
                     } else {
-                        meshColors[i] = objectColor[0];
-                        meshColors[i + 1] = objectColor[1];
-                        meshColors[i + 2] = objectColor[2];
-                        meshColors[i + 3] = objectColor[3];
+                        meshColors[i] = objectColor.r;
+                        meshColors[i + 1] = objectColor.g;
+                        meshColors[i + 2] = objectColor.b;
+                        meshColors[i + 3] = 1.0;
                     }
                 }
             } else {
                 for (let i = 0; i < meshColors.length; i += 4) {
-                    meshColors[i] = objectColor[0];
-                    meshColors[i + 1] = objectColor[1];
-                    meshColors[i + 2] = objectColor[2];
-                    meshColors[i + 3] = objectColor[3];
+                    meshColors[i] = objectColor.r;
+                    meshColors[i + 1] = objectColor.g;
+                    meshColors[i + 2] = objectColor.b;
+                    meshColors[i + 3] = 1.0;
                 }
             }
 
-            mesh.setVerticesData(BABYLON.VertexBuffer.ColorKind, meshColors, true);
+            console.log(meshColors);
 
-            const material = new BABYLON.StandardMaterial("meshMaterial", scene);
-            material.backFaceCulling = true;
-            material.vertexColorsEnabled = true;
-            material.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-            mesh.material = material;
+            // Set color attribute
+            // standardizedGeometry.setAttribute('color', new THREE.BufferAttribute(meshColors, 4));
+
+            let material = new THREE.MeshStandardMaterial({
+                color: 0xff0000,
+                // vertexColors: true,
+                // side: THREE.DoubleSide,
+            });
+
+            console.log("material", material);
+
+            // Create mesh with the new geometry and material
+            mesh = new THREE.Mesh(standardizedGeometry, material);
+
+            mesh.castShadow = true; // Enable shadow casting for this object
+            mesh.receiveShadow = true; // Enable shadow receiving for this object
+
+
+            scene.add(mesh);
+            console.log(mesh);
 
             kdtree = createKDTree(positions);
         };
@@ -101,40 +148,44 @@ document.getElementById('exportAnnotations').addEventListener('click', () => {
     exportAnnotations(mesh, meshColors);
 });
 
-scene.onPointerObservable.add((pointerInfo) => {
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+canvas.addEventListener('pointerdown', (event) => {
     if (!mesh) return;
 
-    switch (pointerInfo.type) {
-        case BABYLON.PointerEventTypes.POINTERDOWN:
-            if (pointerInfo.event.button === 0 && (mode === 'draw' || mode === 'erase')) {
-                isDrawing = true;
-                const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-                handleDrawing(pickResult, mode, kdtree, mesh, meshColors, drawColor, objectColor);
-            } else if (pointerInfo.event.button === 2 && (mode === 'draw' || mode === 'erase')) {
-                prevMode = mode;
-                mode = 'view';
-                camera.attachControl(canvas, true);
-                updateButtonStates(mode);
-            }
-            break;
-        case BABYLON.PointerEventTypes.POINTERMOVE:
-            if (isDrawing && (mode === 'draw' || mode === 'erase')) {
-                const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-                handleDrawing(pickResult, mode, kdtree, mesh, meshColors, drawColor, objectColor);
-            }
-            break;
-        case BABYLON.PointerEventTypes.POINTERUP:
-            if (pointerInfo.event.button === 0 && isDrawing) {
-                isDrawing = false;
-            } else if (pointerInfo.event.button === 2) {
-                mode = prevMode;
-                if (mode !== 'view') {
-                    camera.detachControl(canvas);
-                    updateButtonStates(mode);
-                }
-            }
-            break;
+    mouse.x = (event.clientX / canvas.clientWidth) * 2 - 1;
+    mouse.y = -(event.clientY / canvas.clientHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    const intersects = raycaster.intersectObject(mesh);
+
+    if (intersects.length > 0 && (mode === 'draw' || mode === 'erase')) {
+        isDrawing = true;
+        handleDrawing(intersects[0], mode, kdtree, mesh, meshColors, drawColor, objectColor);
+    } else if (event.button === 2 && (mode === 'draw' || mode === 'erase')) {
+        prevMode = mode;
+        mode = 'view';
+        camera.controls.enabled = true;
+        updateButtonStates(mode);
     }
+});
+
+canvas.addEventListener('pointermove', (event) => {
+    if (!mesh || !isDrawing) return;
+
+    mouse.x = (event.clientX / canvas.clientWidth) * 2 - 1;
+    mouse.y = -(event.clientY / canvas.clientHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    const intersects = raycaster.intersectObject(mesh);
+    if (intersects.length > 0 && (mode === 'draw' || mode === 'erase')) {
+        handleDrawing(intersects[0], mode, kdtree, mesh, meshColors, drawColor, objectColor);
+    }
+});
+
+canvas.addEventListener('pointerup', () => {
+    isDrawing = false;
 });
 
 window.addEventListener('keydown', (event) => {
@@ -142,7 +193,7 @@ window.addEventListener('keydown', (event) => {
         if (mode === 'draw' || mode === 'erase') {
             prevMode = mode;
             mode = 'view';
-            camera.attachControl(canvas, true);
+            camera.controls.enabled = true;
             updateButtonStates(mode);
         }
     }
@@ -152,16 +203,21 @@ window.addEventListener('keyup', (event) => {
     if (event.key === 'Alt' || event.key === 'Control') {
         mode = prevMode;
         if (mode !== 'view') {
-            camera.detachControl(canvas);
+            camera.controls.enabled = false;
             updateButtonStates(mode);
         }
     }
 });
 
-engine.runRenderLoop(() => {
-    scene.render();
-});
+function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+}
+
+animate();
 
 window.addEventListener('resize', () => {
-    engine.resize();
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 });

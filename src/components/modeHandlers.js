@@ -29,9 +29,9 @@ export function handleModeSwitch(event, mode, prevMode, camera, canvas) {
         prevMode = mode; // when we click the button, we forget about the prev mode
         console.log(`Switched to ${mode} mode`);
         if (mode === 'view') {
-            camera.attachControl(canvas, true);
+            camera.controls.enabled = true;
         } else {
-            camera.detachControl(canvas);
+            camera.controls.enabled = false;
         }
         updateButtonStates(mode);
     }
@@ -39,8 +39,8 @@ export function handleModeSwitch(event, mode, prevMode, camera, canvas) {
 }
 
 export function handleDrawing(pickResult, mode, kdtree, mesh, meshColors, drawColor, objectColor) {
-    if (pickResult.hit) {
-        const pickedPoint = pickResult.pickedPoint;
+    if (pickResult.length > 0) {
+        const pickedPoint = pickResult[0].point;
 
         // Color the picked vertex
         const targetColor = mode === 'draw' ? drawColor : objectColor;
@@ -60,13 +60,13 @@ export function handleDrawing(pickResult, mode, kdtree, mesh, meshColors, drawCo
         }
 
         // Update the colors data in the mesh
-        mesh.updateVerticesData(BABYLON.VertexBuffer.ColorKind, meshColors);
+        mesh.geometry.attributes.color.needsUpdate = true;
     }
 }
 
 function colorVertex(vertexIndex, color, meshColors) {
-    meshColors[vertexIndex * 4] = color[0]; // R
-    meshColors[vertexIndex * 4 + 1] = color[1]; // G
-    meshColors[vertexIndex * 4 + 2] = color[2]; // B
-    meshColors[vertexIndex * 4 + 3] = color[3]; // A
+    meshColors[vertexIndex * 4] = color.r; // R
+    meshColors[vertexIndex * 4 + 1] = color.g; // G
+    meshColors[vertexIndex * 4 + 2] = color.b; // B
+    meshColors[vertexIndex * 4 + 3] = 1.0; // A
 }

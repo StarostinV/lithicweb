@@ -15,5 +15,7 @@ export function createKDTree(positions) {
         return (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2;
     };
 
+    console.log('KD-Tree created with', points.length, 'points');
+
     return new kdTree(points, distance, ['x', 'y', 'z']);
 }

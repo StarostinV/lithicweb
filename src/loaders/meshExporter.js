@@ -5,8 +5,8 @@ export function exportAnnotations(mesh, meshColors) {
     }
 
     // Extract vertex data
-    const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-    const indices = mesh.getIndices();
+    const positions = mesh.geometry.attributes.position.array;
+    const indices = mesh.geometry.index.array;
 
     const vertexCount = positions.length / 3;
     const faceCount = indices.length / 3;
