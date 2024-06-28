@@ -83,40 +83,25 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             standardizedGeometry.setIndex(indices);
             standardizedGeometry.computeVertexNormals();
 
-            meshColors = new Float32Array((positions.length / 3) * 4);
-            if (labels.length) {
-                for (let i = 0; i < meshColors.length; i += 4) {
-                    if (labels[Math.floor(i / 4)] === 1) {
-                        meshColors[i] = drawColor.r;
-                        meshColors[i + 1] = drawColor.g;
-                        meshColors[i + 2] = drawColor.b;
-                        meshColors[i + 3] = 1.0;
-                    } else {
-                        meshColors[i] = objectColor.r;
-                        meshColors[i + 1] = objectColor.g;
-                        meshColors[i + 2] = objectColor.b;
-                        meshColors[i + 3] = 1.0;
-                    }
-                }
-            } else {
-                for (let i = 0; i < meshColors.length; i += 4) {
-                    meshColors[i] = objectColor.r;
-                    meshColors[i + 1] = objectColor.g;
-                    meshColors[i + 2] = objectColor.b;
-                    meshColors[i + 3] = 1.0;
-                }
+            meshColors = new Float32Array(positions.length);
+            for (let i = 0; i < meshColors.length; i += 3) {
+                meshColors[i] = objectColor.r;
+                meshColors[i + 1] = objectColor.g;
+                meshColors[i + 2] = objectColor.b;
             }
 
             console.log(meshColors);
 
+            standardizedGeometry.setAttribute('color', new THREE.BufferAttribute(meshColors, 3));
+
             // Set color attribute
             // standardizedGeometry.setAttribute('color', new THREE.BufferAttribute(meshColors, 4));
 
-            let material = new THREE.MeshStandardMaterial({
-                color: objectColor,
+            let material = new THREE.MeshPhongMaterial({
+                // color: objectColor,
                 shininess: 30, // Adjust shininess to see the specular highlights
                 specular: 0x333333, // Add some specular highlights
-                // side: THREE.DoubleSide,
+                vertexColors: true, // Enable per-vertex coloring
             });
 
             console.log("material", material);
@@ -151,18 +136,29 @@ document.getElementById('exportAnnotations').addEventListener('click', () => {
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
+function getIntersects(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    mouse.set(x, y);
+    raycaster.setFromCamera(mouse, camera);
+    return raycaster.intersectObject(mesh);
+}
+
 canvas.addEventListener('pointerdown', (event) => {
     if (!mesh) return;
 
-    mouse.x = (event.clientX / canvas.clientWidth) * 2 - 1;
-    mouse.y = -(event.clientY / canvas.clientHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
+    if (event.button === 0 && (mode === 'draw' || mode === 'erase')) {    
+        const intersects = getIntersects(event);
+    
+        console.log(intersects);
 
-    const intersects = raycaster.intersectObject(mesh);
-
-    if (intersects.length > 0 && (mode === 'draw' || mode === 'erase')) {
-        isDrawing = true;
-        handleDrawing(intersects[0], mode, kdtree, mesh, meshColors, drawColor, objectColor);
+        if (intersects.length > 0) {
+            console.log("handleDrawing!");
+            isDrawing = true;
+            handleDrawing(intersects[0], mode, kdtree, mesh, meshColors, drawColor, objectColor);
+        }
     } else if (event.button === 2 && (mode === 'draw' || mode === 'erase')) {
         prevMode = mode;
         mode = 'view';
@@ -172,14 +168,11 @@ canvas.addEventListener('pointerdown', (event) => {
 });
 
 canvas.addEventListener('pointermove', (event) => {
-    if (!mesh || !isDrawing) return;
+    if (!mesh || !isDrawing || mode === 'view') return;
 
-    mouse.x = (event.clientX / canvas.clientWidth) * 2 - 1;
-    mouse.y = -(event.clientY / canvas.clientHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-
-    const intersects = raycaster.intersectObject(mesh);
-    if (intersects.length > 0 && (mode === 'draw' || mode === 'erase')) {
+    const intersects = getIntersects(event);
+    
+    if (intersects.length > 0) {
         handleDrawing(intersects[0], mode, kdtree, mesh, meshColors, drawColor, objectColor);
     }
 });

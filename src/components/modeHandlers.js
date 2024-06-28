@@ -39,34 +39,34 @@ export function handleModeSwitch(event, mode, prevMode, controls) {
 }
 
 export function handleDrawing(pickResult, mode, kdtree, mesh, meshColors, drawColor, objectColor) {
-    if (pickResult.length > 0) {
-        const pickedPoint = pickResult[0].point;
+    const pickedPoint = pickResult.point;
 
-        // Color the picked vertex
-        const targetColor = mode === 'draw' ? drawColor : objectColor;
+    console.log("picked point", pickedPoint);
 
-        // Find the closest vertex using KD-Tree
-        const nearest = kdtree.nearest({
-            x: pickedPoint.x,
-            y: pickedPoint.y,
-            z: pickedPoint.z
-        }, 1)[0];
+    // Color the picked vertex
+    const targetColor = mode === 'draw' ? drawColor : objectColor;
 
-        const closestVertexIndex = nearest[0].index;
+    // Find the closest vertex using KD-Tree
+    const nearest = kdtree.nearest({
+        x: pickedPoint.x,
+        y: pickedPoint.y,
+        z: pickedPoint.z
+    }, 1)[0];
 
-        // Color the closest vertex
-        if (closestVertexIndex !== -1) {
-            colorVertex(closestVertexIndex, targetColor, meshColors);
-        }
+    const closestVertexIndex = nearest[0].index;
 
-        // Update the colors data in the mesh
-        mesh.geometry.attributes.color.needsUpdate = true;
+    // Color the closest vertex
+    if (closestVertexIndex !== -1) {
+        console.log(`Picked vertex: ${closestVertexIndex}`);
+        colorVertex(closestVertexIndex, targetColor, meshColors);
     }
+
+    // Update the colors data in the mesh
+    mesh.geometry.attributes.color.needsUpdate = true;
 }
 
 function colorVertex(vertexIndex, color, meshColors) {
-    meshColors[vertexIndex * 4] = color.r; // R
-    meshColors[vertexIndex * 4 + 1] = color.g; // G
-    meshColors[vertexIndex * 4 + 2] = color.b; // B
-    meshColors[vertexIndex * 4 + 3] = 1.0; // A
+    meshColors[vertexIndex * 3] = color.r; // R
+    meshColors[vertexIndex * 3 + 1] = color.g; // G
+    meshColors[vertexIndex * 3 + 2] = color.b; // B
 }
