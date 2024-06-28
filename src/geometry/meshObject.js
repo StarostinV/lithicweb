@@ -28,6 +28,9 @@ export class MeshObject {
     }
 
     setMesh(geometry) {
+        console.log(geometry.attributes);
+        console.log(geometry);
+
         let positions = geometry.attributes.position.array;
         positions = standardizePositions(positions); // Apply standardization
         const labels = geometry.attributes.labels ? geometry.attributes.labels.array : [];

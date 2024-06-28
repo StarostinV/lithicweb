@@ -13,7 +13,8 @@ export default class Scene {
 
         // Bind the animate method to the class instance
         this.animate = this.animate.bind(this);
-
+        this.updateLightDirection = this.updateLightDirection.bind(this);
+        document.getElementById('updateLight').addEventListener('click', this.updateLightDirection);
     }
 
     createCamera() {

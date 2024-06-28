@@ -137,7 +137,8 @@ class CustomPLYLoader extends PLYLoader {
                 uvs: [],
                 faceVertexUvs: [],
                 colors: [],
-                labels: [] // To store labels
+                labels: [], // To store labels
+                arrows: [] // To store arrows
             };
             let result;
             const patternBody = /end_header\s([\s\S]*)$/;
@@ -234,7 +235,8 @@ class CustomPLYLoader extends PLYLoader {
                 uvs: [],
                 faceVertexUvs: [],
                 colors: [],
-                labels: []  // To store labels
+                labels: [],  // To store labels
+                arrows: []  // To store arrows
             };
             const little_endian = header.format === 'binary_little_endian';
             const body = new DataView(data, header.headerLength);
@@ -266,6 +268,8 @@ class CustomPLYLoader extends PLYLoader {
             const attrY = findAttrName(['y', 'py', 'posy']) || 'y';
             const attrZ = findAttrName(['z', 'pz', 'posz']) || 'z';
             const attrLabel = findAttrName(['labels']) || 'labels';
+            const attrStartIndex = findAttrName(['start_index']) || 'start_index';
+            const attrEndIndex = findAttrName(['end_index']) || 'end_index';
 
             if (elementName === 'vertex') {
                 buffer.vertices.push(element[attrX], element[attrY], element[attrZ]);
@@ -282,6 +286,11 @@ class CustomPLYLoader extends PLYLoader {
                     buffer.indices.push(vertex_indices[0], vertex_indices[1], vertex_indices[3]);
                     buffer.indices.push(vertex_indices[1], vertex_indices[2], vertex_indices[3]);
                 }
+            } else if (elementName === 'arrow') {
+                buffer.arrows.push({
+                    startIndex: element[attrStartIndex],
+                    endIndex: element[attrEndIndex]
+                });
             }
         }
 
@@ -295,6 +304,8 @@ class CustomPLYLoader extends PLYLoader {
             if (buffer.labels.length > 0) {
                 geometry.setAttribute('labels', new THREE.Int32BufferAttribute(buffer.labels, 1));
             }
+
+            geometry.userData.arrows = buffer.arrows;
 
             geometry.computeBoundingSphere();
             return geometry;

@@ -1,10 +1,8 @@
+import * as THREE from 'three';
 import { exportAnnotations } from './loaders/meshExporter.js';
 import { handleModeSwitch, handleDrawing, updateButtonStates } from './components/modeHandlers.js';
 import CustomPLYLoader from './loaders/customPLYLoader.js';
-import { updateLightDirection } from './utils/updateLight.js';
-import * as THREE from 'three';
 import { acceleratedRaycast } from 'three-mesh-bvh';
-import { IntersectFinder } from './geometry/intersections.js';
 import { MODES, Mode } from './utils/mode.js';
 import {ArrowDrawer} from './components/arrow.js';
 import {MeshObject} from './geometry/meshObject.js';
@@ -21,9 +19,6 @@ const objectColor = new THREE.Color(0.5, 0.5, 0.5); // Gray
 // scene
 const scene = new Scene();
 
-// raycasting
-const intersectFinder = new IntersectFinder(scene.camera, scene.canvas);
-
 // control mode
 const mode = new Mode();
 
@@ -35,8 +30,6 @@ const arrowDrawer = new ArrowDrawer(scene.canvas, meshObject, mode);
 
 // variables
 let isDrawing = false;
-
-document.getElementById('updateLight').addEventListener('click', () => updateLightDirection(scene.camera, scene.light));
 
 document.getElementById('fileInput').addEventListener('change', (event) => {
     const file = event.target.files[0];
@@ -59,7 +52,7 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
 });
 
 document.getElementById('exportAnnotations').addEventListener('click', () => {
-    exportAnnotations(meshObject.mesh, meshObject.meshColors);
+    exportAnnotations(meshObject.mesh, meshObject.meshColors, arrowDrawer);
 });
 
 

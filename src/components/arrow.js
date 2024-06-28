@@ -1,22 +1,24 @@
 import * as THREE from 'three';
 
 class Arrow {
-    constructor(startPoint, endPoint, vertexNormalStart, vertexNormalEnd, offset, color, shaftRadius, headRadius, headLength) {
+    constructor(startPoint, vertexNormalStart, startIndex, offset, color, shaftRadius, headRadius, headLength) {
         this.startPoint = startPoint;
-        this.endPoint = endPoint;
+        this.endPoint = startPoint.clone();
+        this.startIndex = startIndex;
+        this.endIndex = startIndex;
         this.vertexNormalStart = vertexNormalStart;
-        this.vertexNormalEnd = vertexNormalEnd;
+        this.vertexNormalEnd = vertexNormalStart.clone();
         this.offset = offset;
         this.color = color;
         this.shaftRadius = shaftRadius;
         this.headRadius = headRadius;
         this.headLength = headLength;
 
-        this.start = startPoint.clone().addScaledVector(this.vertexNormalStart, this.offset);
-        this.end = endPoint.clone().addScaledVector(this.vertexNormalEnd, this.offset);
+        this.start = this.startPoint.clone().addScaledVector(this.vertexNormalStart, this.offset);
+        this.end = this.endPoint.clone().addScaledVector(this.vertexNormalEnd, this.offset);
 
         this.arrowGroup = new THREE.Group();
-        this.updateArrowGroup();
+        this.updateArrowGroup();  
     }
 
     clear() {
@@ -42,9 +44,10 @@ class Arrow {
 
     }
 
-    updateArrow(newEndPoint, newVertexNormalEnd) {
+    updateArrow(newEndPoint, newVertexNormalEnd, endIndex) {
         // Update the end point and vertex normal
         this.endPoint = newEndPoint;
+        this.endIndex = endIndex;
         this.vertexNormalEnd = newVertexNormalEnd;
 
         // Calculate the new start and end points with offsets
@@ -160,7 +163,7 @@ export class ArrowDrawer {
         if (faceIndex === -1) return;
         this.isDrawing = true;
 
-        this.arrow = new Arrow(firstVertex, firstVertex.clone(), vertexNormal, vertexNormal.clone(), this.offset, 0xff0000, 0.02, 0.05, 0.2);
+        this.arrow = new Arrow(firstVertex, vertexNormal, closestVertexIndex, this.offset, 0xff0000, 0.02, 0.05, 0.2);
 
         this.mesh().add(this.arrow.arrowGroup);
     }
@@ -178,7 +181,7 @@ export class ArrowDrawer {
         if (!this.isDrawing) return;
         const [intersectPoint, faceIndex, vertexNormal, closestVertexIndex, endVertex] = this.meshObject.getAllIntersectionInfo(event);
         if (closestVertexIndex === -1) return;
-        this.arrow.updateArrow(endVertex, vertexNormal);
+        this.arrow.updateArrow(endVertex, vertexNormal, closestVertexIndex);
     }
 
 
