@@ -46,7 +46,7 @@ end_header
         const x = positions[i * 3];
         const y = positions[i * 3 + 1];
         const z = positions[i * 3 + 2];
-        const label = meshColors[i * 4] === 1 ? 1 : 0; // Check if red component is 1 for the label
+        const label = meshColors[i * 3] === 1 ? 1 : 0; // Check if red component is 1 for the label
 
         dataView.setFloat32(offset, x, true); offset += 4;
         dataView.setFloat32(offset, y, true); offset += 4;
@@ -57,8 +57,8 @@ end_header
     // Write the face data
     for (let i = 0; i < faceCount; i++) {
         const i1 = indices[i * 3];
-        const i2 = indices[i * 3 + 2]; // Inverted order for consistency with the usual PLY files with lithic artifacts
-        const i3 = indices[i * 3 + 1];
+        const i2 = indices[i * 3 + 1]; 
+        const i3 = indices[i * 3 + 2];
 
         dataView.setUint8(offset, 3); offset += 1; // Number of vertices per face
         dataView.setInt32(offset, i1, true); offset += 4;

@@ -10,8 +10,8 @@
     "author": "Your Name",
     "license": "MIT",
     "dependencies": {
-        "kd-tree-javascript": "github:ubilabs/kd-tree-javascript",
-        "three": "^0.142.0"
+        "three": "^0.166.0",
+        "three-mesh-bvh": "^0.7.5"
     },
     "devDependencies": {
         "@babel/core": "^7.15.0",

@@ -38,26 +38,12 @@ export function handleModeSwitch(event, mode, prevMode, controls) {
     return [mode, prevMode];
 }
 
-export function handleDrawing(pickResult, mode, kdtree, mesh, meshColors, drawColor, objectColor) {
-    const pickedPoint = pickResult.point;
-
-    console.log("picked point", pickedPoint);
-
+export function handleDrawing(closestVertexIndex, mode, mesh, meshColors, drawColor, objectColor) {
     // Color the picked vertex
     const targetColor = mode === 'draw' ? drawColor : objectColor;
 
-    // Find the closest vertex using KD-Tree
-    const nearest = kdtree.nearest({
-        x: pickedPoint.x,
-        y: pickedPoint.y,
-        z: pickedPoint.z
-    }, 1)[0];
-
-    const closestVertexIndex = nearest[0].index;
-
     // Color the closest vertex
     if (closestVertexIndex !== -1) {
-        console.log(`Picked vertex: ${closestVertexIndex}`);
         colorVertex(closestVertexIndex, targetColor, meshColors);
     }
 
