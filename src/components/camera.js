@@ -11,5 +11,7 @@ export function createCamera(scene, canvas) {
     // Set wheel zoom speed (equivalent to wheelDeltaPercentage in Babylon.js)
     controls.zoomSpeed = 1.2;
 
+    console.log(controls);
+
     return camera;
 }

@@ -23,15 +23,15 @@ function updateCursor(mode) {
     }
 }
 
-export function handleModeSwitch(event, mode, prevMode, camera, canvas) {
+export function handleModeSwitch(event, mode, prevMode, controls) {
     if (mode !== event.target.id.replace('Mode', '')) {
         mode = event.target.id.replace('Mode', '');
         prevMode = mode; // when we click the button, we forget about the prev mode
         console.log(`Switched to ${mode} mode`);
         if (mode === 'view') {
-            camera.controls.enabled = true;
+            controls.enabled = true;
         } else {
-            camera.controls.enabled = false;
+            controls.enabled = false;
         }
         updateButtonStates(mode);
     }

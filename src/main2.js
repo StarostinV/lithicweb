@@ -1,3 +1,4 @@
+import { createCamera } from './components/camera.js';
 import { createKDTree } from './components/kdTree.js';
 import { exportAnnotations } from './loaders/meshExporter.js';
 import { handleModeSwitch, handleDrawing, updateButtonStates } from './components/modeHandlers.js';
@@ -5,13 +6,6 @@ import CustomPLYLoader from './loaders/customPLYLoader.js';
 import { standardizePositions } from './utils/standardizePositions.js';
 import { updateLightDirection } from './utils/updateLight.js';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-
-
-const drawColor = new THREE.Color(1, 0.6, 0.2); // Orange
-const objectColor = new THREE.Color(0.5, 0.5, 0.5); // Gray
-
-// renderer
 
 const canvas = document.getElementById("renderCanvas");
 const renderer = new THREE.WebGLRenderer({ canvas });
@@ -20,28 +14,40 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap; // You can use other types too
 
-// scene
+// document.body.appendChild(renderer.domElement);
+
 const scene = new THREE.Scene();
 
-// camera
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(30, 30, 30);
-const controls = new OrbitControls(camera, canvas);
-controls.target.set(0, 0, 0);
-controls.update();
-controls.zoomSpeed = 1.2;
-
-
-// light
-const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-light.position.set(50, 50, 50); // Position of the light source
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(20, 20, 20); // Position of the light source
+light.castShadow = true; // Enable shadow casting
+light.shadow.mapSize.width = 1024; // Shadow texture width
+light.shadow.mapSize.height = 1024; // Shadow texture height
+light.shadow.camera.near = 0.5; // Near plane of the shadow camera
+light.shadow.camera.far = 500; // Far plane of the shadow camera
+light.shadow.camera.left = -200; // Left bound of the light's view frustum
+light.shadow.camera.right = 200; // Right bound of the light's view frustum
+light.shadow.camera.top = 200; // Top bound of the light's view frustum
+light.shadow.camera.bottom = -200; // Bottom bound of the light's view frustum
 scene.add(light);
 
-const ambientLight = new THREE.AmbientLight(0x0c0c0c, 5);
+const drawColor = new THREE.Color(1, 0.6, 0.2); // Orange
+const objectColor = new THREE.Color(0.5, 0.5, 0.5); // Gray
+
+const camera = createCamera(scene, canvas);
+
+const ambientLight = new THREE.AmbientLight(0x0c0c0c);
 scene.add(ambientLight);
 
+// const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+// light.position.set(1, 1, 0);
+// scene.add(light);
 
-// variables
+// Add additional light for better visibility
+// const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+// directionalLight.position.set(0, 10, 10).normalize();
+// scene.add(directionalLight);
+
 let mesh, meshColors, kdtree, mode = 'view', prevMode = 'view', isDrawing = false;
 
 document.getElementById('updateLight').addEventListener('click', () => updateLightDirection(camera, light));
@@ -64,11 +70,11 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             const indices = Array.from({ length: geometry.index.count }, (_, i) => geometry.index.array[i]);
 
             // Ensure indices define polygons correctly
-            // for (let i = 0; i < indices.length; i += 3) {
-            //     let temp = indices[i + 1];
-            //     indices[i + 1] = indices[i + 2];
-            //     indices[i + 2] = temp;
-            // }
+            for (let i = 0; i < indices.length; i += 3) {
+                let temp = indices[i + 1];
+                indices[i + 1] = indices[i + 2];
+                indices[i + 2] = temp;
+            }
 
             // Remove existing mesh if it exists
             if (mesh) {
@@ -81,7 +87,6 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             const standardizedGeometry = new THREE.BufferGeometry();
             standardizedGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
             standardizedGeometry.setIndex(indices);
-            standardizedGeometry.computeVertexNormals();
 
             meshColors = new Float32Array((positions.length / 3) * 4);
             if (labels.length) {
@@ -112,11 +117,11 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
             // Set color attribute
             // standardizedGeometry.setAttribute('color', new THREE.BufferAttribute(meshColors, 4));
 
-            let material = new THREE.MeshStandardMaterial({
+            let material = new THREE.MeshPhongMaterial({
                 color: objectColor,
                 shininess: 30, // Adjust shininess to see the specular highlights
                 specular: 0x333333, // Add some specular highlights
-                // side: THREE.DoubleSide,
+                side: THREE.DoubleSide,
             });
 
             console.log("material", material);
@@ -140,7 +145,7 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
 
 ['view', 'draw', 'erase'].forEach(modeType => {
     document.getElementById(`${modeType}Mode`).addEventListener('click', (event) => {
-        [mode, prevMode] = handleModeSwitch(event, mode, prevMode, controls);
+        [mode, prevMode] = handleModeSwitch(event, mode, prevMode, camera, canvas);
     });
 });
 
@@ -166,7 +171,7 @@ canvas.addEventListener('pointerdown', (event) => {
     } else if (event.button === 2 && (mode === 'draw' || mode === 'erase')) {
         prevMode = mode;
         mode = 'view';
-        controls.enabled = true;
+        camera.controls.enabled = true;
         updateButtonStates(mode);
     }
 });
@@ -193,7 +198,7 @@ window.addEventListener('keydown', (event) => {
         if (mode === 'draw' || mode === 'erase') {
             prevMode = mode;
             mode = 'view';
-            controls.enabled = true;
+            camera.controls.enabled = true;
             updateButtonStates(mode);
         }
     }
@@ -203,7 +208,7 @@ window.addEventListener('keyup', (event) => {
     if (event.key === 'Alt' || event.key === 'Control') {
         mode = prevMode;
         if (mode !== 'view') {
-            controls.enabled = false;
+            camera.controls.enabled = false;
             updateButtonStates(mode);
         }
     }
