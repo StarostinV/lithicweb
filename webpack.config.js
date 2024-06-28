@@ -1,6 +1,5 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
     entry: './src/main.js',
@@ -18,11 +17,6 @@ module.exports = {
             template: './index.html',
             filename: 'index.html',
             scriptLoading: 'defer',
-        }),
-        new CopyWebpackPlugin({
-            patterns: [
-                { from: './src/style.css', to: './dist/style.css' }, // Adjust the source and destination paths as necessary
-            ],
         }),
     ],
     module: {
