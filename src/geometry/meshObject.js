@@ -111,8 +111,23 @@ export class MeshObject {
         
     }
 
+    colorVertices(vertexIndices, color) {
+        vertexIndices.forEach(index => colorVertex(index, color, this.meshColors));
+        this.mesh.geometry.attributes.color.needsUpdate = true;
+    }
+
+    colorVertex(vertexIndex, color) {
+        colorVertex(vertexIndex, color, this.meshColors);
+        this.mesh.geometry.attributes.color.needsUpdate = true;
+    }
 }
 
+
+function colorVertex(vertexIndex, color, meshColors) {
+    meshColors[vertexIndex * 3] = color.r; // R
+    meshColors[vertexIndex * 3 + 1] = color.g; // G
+    meshColors[vertexIndex * 3 + 2] = color.b; // B
+}
 
 
 function createMeshColors(length, labels, drawColor, objectColor) {

@@ -3,7 +3,8 @@ export const MODES = Object.freeze({
     DRAW: 'draw',
     ERASE: 'erase',
     ARROW: 'arrow',
-    DELETEARROWS: 'deleteArrows'
+    DELETEARROWS: 'deleteArrows',
+    DRAWLINES: 'drawLines'
 });
 
 export class Mode {

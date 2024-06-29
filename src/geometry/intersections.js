@@ -77,7 +77,7 @@ export class IntersectFinder {
 }
 
 
-function getFaceVertices(mesh, faceIndex) {
+export function getFaceVertices(mesh, faceIndex) {
     const positionAttribute = mesh.geometry.attributes.position;
     const indices = mesh.geometry.index;
 

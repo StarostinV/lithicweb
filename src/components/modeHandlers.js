@@ -35,22 +35,3 @@ export function handleModeSwitch(event, mode, controls) {
         updateButtonStates(mode);
     }
 }
-
-export function handleDrawing(closestVertexIndex, mode, mesh, meshColors, drawColor, objectColor) {
-    // Color the picked vertex
-    const targetColor = mode == 'draw' ? drawColor : objectColor;
-
-    // Color the closest vertex
-    if (closestVertexIndex !== -1) {
-        colorVertex(closestVertexIndex, targetColor, meshColors);
-    }
-
-    // Update the colors data in the mesh
-    mesh.geometry.attributes.color.needsUpdate = true;
-}
-
-function colorVertex(vertexIndex, color, meshColors) {
-    meshColors[vertexIndex * 3] = color.r; // R
-    meshColors[vertexIndex * 3 + 1] = color.g; // G
-    meshColors[vertexIndex * 3 + 2] = color.b; // B
-}

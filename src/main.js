@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { exportAnnotations } from './loaders/meshExporter.js';
-import { handleModeSwitch, handleDrawing, updateButtonStates } from './components/modeHandlers.js';
+import { handleModeSwitch, updateButtonStates } from './components/modeHandlers.js';
 import CustomPLYLoader from './loaders/customPLYLoader.js';
 import { acceleratedRaycast } from 'three-mesh-bvh';
 import { MODES, Mode } from './utils/mode.js';
 import {ArrowDrawer} from './components/arrow.js';
 import {MeshObject} from './geometry/meshObject.js';
 import Scene from './components/scene.js';
+import DrawLines from './components/drawLines.js';
 
 
 // Accelerate raycasting
@@ -28,6 +29,8 @@ const meshObject = new MeshObject(scene, drawColor, objectColor);
 // Arrow drawer
 const arrowDrawer = new ArrowDrawer(scene.canvas, meshObject, mode);
 
+const drawLines = new DrawLines(scene, meshObject, mode);
+
 // variables
 let isDrawing = false;
 
@@ -48,7 +51,7 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
     }
 });
 
-['view', 'draw', 'erase', 'arrow', 'deleteArrows'].forEach(modeType => {
+['view', 'draw', 'drawLines', 'erase', 'arrow', 'deleteArrows'].forEach(modeType => {
     document.getElementById(`${modeType}Mode`).addEventListener('click', (event) => {
         handleModeSwitch(event, mode, scene.controls);
     });
@@ -67,7 +70,8 @@ scene.canvas.addEventListener('pointerdown', (event) => {
     
         if (closestVertexIndex !== -1) {
             isDrawing = true;
-            handleDrawing(closestVertexIndex, mode, meshObject.mesh, meshObject.meshColors, drawColor, objectColor);
+            const targetColor = mode == 'draw' ? drawColor : objectColor;
+            meshObject.colorVertex(closestVertexIndex, targetColor);
         }
     } else if (event.button === 2 && (mode != MODES.VIEW)) {
         mode.setMode(MODES.VIEW);
@@ -82,7 +86,8 @@ scene.canvas.addEventListener('pointermove', (event) => {
     const closestVertexIndex = meshObject.getClosestVertexIndex(event);
 
     if (closestVertexIndex !== -1) {
-        handleDrawing(closestVertexIndex, mode, meshObject.mesh, meshObject.meshColors, drawColor, objectColor);
+        const targetColor = mode == 'draw' ? drawColor : objectColor;
+        meshObject.colorVertex(closestVertexIndex, targetColor);
     }
 });
 
