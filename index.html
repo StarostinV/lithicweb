@@ -8,13 +8,16 @@
     <link href= "https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100">
+<script>
+    window.debugGlobalVar = {}; // Declare a global debug object
+</script>
 <div class="fixed top-0 left-0 right-0 bg-white shadow-lg z-10 p-4 flex justify-between items-center">
     <div class="flex items-center space-x-2">
         <button id="showDoc" class="bg-green-200 text-green-800 px-4 py-2 rounded hover:bg-green-300" title="Show Documentation">
             <i class="fas fa-book"></i>
         </button>
-        <label for="fileInput" class="file-input-label" title="Choose a PLY file to upload">Choose File</label>
-        <input type="file" id="fileInput" accept=".ply" class="hidden-file-input">
+        <label for="fileInput" class="file-input-label" title="Choose a PLY or MAT file to upload">Choose File</label>
+        <input type="file" id="fileInput" accept=".ply,.mat" class="hidden-file-input">
         <span id="fileName" class="text-gray-700"></span>
     </div>
     <div class="flex space-x-2">

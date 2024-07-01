@@ -8,7 +8,7 @@ import {ArrowDrawer} from './components/arrow.js';
 import {MeshObject} from './geometry/meshObject.js';
 import Scene from './components/scene.js';
 import DrawLines from './components/drawLines.js';
-
+import MeshLoader from './loaders/meshLoader.js';
 
 // Accelerate raycasting
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
@@ -31,24 +31,13 @@ const arrowDrawer = new ArrowDrawer(scene.canvas, meshObject, mode);
 
 const drawLines = new DrawLines(scene, meshObject, mode);
 
+const meshLoader = new MeshLoader(meshObject, arrowDrawer);
+
 // variables
 let isDrawing = false;
 
 document.getElementById('fileInput').addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function (event) {
-            const data = event.target.result;
-            const loader = new CustomPLYLoader();
-            const geometry = loader.parse(data);
-            const arrows = geometry.userData.arrows ? geometry.userData.arrows : [];
-            meshObject.setMesh(geometry);
-            arrowDrawer.clear();
-            arrowDrawer.load(arrows);
-        };
-        reader.readAsArrayBuffer(file);
-    }
+    meshLoader.load(event);
 });
 
 ['view', 'draw', 'drawLines', 'erase', 'arrow', 'deleteArrows'].forEach(modeType => {

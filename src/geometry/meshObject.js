@@ -27,27 +27,20 @@ export class MeshObject {
         }
     }
 
-    setMesh(geometry) {
-        console.log(geometry.attributes);
-        console.log(geometry);
-
-        let positions = geometry.attributes.position.array;
-        positions = standardizePositions(positions); // Apply standardization
-        const labels = geometry.attributes.labels ? geometry.attributes.labels.array : [];
-        const indices = Array.from({ length: geometry.index.count }, (_, i) => geometry.index.array[i]);
+    setMesh(positions, labels, indices) {
 
         // Remove existing mesh if it exists
         this.clear();
 
         // Create new BufferGeometry and set attributes
-        const standardizedGeometry = new THREE.BufferGeometry();
-        standardizedGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        standardizedGeometry.setIndex(indices);
-        standardizedGeometry.computeVertexNormals();
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
 
         this.meshColors = createMeshColors(positions.length, labels, this.drawColor, this.objectColor);
 
-        standardizedGeometry.setAttribute('color', new THREE.BufferAttribute(this.meshColors, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(this.meshColors, 3));
 
         let material = new THREE.MeshLambertMaterial({
             vertexColors: true, // Enable per-vertex coloring
@@ -56,14 +49,14 @@ export class MeshObject {
         });
 
         // Create mesh with the new geometry and material
-        this.mesh = new THREE.Mesh(standardizedGeometry, material);
+        this.mesh = new THREE.Mesh(geometry, material);
 
         this.mesh.castShadow = true; // Enable shadow casting for this object
         this.mesh.receiveShadow = true; // Enable shadow receiving for this object
         this.scene.light.target = this.mesh;
 
-        const bvh = new MeshBVH(standardizedGeometry);
-        standardizedGeometry.boundsTree = bvh;
+        const bvh = new MeshBVH(geometry);
+        geometry.boundsTree = bvh;
         this.scene.scene.add(this.mesh);
     }
 
