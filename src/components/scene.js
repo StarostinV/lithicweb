@@ -12,14 +12,15 @@ export default class Scene {
         this.createLights();
         this.updateLightIntensity = this.updateLightIntensity.bind(this);
 
-        this.sliderLight = new Slider("sliderLight", "sliderLightValue", 2, 0, 10, (value) => {this.updateLightIntensity(value, this.light)});
-        this.sliderAmbientLight = new Slider("sliderAmbientLight", "sliderAmbientLightValue", 2, 0, 50, (value) => {this.updateLightIntensity(value, this.ambientLight)});
+        this.sliderLight = new Slider("Light", 2, 0, 10, (value) => {this.updateLightIntensity(value, this.light)});
+        this.sliderAmbientLight = new Slider("AmbientLight", 2, 0, 50, (value) => {this.updateLightIntensity(value, this.ambientLight)});
 
 
         // Bind the animate method to the class instance
         this.animate = this.animate.bind(this);
         this.updateLightDirection = this.updateLightDirection.bind(this);
         document.getElementById('updateLight').addEventListener('click', this.updateLightDirection);
+        document.getElementById('updateLight2').addEventListener('click', this.updateLightDirection);
     }
 
     updateLightIntensity(value, light) {

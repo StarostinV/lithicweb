@@ -102,6 +102,10 @@ export class MeshObject {
         return new THREE.Vector3().fromArray(this.mesh.geometry.attributes.position.array.slice(vertexIndex * 3, vertexIndex * 3 + 3));    
     }
 
+    getVerticesWithinRadius(event, radius) {
+        return this.intersectFinder.getVerticesWithinRadius(this.mesh, event, radius);
+    }
+
     getAllIntersectionInfo(event) {
         const [intersectPoint, faceIndex, closestVertexIndex] = this.intersectFinder.getClosestVertexIndex(this.mesh, event);
         if (closestVertexIndex === -1) return [-1, -1, -1, -1, -1];

@@ -1,9 +1,11 @@
 import noUiSlider from 'nouislider';
 
 export default class Slider {
-    constructor(id, valueId, start, min, max, callback) {
-        this.slider = document.getElementById(id);
-        this.value = document.getElementById(valueId);
+    constructor(id, start, min, max, callback) {
+        const sliderId = "slider" + id;
+        this.slider = document.getElementById(sliderId);
+        this.value = document.getElementById(sliderId + 'Value');
+        this.label = document.getElementById(sliderId + 'Label');
         this.callback = callback;
 
         noUiSlider.create(this.slider, {
@@ -20,5 +22,17 @@ export default class Slider {
                 this.callback(values[handle]);
             }
         });
+    }
+
+    hide() {
+        this.slider.style.display = 'none';
+        this.value.style.display = 'none';
+        this.label.style.display = 'none';
+    }
+
+    show() {
+        this.slider.style.display = '';
+        this.value.style.display = '';
+        this.label.style.display = '';
     }
 }

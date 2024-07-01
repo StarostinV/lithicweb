@@ -45,10 +45,15 @@
                 <p class="text-sm text-gray-700">Hold right-click to move the camera.</p>
                 <button id="viewMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to View Mode"
                 style="display: none;">View</button>
-                <p>Light intensity: <span id="sliderLightValue"></span></p>
+                <p>Direct light intensity: <span id="sliderLightValue"></span></p>
                 <div id="sliderLight"></div>
                 <p>Ambient light intensity: <span id="sliderAmbientLightValue"></span></p>
                 <div id="sliderAmbientLight"></div>
+
+                <button id="updateLight2" class="bg-yellow-200 text-yellow-800 px-4 py-2 rounded hover:bg-yellow-300" title="Update Light Direction">
+                    <i class="fas fa-lightbulb"></i> Set Light Direction
+                </button>
+        
 
                 <button id="invertNormals" class="bg-blue-200 text-blue-800 px-4 py-2 rounded hover:bg-blue-400" title="Invert Normals of the mesh">
                     <i class="fas fa-exchange-alt"></i>   Invert Normals
@@ -63,7 +68,11 @@
                 <p class="text-sm text-gray-700">Hold Alt to go to view mode.</p>
                 <button id="drawMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Draw Mode">Draw</button>
                 <button id="drawLinesMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Draw Mode">Draw lines (Right click to stop)</button>
-                <button id="eraseMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Erase Mode">Erase</button>        
+                <button id="eraseMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Erase Mode">Erase</button>  
+                <button id="useBrush" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Use brush">Enable brush</button>
+                <p id="sliderBrushSizeLabel">Brush size: <span id="sliderBrushSizeValue"></span></p>
+                <div id="sliderBrushSize"></div>
+
             </div>
         </div>
         <div id="arrowPanel" class="panel hidden">

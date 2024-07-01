@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { exportAnnotations } from './loaders/meshExporter.js';
-import { acceleratedRaycast } from 'three-mesh-bvh';
 import { MODES, Mode } from './utils/mode.js';
 import {ArrowDrawer} from './components/arrow.js';
 import {MeshObject} from './geometry/meshObject.js';
@@ -8,9 +7,6 @@ import Scene from './components/scene.js';
 import DrawLines from './components/drawLines.js';
 import MeshLoader from './loaders/meshLoader.js';
 import DrawBrush from './components/drawBrush.js';
-
-// Accelerate raycasting
-THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 //colors
 const drawColor = new THREE.Color(1, 0.6, 0.2); // Orange
