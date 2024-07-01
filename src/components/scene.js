@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-
+import Slider from './slider';
 
 export default class Scene {
     constructor() {
@@ -9,12 +9,21 @@ export default class Scene {
         this.renderer = this.createRenderer();
         this.camera = this.createCamera();
         this.controls = this.createControls();
-        this.light = this.createLights();
+        this.createLights();
+        this.updateLightIntensity = this.updateLightIntensity.bind(this);
+
+        this.sliderLight = new Slider("sliderLight", "sliderLightValue", 2, 0, 10, (value) => {this.updateLightIntensity(value, this.light)});
+        this.sliderAmbientLight = new Slider("sliderAmbientLight", "sliderAmbientLightValue", 2, 0, 50, (value) => {this.updateLightIntensity(value, this.ambientLight)});
+
 
         // Bind the animate method to the class instance
         this.animate = this.animate.bind(this);
         this.updateLightDirection = this.updateLightDirection.bind(this);
         document.getElementById('updateLight').addEventListener('click', this.updateLightDirection);
+    }
+
+    updateLightIntensity(value, light) {
+        light.intensity = value;
     }
 
     createCamera() {
@@ -53,7 +62,8 @@ export default class Scene {
         const ambientLight = new THREE.AmbientLight(0x0c0c0c, 1);
         this.scene.add(ambientLight);
 
-        return light;
+        this.light = light;
+        this.ambientLight = ambientLight;
     }
 
     updateLightDirection() {

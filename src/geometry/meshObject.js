@@ -14,6 +14,13 @@ export class MeshObject {
         this.positions = [];
         this.labels = [];
         this.indices = [];
+
+        this.invertMeshNormals = this.invertMeshNormals.bind(this);
+
+        document.getElementById('invertNormals').addEventListener('click', () => {
+            this.invertMeshNormals();
+        });
+        
     }
 
     isNull() {

@@ -7,6 +7,13 @@ export default class MeshLoader {
         this.meshObject = meshObject;
         this.arrowDrawer = arrowDrawer;
         this.loader = new CustomPLYLoader();
+
+        this.load = this.load.bind(this);
+
+        document.getElementById('fileInput').addEventListener('change', (event) => {
+            this.load(event);
+        });
+        
     }
 
     load(event) {
