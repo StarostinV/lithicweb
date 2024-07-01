@@ -36,6 +36,11 @@ const meshLoader = new MeshLoader(meshObject, arrowDrawer);
 // variables
 let isDrawing = false;
 
+
+document.getElementById('invertNormals').addEventListener('click', () => {
+    meshObject.invertMeshNormals();
+});
+
 document.getElementById('fileInput').addEventListener('change', (event) => {
     meshLoader.load(event);
 });

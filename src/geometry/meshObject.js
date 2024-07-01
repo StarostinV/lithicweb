@@ -11,6 +11,9 @@ export class MeshObject {
         this.drawColor = drawColor;
         this.objectColor = objectColor;
         this.intersectFinder = new IntersectFinder(scene);
+        this.positions = [];
+        this.labels = [];
+        this.indices = [];
     }
 
     isNull() {
@@ -27,18 +30,33 @@ export class MeshObject {
         }
     }
 
+    invertMeshNormals() {
+        const indices = this.indices;
+
+        for (let i = 0; i < indices.length; i += 3) {
+            const temp = indices[i];
+            indices[i] = indices[i + 1];
+            indices[i + 1] = temp;
+        }
+
+        this.setMesh(this.positions, this.labels, indices);
+    }
+
     setMesh(positions, labels, indices) {
+        this.positions = positions;
+        this.labels = labels;
+        this.indices = indices;
 
         // Remove existing mesh if it exists
         this.clear();
 
         // Create new BufferGeometry and set attributes
         const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('position', new THREE.BufferAttribute(standardizePositions(this.positions), 3));
         geometry.setIndex(indices);
         geometry.computeVertexNormals();
 
-        this.meshColors = createMeshColors(positions.length, labels, this.drawColor, this.objectColor);
+        this.meshColors = createMeshColors(this.positions.length, labels, this.drawColor, this.objectColor);
 
         geometry.setAttribute('color', new THREE.BufferAttribute(this.meshColors, 3));
 
