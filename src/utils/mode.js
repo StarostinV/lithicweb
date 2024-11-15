@@ -24,12 +24,17 @@ export class Mode {
 
         window.addEventListener('keydown', (event) => {
             if (event.key === 'Alt') {
-                this.setMode(MODES.VIEW);   
+                // event.preventDefault();
+                // Only switch to view mode if we're not already in it
+                if (this.currentMode !== MODES.VIEW) {
+                    this.setMode(MODES.VIEW);   
+                }
             }
         });
         
         window.addEventListener('keyup', (event) => {
             if (event.key === 'Alt') {
+                // event.preventDefault();
                 this.toPreviousMode();
             }
         });
@@ -73,6 +78,7 @@ export class Mode {
     }
 
     toPreviousMode() {
+        console.log('toPreviousMode', this.currentMode, this.previousMode);
         this.currentMode = this.previousMode;
         this.update();
     }
@@ -98,6 +104,7 @@ export class Mode {
     }
 
     handleModeSwitch(event) {
+        console.log('handleModeSwitch', event.target.id);
         this.setMode(event.target.id.replace('Mode', ''), true);        
     }
 
