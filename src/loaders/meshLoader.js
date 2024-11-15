@@ -20,7 +20,7 @@ export default class MeshLoader {
     load(event) {
         const file = event.target.files[0];
         if (!file) return;
-        this.currentFileName = file.name.split('.')[0];
+        this.currentFileName = file.name.substring(0, file.name.lastIndexOf('.'));
     
         const reader = new FileReader();
         reader.onload = (event) => {
