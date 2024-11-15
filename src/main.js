@@ -32,7 +32,7 @@ const meshLoader = new MeshLoader(meshObject, arrowDrawer);
 
 
 document.getElementById('exportAnnotations').addEventListener('click', () => {
-    exportAnnotations(meshObject.mesh, meshObject.meshColors, arrowDrawer);
+    exportAnnotations(meshObject.mesh, meshObject.meshColors, arrowDrawer, meshLoader);
 });
 
 

@@ -1,8 +1,11 @@
-export function exportAnnotations(mesh, meshColors, arrowDrawer) {
+export function exportAnnotations(mesh, meshColors, arrowDrawer, meshLoader) {
     if (!mesh) {
         console.error("No mesh to export.");
         return;
     }
+
+    // Get filename
+    const fileName = (meshLoader.currentFileName || 'mesh') + '.ply';
 
     // Extract vertex data
     const positions = mesh.geometry.attributes.position.array;
@@ -85,7 +88,7 @@ end_header
     // Create a link element and trigger the download
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'mesh.ply';
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

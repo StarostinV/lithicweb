@@ -7,6 +7,7 @@ export default class MeshLoader {
         this.meshObject = meshObject;
         this.arrowDrawer = arrowDrawer;
         this.loader = new CustomPLYLoader();
+        this.currentFileName = null; 
 
         this.load = this.load.bind(this);
 
@@ -19,6 +20,7 @@ export default class MeshLoader {
     load(event) {
         const file = event.target.files[0];
         if (!file) return;
+        this.currentFileName = file.name.split('.')[0];
     
         const reader = new FileReader();
         reader.onload = (event) => {
