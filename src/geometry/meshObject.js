@@ -2,6 +2,7 @@ import { standardizePositions } from './standardizePositions.js';
 import * as THREE from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import { IntersectFinder } from './intersections.js';
+import DynamicTypedArray from '../utils/DynamicTypedArray.js';
 
 export class MeshObject {
     constructor(scene, edgeColor, objectColor) {
@@ -61,6 +62,11 @@ export class MeshObject {
     }
 
     setMesh(positions, labels, indices) {
+        // if labels is empty, set all to 0
+        if (labels.length === 0) {
+            labels = new Uint8Array(positions.length / 3).fill(0);
+        }
+
         this.positions = positions;
         this.edgeLabels = labels;
         this.indices = indices;
@@ -207,16 +213,36 @@ export class MeshObject {
         this.segments = newSegments;
     }
 
+    segmentMeshSimple() {
+        if (!this.adjacencyGraph) return [];
+        // no chunking
+
+        const segments = [];
+        const totalVertices = this.positions.length / 3;
+        const visited = new Uint8Array(totalVertices).fill(0);
+
+        for (let i = 0; i < totalVertices; i++) {
+            if (visited[i] || this.edgeLabels[i] !== 0) continue;
+            const segment = this.floodFillOptimized(i, visited);
+            if (segment.length > 0) {
+                segments.push(segment);
+            }
+        }
+        
+        console.log(segments);
+        return segments;
+    }
+
     segmentMesh() {
         if (!this.adjacencyGraph) return [];
 
         // Use TypedArrays for better performance
-        const visited = new Uint8Array(this.positions.length / 3);
+        const totalVertices = this.positions.length / 3;
+        const visited = new Uint8Array(totalVertices).fill(0);
         const segments = [];
         
         // Process chunks of vertices in parallel
         const chunkSize = 10000; // Adjust based on your needs
-        const totalVertices = this.positions.length / 3;
         
         for (let startIdx = 0; startIdx < totalVertices; startIdx += chunkSize) {
             const endIdx = Math.min(startIdx + chunkSize, totalVertices);
@@ -225,7 +251,6 @@ export class MeshObject {
             for (let vertex = startIdx; vertex < endIdx; vertex++) {
                 // Skip if visited or not labeled
                 if (visited[vertex] || this.edgeLabels[vertex] !== 0) continue;
-                
                 const segment = this.floodFillOptimized(vertex, visited);
                 if (segment.length > 0) {
                     segments.push(segment);
@@ -237,49 +262,32 @@ export class MeshObject {
     }
 
     floodFillOptimized(startVertex, visited) {
-        // Pre-allocate arrays for better performance
-        let segment = new Uint32Array(1000); // Changed to let
-        let segmentSize = 0;
+        const segment = new DynamicTypedArray();
+        const queue = new DynamicTypedArray(10000);
         
-        // Use typed array for queue with larger initial size
-        let queueArray = new Uint32Array(10000); // Changed to let, increased size
+        queue.push(startVertex);
         let queueStart = 0;
-        let queueEnd = 1;
-        queueArray[0] = startVertex;
         
-        while (queueStart < queueEnd) {
-            const vertex = queueArray[queueStart++];
+        while (queueStart < queue.size) {
+            const vertex = queue.array[queueStart++];
             
             if (visited[vertex]) continue;
             visited[vertex] = 1;
             
-            if (this.edgeLabels[vertex] === 0) { // Note: changed to 0 to match your unlabeled vertices
-                // Expand segment array if needed
-                if (segmentSize >= segment.length) {
-                    const newSegment = new Uint32Array(segment.length * 2);
-                    newSegment.set(segment);
-                    segment = newSegment;
-                }
-                segment[segmentSize++] = vertex;
+            if (this.edgeLabels[vertex] === 0) {
+                segment.push(vertex);
                 
                 // Process neighbors
                 const neighbors = this.adjacencyGraph.get(vertex);
                 for (const neighbor of neighbors) {
                     if (!visited[neighbor] && this.edgeLabels[neighbor] === 0) {
-                        // Expand queue if needed
-                        if (queueEnd >= queueArray.length) {
-                            const newQueue = new Uint32Array(queueArray.length * 2);
-                            newQueue.set(queueArray);
-                            queueArray = newQueue;
-                        }
-                        queueArray[queueEnd++] = neighbor;
+                        queue.push(neighbor);
                     }
                 }
             }
         }
         
-        // Return only the used portion of the segment array
-        return new Uint32Array(segment.buffer, 0, segmentSize);
+        return segment.getUsedPortion();
     }
 
     getClickedPoint(event) {
