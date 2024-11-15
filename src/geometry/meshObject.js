@@ -4,15 +4,16 @@ import { MeshBVH } from 'three-mesh-bvh';
 import { IntersectFinder } from './intersections.js';
 
 export class MeshObject {
-    constructor(scene, drawColor, objectColor) {
+    constructor(scene, edgeColor, objectColor) {
         this.scene = scene;
         this.mesh = null;
         this.meshColors = null;
-        this.drawColor = drawColor;
+        this.edgeColor = edgeColor;
         this.objectColor = objectColor;
         this.intersectFinder = new IntersectFinder(scene);
         this.positions = [];
-        this.labels = [];
+        this.faceLabels = [];
+        this.edgeLabels = [];
         this.indices = [];
         this.adjacencyGraph = null;
         this.segments = [];
@@ -52,12 +53,12 @@ export class MeshObject {
             indices[i + 1] = temp;
         }
 
-        this.setMesh(this.positions, this.labels, indices);
+        this.setMesh(this.positions, this.edgeLabels, indices);
     }
 
     setMesh(positions, labels, indices) {
         this.positions = positions;
-        this.labels = labels;
+        this.edgeLabels = labels;
         this.indices = indices;
 
         // Remove existing mesh if it exists
@@ -69,7 +70,7 @@ export class MeshObject {
         geometry.setIndex(indices);
         geometry.computeVertexNormals();
 
-        this.meshColors = createMeshColors(this.positions.length, labels, this.drawColor, this.objectColor);
+        this.meshColors = createMeshColors(this.positions.length, labels, this.edgeColor, this.objectColor);
 
         geometry.setAttribute('color', new THREE.BufferAttribute(this.meshColors, 3));
 
@@ -92,8 +93,7 @@ export class MeshObject {
 
         // Build adjacency graph after setting the mesh
         this.buildAdjacencyGraph();
-        this.segments = [];
-        // this.updateSegments();
+        this.updateSegments();
     }
 
     buildAdjacencyGraph() {
@@ -129,45 +129,76 @@ export class MeshObject {
     segmentMesh() {
         if (!this.adjacencyGraph) return [];
 
-        const visited = new Set();
+        // Use TypedArrays for better performance
+        const visited = new Uint8Array(this.positions.length / 3);
         const segments = [];
         
-        // Start flood-fill from each unvisited labeled vertex
-        for (let vertex = 0; vertex < this.positions.length / 3; vertex++) {
-            if (visited.has(vertex) || this.labels[vertex] !== 0) continue;
+        // Process chunks of vertices in parallel
+        const chunkSize = 10000; // Adjust based on your needs
+        const totalVertices = this.positions.length / 3;
+        
+        for (let startIdx = 0; startIdx < totalVertices; startIdx += chunkSize) {
+            const endIdx = Math.min(startIdx + chunkSize, totalVertices);
             
-            const segment = this.floodFill(vertex, visited);
-            if (segment.length > 0) {
-                segments.push(segment);
+            // Process each chunk
+            for (let vertex = startIdx; vertex < endIdx; vertex++) {
+                // Skip if visited or not labeled
+                if (visited[vertex] || this.edgeLabels[vertex] !== 0) continue;
+                
+                const segment = this.floodFillOptimized(vertex, visited);
+                if (segment.length > 0) {
+                    segments.push(segment);
+                }
             }
         }
         
         return segments;
     }
 
-    floodFill(startVertex, visited) {
-        const segment = [];
-        const queue = [startVertex];
+    floodFillOptimized(startVertex, visited) {
+        // Pre-allocate arrays for better performance
+        let segment = new Uint32Array(1000); // Changed to let
+        let segmentSize = 0;
         
-        while (queue.length > 0) {
-            const vertex = queue.shift();
+        // Use typed array for queue with larger initial size
+        let queueArray = new Uint32Array(10000); // Changed to let, increased size
+        let queueStart = 0;
+        let queueEnd = 1;
+        queueArray[0] = startVertex;
+        
+        while (queueStart < queueEnd) {
+            const vertex = queueArray[queueStart++];
             
-            if (visited.has(vertex)) continue;
-            visited.add(vertex);
+            if (visited[vertex]) continue;
+            visited[vertex] = 1;
             
-            if (this.labels[vertex] === 0) {
-                segment.push(vertex);
+            if (this.edgeLabels[vertex] === 0) { // Note: changed to 0 to match your unlabeled vertices
+                // Expand segment array if needed
+                if (segmentSize >= segment.length) {
+                    const newSegment = new Uint32Array(segment.length * 2);
+                    newSegment.set(segment);
+                    segment = newSegment;
+                }
+                segment[segmentSize++] = vertex;
                 
-                // Add unvisited labeled neighbors to queue
-                for (const neighbor of this.adjacencyGraph.get(vertex)) {
-                    if (!visited.has(neighbor) && this.labels[neighbor] === 0) {
-                        queue.push(neighbor);
+                // Process neighbors
+                const neighbors = this.adjacencyGraph.get(vertex);
+                for (const neighbor of neighbors) {
+                    if (!visited[neighbor] && this.edgeLabels[neighbor] === 0) {
+                        // Expand queue if needed
+                        if (queueEnd >= queueArray.length) {
+                            const newQueue = new Uint32Array(queueArray.length * 2);
+                            newQueue.set(queueArray);
+                            queueArray = newQueue;
+                        }
+                        queueArray[queueEnd++] = neighbor;
                     }
                 }
             }
         }
         
-        return segment;
+        // Return only the used portion of the segment array
+        return new Uint32Array(segment.buffer, 0, segmentSize);
     }
 
     getClickedPoint(event) {
@@ -218,10 +249,27 @@ export class MeshObject {
         
     }
 
-    labelVertices(vertexIndices, label) {
+    addEdgeVertex(vertexIndex) {
+        this.edgeLabels[vertexIndex] = 1;
+        this.colorVertex(vertexIndex, this.edgeColor);
+    }
+
+    addEdgeVertices(vertexIndices) {
         vertexIndices.forEach(index => {
-            this.labels[index] = label;
-            colorVertex(index, color, this.meshColors);
+            this.edgeLabels[index] = 1;
+            this.colorVertex(index, this.edgeColor);
+        });
+    }
+
+    removeEdgeVertex(vertexIndex) {
+        this.edgeLabels[vertexIndex] = 0;
+        this.colorVertex(vertexIndex, this.objectColor);
+    }
+
+    removeEdgeVertices(vertexIndices) {
+        vertexIndices.forEach(index => {
+            this.edgeLabels[index] = 0;
+            this.colorVertex(index, this.objectColor);
         });
     }
 
@@ -233,6 +281,12 @@ export class MeshObject {
     colorVertex(vertexIndex, color) {
         colorVertex(vertexIndex, color, this.meshColors);
         this.mesh.geometry.attributes.color.needsUpdate = true;
+    }
+
+    onDrawFinished() {
+        if (document.getElementById('auto-segments').checked) {
+            this.updateSegments();
+        }
     }
 }
 

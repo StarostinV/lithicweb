@@ -38,6 +38,7 @@ export default class DrawLines {
         } else if (this.line) {
             this.colorVerticesAlongLine();
             this.clear();
+            this.meshObject.onDrawFinished();
             this.startLine(vertexIndex);
         }
     }
@@ -75,7 +76,7 @@ export default class DrawLines {
         const geometry = new THREE.BufferGeometry().setFromPoints([this.startPoint, this.startPoint.clone()]);
 
         // Create a new material
-        const material = new THREE.LineBasicMaterial({ color: this.meshObject.drawColor });
+        const material = new THREE.LineBasicMaterial({ color: this.meshObject.edgeColor });
 
         // Create a new line
         this.line = new THREE.Line(geometry, material);
@@ -118,6 +119,6 @@ export default class DrawLines {
         // apply getFaceVertices, take first 3 results and flatten:
         const vertices = faceIndices.flatMap(faceIndex => getFaceVertices(this.meshObject.mesh, faceIndex).slice(0, 3));
 
-        this.meshObject.colorVertices(vertices, this.meshObject.drawColor);
+        this.meshObject.addEdgeVertices(vertices);
     }
 }

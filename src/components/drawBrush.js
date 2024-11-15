@@ -52,7 +52,10 @@ export default class DrawBrush {
 
     mouseUp(event) {
         if (event.button !== 0) return;
-        this.isDrawing = false;
+        if (this.isDrawing) {
+            this.meshObject.onDrawFinished();
+            this.isDrawing = false;
+        }
     }
 
     mouseMove(event) {
@@ -63,34 +66,40 @@ export default class DrawBrush {
 
     draw(event) {
         if (this.meshObject.isNull() || !this.isDrawing) return;
+        
+        // if mode is not in draw or erase, return
+        if (this.mode != MODES.DRAW && this.mode != MODES.ERASE) return;
 
-        let color;
-
-        if (this.mode == MODES.DRAW) {
-            color = this.meshObject.drawColor;
-        } else if (this.mode == MODES.ERASE) {
-            color = this.meshObject.objectColor;
-        } else {
-            return;
-        }
-
+        // if useBrush, call drawBrush, otherwise call drawVertex
         if (this.useBrush) {
-            this.drawBrush(event, color);
-            return;
-        }
-
-        const closestVertexIndex = this.meshObject.getClosestVertexIndex(event);
-    
-        if (closestVertexIndex !== -1) {
-            this.meshObject.colorVertex(closestVertexIndex, color);
+            this.drawBrush(event);
+        } else {
+            this.drawVertex(event);
         }
     }
 
-    drawBrush(event, color) {
+    drawVertex(event) {
+        const closestVertexIndex = this.meshObject.getClosestVertexIndex(event);
+
+        if (closestVertexIndex === -1) return;
+
+        if (this.mode == MODES.DRAW) {
+            this.meshObject.addEdgeVertex(closestVertexIndex);
+        } else if (this.mode == MODES.ERASE) {
+            this.meshObject.removeEdgeVertex(closestVertexIndex);
+        }
+    }
+
+    drawBrush(event) {
+        console.log('drawBrush');
         const vertexIndices = this.meshObject.getVerticesWithinRadius(event, this.brushRadius);
 
         if (vertexIndices.length === 0) return;
 
-        this.meshObject.colorVertices(vertexIndices, color);
+        if (this.mode == MODES.DRAW) {
+            this.meshObject.addEdgeVertices(vertexIndices);
+        } else if (this.mode == MODES.ERASE) {
+            this.meshObject.removeEdgeVertices(vertexIndices);
+        }
     }
 }

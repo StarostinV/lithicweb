@@ -58,21 +58,9 @@ export class Mode {
 
     updateControls() {
         if (this.currentMode === MODES.VIEW) {
-            console.log('Before Change:', this.scene.controls.enabled);
-
             this.scene.controls.enabled = true;
-
-            console.log('After Change:', this.scene.controls.enabled);
-
-            
-            console.log('controls enabled');
         } else {
-            console.log('Before Change:', this.scene.controls.enabled);
-
             this.scene.controls.enabled = false;
-            console.log('After Change:', this.scene.controls.enabled);
-
-            console.log('controls disabled');
         }
     }
 
