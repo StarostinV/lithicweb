@@ -14,11 +14,17 @@ export class MeshObject {
         this.positions = [];
         this.labels = [];
         this.indices = [];
+        this.adjacencyGraph = null;
+        this.segments = [];
 
         this.invertMeshNormals = this.invertMeshNormals.bind(this);
 
         document.getElementById('invertNormals').addEventListener('click', () => {
             this.invertMeshNormals();
+        });
+
+        document.getElementById('update-segments').addEventListener('click', () => {
+            this.updateSegments();
         });
         
     }
@@ -83,6 +89,85 @@ export class MeshObject {
         const bvh = new MeshBVH(geometry);
         geometry.boundsTree = bvh;
         this.scene.scene.add(this.mesh);
+
+        // Build adjacency graph after setting the mesh
+        this.buildAdjacencyGraph();
+        this.segments = [];
+        // this.updateSegments();
+    }
+
+    buildAdjacencyGraph() {
+        const graph = new Map();
+        
+        // Create vertices entries
+        for (let i = 0; i < this.positions.length / 3; i++) {
+            graph.set(i, new Set());
+        }
+        
+        // Add edges from triangles
+        for (let i = 0; i < this.indices.length; i += 3) {
+            const v1 = this.indices[i];
+            const v2 = this.indices[i + 1];
+            const v3 = this.indices[i + 2];
+            
+            graph.get(v1).add(v2).add(v3);
+            graph.get(v2).add(v1).add(v3);
+            graph.get(v3).add(v1).add(v2);
+        }
+        
+        this.adjacencyGraph = graph;
+    }
+
+    updateSegments() {
+        this.segments = this.segmentMesh();
+        this.segments.forEach((segment) => {
+            const color = new THREE.Color(Math.random(), Math.random(), Math.random());
+            this.colorVertices(segment, color);
+        });
+    }
+
+    segmentMesh() {
+        if (!this.adjacencyGraph) return [];
+
+        const visited = new Set();
+        const segments = [];
+        
+        // Start flood-fill from each unvisited labeled vertex
+        for (let vertex = 0; vertex < this.positions.length / 3; vertex++) {
+            if (visited.has(vertex) || this.labels[vertex] !== 0) continue;
+            
+            const segment = this.floodFill(vertex, visited);
+            if (segment.length > 0) {
+                segments.push(segment);
+            }
+        }
+        
+        return segments;
+    }
+
+    floodFill(startVertex, visited) {
+        const segment = [];
+        const queue = [startVertex];
+        
+        while (queue.length > 0) {
+            const vertex = queue.shift();
+            
+            if (visited.has(vertex)) continue;
+            visited.add(vertex);
+            
+            if (this.labels[vertex] === 0) {
+                segment.push(vertex);
+                
+                // Add unvisited labeled neighbors to queue
+                for (const neighbor of this.adjacencyGraph.get(vertex)) {
+                    if (!visited.has(neighbor) && this.labels[neighbor] === 0) {
+                        queue.push(neighbor);
+                    }
+                }
+            }
+        }
+        
+        return segment;
     }
 
     getClickedPoint(event) {
@@ -131,6 +216,13 @@ export class MeshObject {
 
         return vertexNormal;
         
+    }
+
+    labelVertices(vertexIndices, label) {
+        vertexIndices.forEach(index => {
+            this.labels[index] = label;
+            colorVertex(index, color, this.meshColors);
+        });
     }
 
     colorVertices(vertexIndices, color) {
