@@ -17,6 +17,7 @@ export class MeshObject {
         this.indices = [];
         this.adjacencyGraph = null;
         this.segments = [];
+        this.faceColors = new Map();
 
         this.invertMeshNormals = this.invertMeshNormals.bind(this);
 
@@ -27,7 +28,10 @@ export class MeshObject {
         document.getElementById('update-segments').addEventListener('click', () => {
             this.updateSegments();
         });
-        
+
+        document.getElementById('update-segment-colors').addEventListener('click', () => {
+            this.regenerateColors();
+        });
     }
 
     isNull() {
@@ -119,11 +123,88 @@ export class MeshObject {
     }
 
     updateSegments() {
-        this.segments = this.segmentMesh();
-        this.segments.forEach((segment) => {
-            const color = new THREE.Color(Math.random(), Math.random(), Math.random());
-            this.colorVertices(segment, color);
+        const previousFaceLabels = [...this.faceLabels];
+        const newSegments = this.segmentMesh();
+        
+        // Find largest segment
+        let largestSegmentIndex = 0;
+        let maxSize = 0;
+        newSegments.forEach((segment, index) => {
+            if (segment.length > maxSize) {
+                maxSize = segment.length;
+                largestSegmentIndex = index;
+            }
         });
+
+        // Keep track of used colors
+        const usedColors = new Set();
+        usedColors.add(this.objectColor);
+
+        // Update face colors map and labels
+        const newFaceColors = new Map();
+        newSegments.forEach((segment, index) => {
+            const segmentId = index + 1;
+            
+            // For largest segment, use objectColor and ensure all vertices are colored properly
+            if (index === largestSegmentIndex) {
+                newFaceColors.set(segmentId, this.objectColor);
+                segment.forEach(vertexIndex => {
+                    this.faceLabels[vertexIndex] = segmentId;
+                    this.colorVertex(vertexIndex, this.objectColor);
+                });
+                return;
+            }
+
+            // Try to match with previous segments
+            let bestMatchId = null;
+            let bestMatchScore = 0;
+            
+            if (previousFaceLabels.length > 0) {
+                // Sample some vertices from current segment to find best matching previous segment
+                const sampleSize = Math.min(100, segment.length);
+                const samples = new Set(segment.slice(0, sampleSize));
+                
+                const previousIds = new Set(previousFaceLabels);
+                previousIds.delete(0);  // Ignore unlabeled vertices
+                
+                for (const prevId of previousIds) {
+                    let matchScore = 0;
+                    samples.forEach(vertexIndex => {
+                        if (previousFaceLabels[vertexIndex] === prevId) {
+                            matchScore++;
+                        }
+                    });
+                    
+                    if (matchScore > bestMatchScore) {
+                        bestMatchScore = matchScore;
+                        bestMatchId = prevId;
+                    }
+                }
+            }
+
+            // Use previous color if good match found and color not already used, otherwise generate new color
+            let color;
+            if (bestMatchId && this.faceColors.has(bestMatchId)) {
+                const previousColor = this.faceColors.get(bestMatchId);
+                if (!colorExistsInSet(previousColor, usedColors)) {
+                    color = previousColor;
+                } else {
+                    color = generateUniqueColor(usedColors);
+                }
+            } else {
+                color = generateUniqueColor(usedColors);
+            }
+            
+            usedColors.add(color);
+            newFaceColors.set(segmentId, color);
+            segment.forEach(vertexIndex => {
+                this.faceLabels[vertexIndex] = segmentId;
+                this.colorVertex(vertexIndex, color);
+            });
+        });
+
+        this.faceColors = newFaceColors;
+        this.segments = newSegments;
     }
 
     segmentMesh() {
@@ -288,6 +369,46 @@ export class MeshObject {
             this.updateSegments();
         }
     }
+
+    regenerateColors() {
+        const usedColors = new Set();
+        usedColors.add(this.objectColor);
+        const newFaceColors = new Map();
+
+        // Find largest segment ID
+        let largestSegmentId = null;
+        let maxSize = 0;
+        this.segments.forEach((segment, index) => {
+            const segmentId = index + 1;
+            if (segment.length > maxSize) {
+                maxSize = segment.length;
+                largestSegmentId = segmentId;
+            }
+        });
+
+        // Assign new random colors to each segment
+        this.segments.forEach((segment, index) => {
+            const segmentId = index + 1;
+            
+            // Keep objectColor for largest segment
+            if (segmentId === largestSegmentId) {
+                newFaceColors.set(segmentId, this.objectColor);
+                return;
+            }
+
+            // Generate new random color for other segments
+            const color = generateUniqueColor(usedColors);
+            usedColors.add(color);
+            newFaceColors.set(segmentId, color);
+
+            // Update vertex colors
+            segment.forEach(vertexIndex => {
+                this.colorVertex(vertexIndex, color);
+            });
+        });
+
+        this.faceColors = newFaceColors;
+    }
 }
 
 
@@ -320,4 +441,35 @@ function createMeshColors(length, labels, drawColor, objectColor) {
         }
     }
     return meshColors;
+}
+
+function colorExistsInSet(color, colorSet) {
+    for (const existingColor of colorSet) {
+        if (color.equals(existingColor)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function generateUniqueColor(usedColors) {
+    let newColor;
+    let attempts = 0;
+    const maxAttempts = 100;
+
+    do {
+        newColor = new THREE.Color(
+            Math.random(),
+            Math.random(),
+            Math.random()
+        );
+        attempts++;
+        // Break loop if we can't find a unique color after many attempts
+        if (attempts > maxAttempts) {
+            console.warn('Could not generate unique color after ' + maxAttempts + ' attempts');
+            break;
+        }
+    } while (colorExistsInSet(newColor, usedColors));
+
+    return newColor;
 }
