@@ -116,9 +116,11 @@ export default class DrawLines {
             return this.meshObject.mesh.geometry.boundsTree.closestPointToPoint(point).faceIndex;
         });
 
-        // apply getFaceVertices, take first 3 results and flatten:
-        const vertices = faceIndices.flatMap(faceIndex => getFaceVertices(this.meshObject.mesh, faceIndex).slice(0, 3));
+        const vertexIndices = faceIndices.flatMap(faceIndex => getFaceVertices(this.meshObject.mesh, faceIndex).slice(0, 3));
 
-        this.meshObject.addEdgeVertices(vertices);
+        // Create a connected path ensuring all vertices are reachable
+        const connectedPath = this.meshObject.createConnectedPath(vertexIndices);
+
+        this.meshObject.addEdgeVertices(connectedPath);
     }
 }

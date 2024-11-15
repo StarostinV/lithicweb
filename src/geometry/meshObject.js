@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import { IntersectFinder } from './intersections.js';
 import DynamicTypedArray from '../utils/DynamicTypedArray.js';
+import { PathFinder } from './PathFinder.js';
 
 export class MeshObject {
     constructor(scene, edgeColor, objectColor) {
@@ -19,6 +20,7 @@ export class MeshObject {
         this.adjacencyGraph = null;
         this.segments = [];
         this.faceColors = new Map();
+        this.pathFinder = new PathFinder(this);
 
         this.invertMeshNormals = this.invertMeshNormals.bind(this);
 
@@ -104,6 +106,7 @@ export class MeshObject {
         // Build adjacency graph after setting the mesh
         this.buildAdjacencyGraph();
         this.updateSegments();
+        this.checkMeshConnectivity();
     }
 
     buildAdjacencyGraph() {
@@ -416,6 +419,64 @@ export class MeshObject {
         });
 
         this.faceColors = newFaceColors;
+    }
+
+    findShortestPath(startVertex, endVertex) {
+        return this.pathFinder.findShortestPath(startVertex, endVertex);
+    }
+
+    areVerticesConnected(vertex1, vertex2) {
+        if (!this.adjacencyGraph) return false;
+        return this.adjacencyGraph.get(vertex1).has(vertex2);
+    }
+
+    createConnectedPath(vertices) {
+        if (!vertices || vertices.length < 2) return vertices;
+
+        const connectedPath = [vertices[0]];
+        
+        for (let i = 1; i < vertices.length; i++) {
+            const currentVertex = vertices[i];
+            const previousVertex = vertices[i - 1];
+
+            // check if vertices are valid, i.e. integers within the range of edgeLabels
+            if (previousVertex < 0 || previousVertex >= this.edgeLabels.length || currentVertex < 0 || currentVertex >= this.edgeLabels.length) {
+                console.warn("Invalid vertex indices in createConnectedPath", previousVertex, currentVertex);
+                continue;
+            }
+
+            if (this.areVerticesConnected(previousVertex, currentVertex)) {
+                // If vertices are directly connected, just add the current vertex
+                connectedPath.push(currentVertex);
+            } else {
+                // Find path between vertices and add all intermediate vertices
+                const path = this.pathFinder.findShortestPath(previousVertex, currentVertex);
+                // Skip first vertex as it's already in the path
+                connectedPath.push(...path.slice(1));
+            }
+        }
+
+        return connectedPath;
+    }
+
+    checkMeshConnectivity() {
+        const totalVertices = this.positions.length / 3;
+        const usedVertices = new Set(this.indices);
+        
+        const unusedVertices = [];
+        for (let i = 0; i < totalVertices; i++) {
+            if (!usedVertices.has(i)) {
+                unusedVertices.push(i);
+            }
+        }
+
+        if (unusedVertices.length > 0) {
+            console.warn(`Found ${unusedVertices.length} isolated vertices:`, unusedVertices);
+            return false;
+        }
+
+        console.log('Mesh is fully connected - all vertices are used in triangles');
+        return true;
     }
 }
 

@@ -9,6 +9,7 @@ export default class DrawBrush {
         this.isDrawing = false;
         this.useBrush = false;
         this.brushRadius = 0.5;
+        this.previousVertex = null;
 
         this.leftClickDown = this.mouseDown.bind(this);
         this.mouseMove = this.mouseMove.bind(this);
@@ -55,6 +56,7 @@ export default class DrawBrush {
         if (this.isDrawing) {
             this.meshObject.onDrawFinished();
             this.isDrawing = false;
+            this.previousVertex = null;
         }
     }
 
@@ -83,11 +85,25 @@ export default class DrawBrush {
 
         if (closestVertexIndex === -1) return;
 
-        if (this.mode == MODES.DRAW) {
-            this.meshObject.addEdgeVertex(closestVertexIndex);
-        } else if (this.mode == MODES.ERASE) {
-            this.meshObject.removeEdgeVertex(closestVertexIndex);
+        if (this.previousVertex === null) {
+            this.previousVertex = closestVertexIndex;
+            if (this.mode == MODES.DRAW) {
+                this.meshObject.addEdgeVertex(closestVertexIndex);
+            } else if (this.mode == MODES.ERASE) {
+                this.meshObject.removeEdgeVertex(closestVertexIndex);
+            }
+            return;
         }
+
+        const path = this.meshObject.findShortestPath(this.previousVertex, closestVertexIndex);
+        
+        if (this.mode == MODES.DRAW) {
+            this.meshObject.addEdgeVertices(path);
+        } else if (this.mode == MODES.ERASE) {
+            this.meshObject.removeEdgeVertices(path);
+        }
+
+        this.previousVertex = closestVertexIndex;
     }
 
     drawBrush(event) {
