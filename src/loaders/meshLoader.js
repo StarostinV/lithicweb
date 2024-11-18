@@ -58,9 +58,19 @@ export default class MeshLoader {
     readPLY(data) {
         const geometry = this.loader.parse(data);
 
+        const labelIds = geometry.attributes.labelid ? geometry.attributes.labelid.array : [];
         const positions = geometry.attributes.position.array;
-        const labels = geometry.attributes.labels ? geometry.attributes.labels.array : [];
         const indices = Array.from({ length: geometry.index.count }, (_, i) => geometry.index.array[i]);
+        let labels;
+
+        console.log({positions, indices, labelIds});
+
+        if (labelIds.length > 0 && !geometry.attributes.labels  ) {
+            labels = calculateVertexEdgeLabelsFromLabelIds(indices, labelIds);
+        } else {
+            labels = geometry.attributes.labels ? geometry.attributes.labels.array : [];
+        }
+
         const arrows = geometry.userData.arrows ? geometry.userData.arrows : [];
 
         return {
@@ -109,6 +119,30 @@ export default class MeshLoader {
         //     arrows: []
         // }
     }
+}
+
+
+function calculateVertexEdgeLabelsFromLabelIds(indices, labelIds) {
+    if (indices.length === 0 || labelIds.length === 0) return [];
+
+    const vertexEdgeLabels = new Uint8Array(labelIds.length);
+
+    // Process each triangle
+    for (let i = 0; i < indices.length; i += 3) {
+        const vertex1Label = labelIds[indices[i]];
+        const vertex2Label = labelIds[indices[i + 1]];
+        const vertex3Label = labelIds[indices[i + 2]];
+
+        // If any vertex in the triangle has a different label than others,
+        // mark all vertices in this triangle as edge vertices
+        if (vertex1Label !== vertex2Label || vertex2Label !== vertex3Label || vertex1Label !== vertex3Label) {
+            vertexEdgeLabels[indices[i]] = 1;
+            vertexEdgeLabels[indices[i + 1]] = 1;
+            vertexEdgeLabels[indices[i + 2]] = 1;
+        }
+    }
+
+    return vertexEdgeLabels;
 }
 
 
