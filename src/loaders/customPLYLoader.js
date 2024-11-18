@@ -137,8 +137,9 @@ class CustomPLYLoader extends PLYLoader {
                 uvs: [],
                 faceVertexUvs: [],
                 colors: [],
-                labels: [], // To store labels
-                arrows: [] // To store arrows
+                labels: [],
+                labelIds: [],
+                arrows: []
             };
             let result;
             const patternBody = /end_header\s([\s\S]*)$/;
@@ -235,8 +236,9 @@ class CustomPLYLoader extends PLYLoader {
                 uvs: [],
                 faceVertexUvs: [],
                 colors: [],
-                labels: [],  // To store labels
-                arrows: []  // To store arrows
+                labels: [],
+                labelIds: [],
+                arrows: []
             };
             const little_endian = header.format === 'binary_little_endian';
             const body = new DataView(data, header.headerLength);
@@ -267,16 +269,21 @@ class CustomPLYLoader extends PLYLoader {
             const attrX = findAttrName(['x', 'px', 'posx']) || 'x';
             const attrY = findAttrName(['y', 'py', 'posy']) || 'y';
             const attrZ = findAttrName(['z', 'pz', 'posz']) || 'z';
-            const attrLabel = findAttrName(['labels']) || 'labels';
+            const attrLabels = findAttrName(['labels']);
+            const attrLabelId = findAttrName(['labelid']);
             const attrStartIndex = findAttrName(['start_index']) || 'start_index';
             const attrEndIndex = findAttrName(['end_index']) || 'end_index';
 
             if (elementName === 'vertex') {
                 buffer.vertices.push(element[attrX], element[attrY], element[attrZ]);
 
-                // Store labels if present
-                if (attrLabel in element) {
-                    buffer.labels.push(element[attrLabel]);
+                if (attrLabels) {
+                    if (!buffer.labels) buffer.labels = [];
+                    buffer.labels.push(element[attrLabels]);
+                }
+                if (attrLabelId) {
+                    if (!buffer.labelIds) buffer.labelIds = [];
+                    buffer.labelIds.push(element[attrLabelId]);
                 }
             } else if (elementName === 'face') {
                 const vertex_indices = element.vertex_indices || element.vertex_index;
@@ -301,12 +308,15 @@ class CustomPLYLoader extends PLYLoader {
             }
 
             geometry.setAttribute('position', new THREE.Float32BufferAttribute(buffer.vertices, 3));
-            if (buffer.labels.length > 0) {
+            
+            if (buffer.labels && buffer.labels.length > 0) {
                 geometry.setAttribute('labels', new THREE.Int32BufferAttribute(buffer.labels, 1));
+            }
+            if (buffer.labelIds && buffer.labelIds.length > 0) {
+                geometry.setAttribute('labelid', new THREE.Int32BufferAttribute(buffer.labelIds, 1));
             }
 
             geometry.userData.arrows = buffer.arrows;
-
             geometry.computeBoundingSphere();
             return geometry;
         }
