@@ -63,8 +63,6 @@ export default class MeshLoader {
         const indices = Array.from({ length: geometry.index.count }, (_, i) => geometry.index.array[i]);
         let labels;
 
-        console.log({positions, indices, labelIds});
-
         if (labelIds.length > 0 && !geometry.attributes.labels  ) {
             labels = calculateVertexEdgeLabelsFromLabelIds(indices, labelIds);
         } else {
