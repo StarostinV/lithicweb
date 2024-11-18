@@ -1,10 +1,10 @@
 export class PathFinder {
-    constructor(meshObject) {
-        this.meshObject = meshObject;
+    constructor(annotatedMesh) {
+        this.annotatedMesh = annotatedMesh;
     }
 
     findShortestPath(startVertex, endVertex) {
-        if (!this.meshObject.adjacencyGraph || startVertex === endVertex) {
+        if (!this.annotatedMesh.adjacencyGraph || startVertex === endVertex) {
             return [startVertex];
         }
 
@@ -29,7 +29,7 @@ export class PathFinder {
             closedSet.add(current);
 
             // Check neighbors
-            for (const neighbor of this.meshObject.adjacencyGraph.get(current)) {
+            for (const neighbor of this.annotatedMesh.adjacencyGraph.get(current)) {
                 if (closedSet.has(neighbor)) continue;
 
                 const tentativeGScore = gScore.get(current) + this.getVertexDistance(current, neighbor);
@@ -52,14 +52,14 @@ export class PathFinder {
 
     heuristic(vertexIndex1, vertexIndex2) {
         // Using 3D Euclidean distance as heuristic
-        const pos1 = this.meshObject.indexToVertex(vertexIndex1);
-        const pos2 = this.meshObject.indexToVertex(vertexIndex2);
+        const pos1 = this.annotatedMesh.indexToVertex(vertexIndex1);
+        const pos2 = this.annotatedMesh.indexToVertex(vertexIndex2);
         return pos1.distanceTo(pos2);
     }
 
     getVertexDistance(vertexIndex1, vertexIndex2) {
-        const pos1 = this.meshObject.indexToVertex(vertexIndex1);
-        const pos2 = this.meshObject.indexToVertex(vertexIndex2);
+        const pos1 = this.annotatedMesh.indexToVertex(vertexIndex1);
+        const pos2 = this.annotatedMesh.indexToVertex(vertexIndex2);
         return pos1.distanceTo(pos2);
     }
 
