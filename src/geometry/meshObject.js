@@ -22,6 +22,7 @@ export class MeshObject {
         this.faceColors = new Map();
         this.pathFinder = new PathFinder(this);
         this.segmenter = new MeshSegmenter(this);
+        this.showSegments = true;
 
         this.invertMeshNormals = this.invertMeshNormals.bind(this);
 
@@ -30,11 +31,32 @@ export class MeshObject {
         });
 
         document.getElementById('update-segments').addEventListener('click', () => {
-            this.updateSegments();
+            if (this.showSegments) {
+                this.updateSegments();
+            }
         });
 
         document.getElementById('update-segment-colors').addEventListener('click', () => {
             this.regenerateColors();
+        });
+
+        document.getElementById('show-segments').addEventListener('click', () => {
+            this.showSegments = !this.showSegments;
+            if (!this.showSegments) {
+                document.getElementById('update-segment-colors').disabled = true;
+            } else {
+                document.getElementById('update-segment-colors').disabled = false;
+                if (!document.getElementById('auto-segments').checked) {
+                    this.updateSegments();
+                }
+            }
+            this.updateSegmentColors();
+        });
+
+        document.getElementById('auto-segments').addEventListener('click', () => {
+            if (document.getElementById('show-segments').checked) {
+                this.updateSegments();
+            }
         });
     }
 
@@ -105,6 +127,10 @@ export class MeshObject {
         this.faceLabels = faceLabels;
         this.faceColors = faceColors;
         this.segments = newSegments;
+
+        if (!this.showSegments) {
+            this.colorSegmentsObjectColor();
+        }
     }
 
     getClickedPoint(event) {
@@ -157,12 +183,14 @@ export class MeshObject {
 
     addEdgeVertex(vertexIndex) {
         this.edgeLabels[vertexIndex] = 1;
+        this.faceLabels[vertexIndex] = 0;
         this.colorVertex(vertexIndex, this.edgeColor);
     }
 
     addEdgeVertices(vertexIndices) {
         vertexIndices.forEach(index => {
             this.edgeLabels[index] = 1;
+            this.faceLabels[index] = 0;
             this.colorVertex(index, this.edgeColor);
         });
     }
@@ -193,6 +221,26 @@ export class MeshObject {
         if (document.getElementById('auto-segments').checked) {
             this.updateSegments();
         }
+    }
+
+    updateSegmentColors() {
+        if (this.showSegments) {
+            this.colorSegmentsFaceColor();
+        } else {
+            this.colorSegmentsObjectColor();
+        }
+    }
+
+    colorSegmentsFaceColor() {
+        this.segments.forEach((segment, index) => {
+            segment.forEach(vertexIndex => this.colorVertex(vertexIndex, this.faceColors.get(index + 1)));
+        });
+    }
+
+    colorSegmentsObjectColor() {
+        this.segments.forEach(segment => {
+            segment.forEach(vertexIndex => this.colorVertex(vertexIndex, this.objectColor));
+        });
     }
 
     regenerateColors() {
