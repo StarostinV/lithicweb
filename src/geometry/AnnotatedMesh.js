@@ -1,6 +1,7 @@
 import { BasicMesh } from './BasicMesh.js';
 import { PathFinder } from './PathFinder.js';
 import { MeshSegmenter } from './segmentation.js';
+import { ActionHistory } from '../utils/ActionHistory.js';
 
 export class AnnotatedMesh extends BasicMesh {
     constructor(scene, edgeColor, objectColor) {
@@ -14,6 +15,9 @@ export class AnnotatedMesh extends BasicMesh {
         this.faceColors = new Map();
         this.pathFinder = new PathFinder(this);
         this.segmenter = new MeshSegmenter(this);
+        this.history = new ActionHistory();
+        this.isRestoringState = false; // Flag to prevent recording during restore
+        this.pendingAction = null; // Store state before draw operation
 
         this.setupEventListeners();
     }
@@ -25,6 +29,7 @@ export class AnnotatedMesh extends BasicMesh {
         this.edgeLabels = [];
         this.meshColors = null;
         this.faceColors.clear();
+        this.history.clear();
     }
 
     setupEventListeners() {
@@ -65,11 +70,21 @@ export class AnnotatedMesh extends BasicMesh {
     }
 
     addEdgeVertex(vertexIndex) {
+        // Capture state before first modification in a drawing operation
+        if (!this.isRestoringState && this.pendingAction === null) {
+            this.startDrawOperation('draw');
+        }
+        
         this.edgeLabels[vertexIndex] = 1;
         this.colorVertex(vertexIndex, this.edgeColor);
     }
 
     addEdgeVertices(vertexIndices) {
+        // Capture state before first modification in a drawing operation
+        if (!this.isRestoringState && this.pendingAction === null) {
+            this.startDrawOperation('draw');
+        }
+        
         vertexIndices.forEach(index => {
             this.edgeLabels[index] = 1;
             this.colorVertex(index, this.edgeColor);
@@ -77,11 +92,21 @@ export class AnnotatedMesh extends BasicMesh {
     }
 
     removeEdgeVertex(vertexIndex) {
+        // Capture state before first modification in an erase operation
+        if (!this.isRestoringState && this.pendingAction === null) {
+            this.startDrawOperation('erase');
+        }
+        
         this.edgeLabels[vertexIndex] = 0;
         this.colorVertex(vertexIndex, this.objectColor);
     }
 
     removeEdgeVertices(vertexIndices) {
+        // Capture state before first modification in an erase operation
+        if (!this.isRestoringState && this.pendingAction === null) {
+            this.startDrawOperation('erase');
+        }
+        
         vertexIndices.forEach(index => {
             this.edgeLabels[index] = 0;
             this.colorVertex(index, this.objectColor);
@@ -99,9 +124,109 @@ export class AnnotatedMesh extends BasicMesh {
     }
 
     onDrawFinished() {
+        // Finalize the history action when drawing is complete
+        if (!this.isRestoringState && this.pendingAction !== null) {
+            this.finishDrawOperation();
+        }
+        
         if (document.getElementById('auto-segments').checked) {
             this.updateSegments();
         }
+    }
+
+    // Start tracking a draw operation
+    startDrawOperation(actionType) {
+        this.pendingAction = {
+            type: actionType,
+            previousState: this.getCurrentEdgeIndices()
+        };
+    }
+
+    // Finish tracking and save to history
+    finishDrawOperation() {
+        if (this.pendingAction === null) return;
+
+        const currentState = this.getCurrentEdgeIndices();
+        
+        // Only save if there were actual changes
+        if (!this.setsEqual(this.pendingAction.previousState, currentState)) {
+            this.history.push({
+                type: this.pendingAction.type,
+                previousState: this.pendingAction.previousState,
+                newState: currentState,
+                timestamp: Date.now(),
+                description: this.pendingAction.type === 'draw' ? 'Draw edges' : 'Erase edges'
+            });
+        }
+
+        this.pendingAction = null;
+    }
+
+    // Get current edge indices where edgeLabels === 1
+    getCurrentEdgeIndices() {
+        const indices = new Set();
+        for (let i = 0; i < this.edgeLabels.length; i++) {
+            if (this.edgeLabels[i] === 1) {
+                indices.add(i);
+            }
+        }
+        return indices;
+    }
+
+    // Restore state from edge indices
+    restoreEdgeState(edgeIndices) {
+        this.isRestoringState = true;
+        
+        // Clear all edges
+        for (let i = 0; i < this.edgeLabels.length; i++) {
+            if (this.edgeLabels[i] === 1) {
+                this.edgeLabels[i] = 0;
+                this.colorVertex(i, this.objectColor);
+            }
+        }
+        
+        // Restore specified edges
+        edgeIndices.forEach(index => {
+            this.edgeLabels[index] = 1;
+            this.colorVertex(index, this.edgeColor);
+        });
+        
+        this.isRestoringState = false;
+    }
+
+    // Undo last action
+    undo() {
+        const action = this.history.undo();
+        if (action) {
+            this.restoreEdgeState(action.previousState);
+            if (document.getElementById('auto-segments').checked) {
+                this.updateSegments();
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // Redo last undone action
+    redo() {
+        const action = this.history.redo();
+        if (action) {
+            this.restoreEdgeState(action.newState);
+            if (document.getElementById('auto-segments').checked) {
+                this.updateSegments();
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // Helper to compare two sets
+    setsEqual(setA, setB) {
+        if (setA.size !== setB.size) return false;
+        for (const item of setA) {
+            if (!setB.has(item)) return false;
+        }
+        return true;
     }
 
     regenerateColors() {
