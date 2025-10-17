@@ -18,6 +18,8 @@ export class AnnotatedMesh extends BasicMesh {
         this.history = new ActionHistory();
         this.isRestoringState = false; // Flag to prevent recording during restore
         this.pendingAction = null; // Store state before draw operation
+        this.currentEdgeIndices = new Set(); // Track edge indices in real-time
+        this.initialState = new Set(); // Store the loaded mesh's initial state
 
         this.setupEventListeners();
     }
@@ -52,6 +54,18 @@ export class AnnotatedMesh extends BasicMesh {
         }
 
         this.edgeLabels = labels;
+        
+        // Initialize currentEdgeIndices from labels
+        this.currentEdgeIndices = new Set();
+        for (let i = 0; i < labels.length; i++) {
+            if (labels[i] === 1) {
+                this.currentEdgeIndices.add(i);
+            }
+        }
+
+        // Save initial state (loaded mesh state)
+        this.initialState = new Set(this.currentEdgeIndices);
+        
         super.setMesh(positions, indices);
         this.updateSegments();
     }
@@ -77,6 +91,11 @@ export class AnnotatedMesh extends BasicMesh {
         
         this.edgeLabels[vertexIndex] = 1;
         this.colorVertex(vertexIndex, this.edgeColor);
+        
+        // Track in real-time (only if not restoring)
+        if (!this.isRestoringState) {
+            this.currentEdgeIndices.add(vertexIndex);
+        }
     }
 
     addEdgeVertices(vertexIndices) {
@@ -88,6 +107,11 @@ export class AnnotatedMesh extends BasicMesh {
         vertexIndices.forEach(index => {
             this.edgeLabels[index] = 1;
             this.colorVertex(index, this.edgeColor);
+            
+            // Track in real-time (only if not restoring)
+            if (!this.isRestoringState) {
+                this.currentEdgeIndices.add(index);
+            }
         });
     }
 
@@ -99,6 +123,11 @@ export class AnnotatedMesh extends BasicMesh {
         
         this.edgeLabels[vertexIndex] = 0;
         this.colorVertex(vertexIndex, this.objectColor);
+        
+        // Track in real-time (only if not restoring)
+        if (!this.isRestoringState) {
+            this.currentEdgeIndices.delete(vertexIndex);
+        }
     }
 
     removeEdgeVertices(vertexIndices) {
@@ -110,6 +139,11 @@ export class AnnotatedMesh extends BasicMesh {
         vertexIndices.forEach(index => {
             this.edgeLabels[index] = 0;
             this.colorVertex(index, this.objectColor);
+            
+            // Track in real-time (only if not restoring)
+            if (!this.isRestoringState) {
+                this.currentEdgeIndices.delete(index);
+            }
         });
     }
 
@@ -138,7 +172,8 @@ export class AnnotatedMesh extends BasicMesh {
     startDrawOperation(actionType) {
         this.pendingAction = {
             type: actionType,
-            previousState: this.getCurrentEdgeIndices()
+            // Clone the current set (O(E) where E = number of edges, not O(V))
+            previousState: new Set(this.currentEdgeIndices)
         };
     }
 
@@ -146,7 +181,8 @@ export class AnnotatedMesh extends BasicMesh {
     finishDrawOperation() {
         if (this.pendingAction === null) return;
 
-        const currentState = this.getCurrentEdgeIndices();
+        // Use the current tracked set (O(1) access, not O(V) iteration)
+        const currentState = new Set(this.currentEdgeIndices);
         
         // Only save if there were actual changes
         if (!this.setsEqual(this.pendingAction.previousState, currentState)) {
@@ -162,33 +198,24 @@ export class AnnotatedMesh extends BasicMesh {
         this.pendingAction = null;
     }
 
-    // Get current edge indices where edgeLabels === 1
-    getCurrentEdgeIndices() {
-        const indices = new Set();
-        for (let i = 0; i < this.edgeLabels.length; i++) {
-            if (this.edgeLabels[i] === 1) {
-                indices.add(i);
-            }
-        }
-        return indices;
-    }
-
     // Restore state from edge indices
     restoreEdgeState(edgeIndices) {
         this.isRestoringState = true;
         
-        // Clear all edges
-        for (let i = 0; i < this.edgeLabels.length; i++) {
-            if (this.edgeLabels[i] === 1) {
-                this.edgeLabels[i] = 0;
-                this.colorVertex(i, this.objectColor);
-            }
-        }
+        // Clear all edges (iterate only current edge indices, not all vertices)
+        this.currentEdgeIndices.forEach(index => {
+            this.edgeLabels[index] = 0;
+            this.colorVertex(index, this.objectColor);
+        });
+        
+        // Update tracked set
+        this.currentEdgeIndices.clear();
         
         // Restore specified edges
         edgeIndices.forEach(index => {
             this.edgeLabels[index] = 1;
             this.colorVertex(index, this.edgeColor);
+            this.currentEdgeIndices.add(index);
         });
         
         this.isRestoringState = false;
@@ -218,6 +245,42 @@ export class AnnotatedMesh extends BasicMesh {
             return true;
         }
         return false;
+    }
+
+    // Jump to view a specific state without modifying history
+    jumpToState(targetIndex) {
+        const currentIndex = this.history.getCurrentIndex();
+        
+        if (targetIndex === currentIndex) {
+            return; // Already viewing this state
+        }
+
+        // Determine target state
+        let targetState = null;
+        
+        if (targetIndex === 0) {
+            // Jump to initial state (loaded mesh state)
+            targetState = this.initialState;
+        } else if (targetIndex <= this.history.undoStack.length) {
+            // Target is in undo stack
+            targetState = this.history.undoStack[targetIndex - 1].newState;
+        } else {
+            // Target is in redo stack
+            const redoIndex = targetIndex - this.history.undoStack.length - 1;
+            targetState = this.history.redoStack[this.history.redoStack.length - 1 - redoIndex].newState;
+        }
+
+        if (targetState) {
+            // Update view index (doesn't modify stacks)
+            this.history.jumpToViewState(targetIndex);
+            
+            // Apply the target state visually
+            this.restoreEdgeState(targetState);
+            
+            if (document.getElementById('auto-segments').checked) {
+                this.updateSegments();
+            }
+        }
     }
 
     // Helper to compare two sets

@@ -122,7 +122,7 @@
                 </div>
                 <div class="border-t pt-2 mt-2">
                     <h3 class="text-sm font-semibold mb-2">Action History</h3>
-                    <div id="historyList" class="space-y-1 max-h-96 overflow-y-auto">
+                    <div id="historyList" class="space-y-1 overflow-y-auto" style="max-height: 400px;">
                         <p class="text-sm text-gray-500 italic">No actions yet</p>
                     </div>
                 </div>
@@ -200,6 +200,8 @@ This tool allows you to annotate 3D models and is primarily developed for annota
 The History panel provides a complete view of all your annotation actions:
 - **Undo/Redo**: Use buttons or keyboard shortcuts to undo/redo actions
 - **Visual Timeline**: See all actions with timestamps and edge counts
+- **Clickable States**: Click any state in the timeline to jump directly to it
+- **Current State Indicator**: The active state is highlighted in blue
 - **Memory Efficient**: Only stores edge indices, not full mesh data
 - **Clear History**: Remove all history to free up memory
 
