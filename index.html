@@ -38,7 +38,22 @@
         <canvas id="renderCanvas" class="w-full h-screen"></canvas>
     </div>
 
-    <div id="sideMenu" class="side-menu">
+    <!-- Floating Undo/Redo buttons for tablet users -->
+    <div style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-150%); z-index: 100; pointer-events: none;">
+        <div class="flex items-center space-x-8 select-none" style="pointer-events: auto;">
+            <button id="floatingUndoBtn"
+              class="text-gray-500 hover:text-white transition-transform hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed p-2"
+              title="Undo (Ctrl+Z)" disabled>
+              <i class="fas fa-undo fa-2x"></i>
+            </button>
+            <button id="floatingRedoBtn"
+              class="text-gray-500 hover:text-white transition-transform hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed p-2"
+              title="Redo (Ctrl+Shift+Z)" disabled>
+              <i class="fas fa-redo fa-2x"></i>
+            </button>
+        </div>
+    </div>
+                        <div id="sideMenu" class="side-menu">
         <div id="viewPanel" class="panel">
             <h2 class="text-xl font-bold mb-4">View Mode</h2>
             <div class="flex flex-col space-y-2">
@@ -439,6 +454,23 @@ Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.staros
 
 #historyList::-webkit-scrollbar-thumb:hover {
     background: #555;
+}
+
+/* Floating action buttons */
+.floating-action-btn {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.floating-action-btn:not(:disabled):hover {
+    transform: scale(1.1);
+}
+
+.floating-action-btn:not(:disabled):active {
+    transform: scale(0.95);
 }
     </style>
 </body>

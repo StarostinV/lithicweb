@@ -6,6 +6,10 @@ export class HistoryPanel {
         this.clearHistoryBtn = document.getElementById('clearHistoryBtn');
         this.historyList = document.getElementById('historyList');
         this.historyStats = document.getElementById('historyStats');
+        
+        // Floating buttons for tablet users
+        this.floatingUndoBtn = document.getElementById('floatingUndoBtn');
+        this.floatingRedoBtn = document.getElementById('floatingRedoBtn');
 
         this.setupEventListeners();
         this.updateUI(meshObject.history);
@@ -15,13 +19,23 @@ export class HistoryPanel {
         // Listen to history changes
         this.meshObject.history.addListener((history) => this.updateUI(history));
 
-        // Undo button
+        // Undo button (panel)
         this.undoBtn.addEventListener('click', () => {
             this.meshObject.undo();
         });
 
-        // Redo button
+        // Redo button (panel)
         this.redoBtn.addEventListener('click', () => {
+            this.meshObject.redo();
+        });
+
+        // Floating undo button
+        this.floatingUndoBtn.addEventListener('click', () => {
+            this.meshObject.undo();
+        });
+
+        // Floating redo button
+        this.floatingRedoBtn.addEventListener('click', () => {
             this.meshObject.redo();
         });
 
@@ -34,9 +48,14 @@ export class HistoryPanel {
     }
 
     updateUI(history) {
-        // Update button states
-        this.undoBtn.disabled = !history.canUndo();
-        this.redoBtn.disabled = !history.canRedo();
+        // Update button states (both panel and floating buttons)
+        const canUndo = history.canUndo();
+        const canRedo = history.canRedo();
+        
+        this.undoBtn.disabled = !canUndo;
+        this.redoBtn.disabled = !canRedo;
+        this.floatingUndoBtn.disabled = !canUndo;
+        this.floatingRedoBtn.disabled = !canRedo;
 
         // Update stats
         const undoCount = history.getUndoStack().length;
