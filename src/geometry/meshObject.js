@@ -304,12 +304,23 @@ export class MeshObject {
         
         // Only save if there were actual changes
         if (!this.setsEqual(this.pendingAction.previousState, currentState)) {
+            // Use custom description if provided, otherwise generate based on type
+            let description = this.pendingAction.description;
+            if (!description) {
+                switch (this.pendingAction.type) {
+                    case 'draw': description = 'Draw edges'; break;
+                    case 'erase': description = 'Erase edges'; break;
+                    case 'model': description = 'AI segmentation'; break;
+                    default: description = this.pendingAction.type;
+                }
+            }
+            
             this.history.push({
                 type: this.pendingAction.type,
                 previousState: this.pendingAction.previousState,
                 newState: currentState,
                 timestamp: Date.now(),
-                description: this.pendingAction.type === 'draw' ? 'Draw edges' : 'Erase edges'
+                description: description
             });
         }
 

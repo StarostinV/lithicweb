@@ -147,7 +147,12 @@ export class HistoryPanel {
         
         const timestamp = new Date(action.timestamp).toLocaleTimeString();
         const edgeCount = action.newState ? action.newState.size : 0;
-        const icon = action.type === 'draw' ? '<i class="fas fa-pen"></i>' : '<i class="fas fa-eraser"></i>';
+        let icon = '<i class="fas fa-pen"></i>';
+        if (action.type === 'erase') {
+            icon = '<i class="fas fa-eraser"></i>';
+        } else if (action.type === 'model') {
+            icon = '<i class="fas fa-brain text-purple-600"></i>';
+        }
         
         item.innerHTML = `
             <div class="flex justify-between items-start">

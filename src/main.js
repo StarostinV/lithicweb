@@ -8,6 +8,7 @@ import DrawLines from './components/drawLines.js';
 import MeshLoader from './loaders/meshLoader.js';
 import DrawBrush from './components/drawBrush.js';
 import { HistoryPanel } from './components/historyPanel.js';
+import { ModelPanel } from './components/modelPanel.js';
 
 //colors
 const drawColor = new THREE.Color(1, 0.6, 0.2); // Orange
@@ -32,8 +33,10 @@ const drawBrush = new DrawBrush(scene, mode, meshObject);
 const meshLoader = new MeshLoader(meshObject, arrowDrawer);
 
 // History panel
-
 const historyPanel = new HistoryPanel(meshObject);
+
+// Model panel (AI inference)
+const modelPanel = new ModelPanel(meshObject);
 
 document.getElementById('exportAnnotations').addEventListener('click', () => {
     exportAnnotations(meshObject.mesh, meshObject.meshColors, arrowDrawer, meshLoader);
@@ -66,6 +69,11 @@ document.getElementById('drawPanelBtn').addEventListener('click', () => {
 document.getElementById('arrowPanelBtn').addEventListener('click', () => {
     showHidePanel('arrowPanel');
     mode.setMode(MODES.ARROW, true);
+});
+
+document.getElementById('modelPanelBtn').addEventListener('click', () => {
+    showHidePanel('modelPanel');
+    mode.setMode(MODES.VIEW, true);
 });
 
 document.getElementById('historyPanelBtn').addEventListener('click', () => {
