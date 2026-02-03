@@ -193,9 +193,23 @@ function updateCursor(mode) {
 function updatePanelBtnStates(modePanel) {
     const buttons = document.querySelectorAll('.toggle-button');
     buttons.forEach(button => {
+        // Skip special colored buttons (model, evaluation) unless they're the active panel
+        const isModelBtn = button.id === 'modelPanelBtn';
+        const isEvalBtn = button.id === 'evaluationPanelBtn';
+        const isHistoryBtn = button.id === 'historyPanelBtn';
+        
         button.classList.remove('bg-blue-500', 'text-white');
+        
         if (button.id === `${modePanel}PanelBtn`) {
             button.classList.add('bg-blue-500', 'text-white');
+        } else if (isModelBtn) {
+            // Restore model button's default purple style
+            button.classList.remove('bg-gray-300', 'text-gray-700');
+            button.classList.add('bg-purple-300', 'text-purple-800');
+        } else if (isEvalBtn) {
+            // Restore evaluation button's default teal style
+            button.classList.remove('bg-gray-300', 'text-gray-700');
+            button.classList.add('bg-teal-300', 'text-teal-800');
         } else {
             button.classList.add('bg-gray-300', 'text-gray-700');
         }

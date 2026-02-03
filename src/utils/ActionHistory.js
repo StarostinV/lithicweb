@@ -7,26 +7,76 @@ export class ActionHistory {
         this.currentViewIndex = 0; // Track which state we're viewing (0 = initial)
     }
 
+    /**
+     * Check if an action is protected from deletion.
+     * Protected actions: model predictions, labeled (GT/Pred), or renamed states.
+     * @param {Object} action - The action to check
+     * @returns {boolean} True if protected
+     */
+    isActionProtected(action) {
+        if (!action) return false;
+        // Explicitly protected (GT/Pred labeled)
+        if (action.protected) return true;
+        // Model predictions are auto-protected
+        if (action.type === 'model') return true;
+        // Renamed states are protected
+        if (action.customDescription) return true;
+        return false;
+    }
+
     push(action) {
         // Add timestamp if not present
         if (!action.timestamp) {
             action.timestamp = Date.now();
         }
 
-        // If we're viewing an old state, truncate future states
+        // If we're viewing an old state, handle truncation with protection
         if (this.currentViewIndex < this.undoStack.length) {
+            // Collect protected states that would be truncated
+            const protectedStates = [];
+            for (let i = this.currentViewIndex; i < this.undoStack.length; i++) {
+                if (this.isActionProtected(this.undoStack[i])) {
+                    protectedStates.push(this.undoStack[i]);
+                }
+            }
+            // Also collect protected states from redo stack
+            for (const redoAction of this.redoStack) {
+                if (this.isActionProtected(redoAction)) {
+                    protectedStates.push(redoAction);
+                }
+            }
+            
+            // Truncate to current view position
             this.undoStack = this.undoStack.slice(0, this.currentViewIndex);
             this.redoStack = [];
+            
+            // Push the new action
+            this.undoStack.push(action);
+            
+            // Re-add protected states after the new action
+            for (const protectedAction of protectedStates) {
+                this.undoStack.push(protectedAction);
+            }
+        } else {
+            this.undoStack.push(action);
+            this.redoStack = []; // Clear redo stack when new action is performed
         }
-
-        this.undoStack.push(action);
         
-        // Limit stack size for memory efficiency
-        if (this.undoStack.length > this.maxHistorySize) {
-            this.undoStack.shift();
+        // Limit stack size for memory efficiency (but don't remove protected states)
+        while (this.undoStack.length > this.maxHistorySize) {
+            // Find first non-protected state to remove
+            let removed = false;
+            for (let i = 0; i < this.undoStack.length - 1; i++) {
+                if (!this.isActionProtected(this.undoStack[i])) {
+                    this.undoStack.splice(i, 1);
+                    removed = true;
+                    break;
+                }
+            }
+            // If all states are protected, just break to avoid infinite loop
+            if (!removed) break;
         }
         
-        this.redoStack = []; // Clear redo stack when new action is performed
         this.currentViewIndex = this.undoStack.length; // Update view to latest
         this.notifyListeners();
     }
@@ -98,6 +148,86 @@ export class ActionHistory {
 
     getRedoStack() {
         return [...this.redoStack];
+    }
+
+    /**
+     * Get action at a specific state index.
+     * @param {number} stateIndex - State index (1-based, 0 is initial state)
+     * @returns {Object|null} The action or null if invalid index
+     */
+    getActionAtIndex(stateIndex) {
+        if (stateIndex === 0) return null; // Initial state has no action
+        
+        if (stateIndex <= this.undoStack.length) {
+            return this.undoStack[stateIndex - 1];
+        }
+        
+        const redoIndex = stateIndex - this.undoStack.length - 1;
+        if (redoIndex < this.redoStack.length) {
+            return this.redoStack[this.redoStack.length - 1 - redoIndex];
+        }
+        
+        return null;
+    }
+
+    /**
+     * Set protection status for a state.
+     * @param {number} stateIndex - State index (1-based)
+     * @param {boolean} isProtected - Whether to protect the state
+     */
+    setProtected(stateIndex, isProtected) {
+        const action = this.getActionAtIndex(stateIndex);
+        if (action) {
+            action.protected = isProtected;
+            this.notifyListeners();
+        }
+    }
+
+    /**
+     * Rename a state (also protects it).
+     * @param {number} stateIndex - State index (1-based)
+     * @param {string} newDescription - New description for the state
+     */
+    renameState(stateIndex, newDescription) {
+        const action = this.getActionAtIndex(stateIndex);
+        if (action) {
+            action.customDescription = newDescription;
+            this.notifyListeners();
+        }
+    }
+
+    /**
+     * Clear custom description (but keep original description).
+     * @param {number} stateIndex - State index (1-based)
+     */
+    clearCustomDescription(stateIndex) {
+        const action = this.getActionAtIndex(stateIndex);
+        if (action) {
+            delete action.customDescription;
+            this.notifyListeners();
+        }
+    }
+
+    /**
+     * Get the display description for a state.
+     * @param {number} stateIndex - State index (1-based)
+     * @returns {string} The description to display
+     */
+    getDisplayDescription(stateIndex) {
+        const action = this.getActionAtIndex(stateIndex);
+        if (!action) return 'Initial State';
+        return action.customDescription || action.description || action.type;
+    }
+
+    /**
+     * Check if a state is protected.
+     * @param {number} stateIndex - State index (1-based, 0 is always unprotected)
+     * @returns {boolean}
+     */
+    isStateProtected(stateIndex) {
+        if (stateIndex === 0) return false;
+        const action = this.getActionAtIndex(stateIndex);
+        return this.isActionProtected(action);
     }
 
     // Listener pattern for UI updates

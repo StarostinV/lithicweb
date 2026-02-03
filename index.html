@@ -26,6 +26,7 @@
         <button id="arrowPanelBtn" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Erase Mode">Arrows</button>
         <button id="modelPanelBtn" class="toggle-button bg-purple-300 text-purple-800 px-4 py-2 rounded hover:bg-purple-400" title="AI Model Inference">Model</button>
         <button id="historyPanelBtn" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="View History">History</button>
+        <button id="evaluationPanelBtn" class="toggle-button bg-teal-300 text-teal-800 px-4 py-2 rounded hover:bg-teal-400" title="Evaluation Mode">Evaluation</button>
         <!-- <button id="invertNormals" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Invert Normals">Invert normals</button> -->        
         <button id="updateLight" class="bg-yellow-200 text-yellow-800 px-4 py-2 rounded hover:bg-yellow-300" title="Update Light Direction">
             <i class="fas fa-lightbulb"></i>
@@ -195,6 +196,123 @@
                 </div>
             </div>
         </div>
+        <div id="evaluationPanel" class="panel hidden">
+            <h2 class="text-xl font-bold mb-4"><i class="fas fa-chart-bar"></i> Evaluation</h2>
+            <div class="flex flex-col space-y-3">
+                <!-- GT/Pred Status -->
+                <div class="eval-section">
+                    <h3 class="text-sm font-semibold mb-2">Comparison States</h3>
+                    <div class="eval-status-row">
+                        <span class="eval-status-label">Ground Truth:</span>
+                        <span id="evalGtStatus" class="eval-status-value text-gray-400">Not set</span>
+                        <button id="evalClearGt" class="eval-clear-btn" title="Clear Ground Truth">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="eval-status-row">
+                        <span class="eval-status-label">Prediction:</span>
+                        <span id="evalPredStatus" class="eval-status-value text-gray-400">Not set</span>
+                        <button id="evalClearPred" class="eval-clear-btn" title="Clear Prediction">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Use GT/Pred buttons in History panel to set states</p>
+                </div>
+
+                <!-- Parameters -->
+                <div class="eval-section border-t pt-3">
+                    <h3 class="text-sm font-semibold mb-2">Parameters</h3>
+                    <div class="eval-param-row">
+                        <label for="evalIouThreshold">IoU Threshold:</label>
+                        <input type="range" id="evalIouThreshold" min="0" max="1" step="0.05" value="0.5" class="eval-slider">
+                        <span id="evalIouValue" class="eval-param-value">0.50</span>
+                    </div>
+                    <div class="eval-param-row">
+                        <label for="evalOversegThreshold">OverSeg Threshold:</label>
+                        <input type="range" id="evalOversegThreshold" min="0" max="0.5" step="0.01" value="0.1" class="eval-slider">
+                        <span id="evalOversegValue" class="eval-param-value">0.10</span>
+                    </div>
+                    <div class="eval-param-row">
+                        <label for="evalUndersegThreshold">UnderSeg Threshold:</label>
+                        <input type="range" id="evalUndersegThreshold" min="0" max="0.5" step="0.01" value="0.1" class="eval-slider">
+                        <span id="evalUndersegValue" class="eval-param-value">0.10</span>
+                    </div>
+                    <button id="evalComputeBtn" class="w-full bg-teal-500 text-white px-4 py-2 rounded hover:bg-teal-600 mt-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <i class="fas fa-calculator"></i> Compute Metrics
+                    </button>
+                </div>
+
+                <!-- Results -->
+                <div class="eval-section border-t pt-3">
+                    <h3 class="text-sm font-semibold mb-2">Results</h3>
+                    <div id="evalResults" class="eval-results">
+                        <p class="text-gray-400 italic">Compute metrics to see results</p>
+                    </div>
+                    <p class="eval-hover-hint"><i class="fas fa-info-circle"></i> Hover over metrics for explanations</p>
+                </div>
+
+                <!-- Error Breakdown -->
+                <div class="eval-section border-t pt-3">
+                    <h3 class="text-sm font-semibold mb-2">Error Breakdown</h3>
+                    <div id="evalErrorBreakdown" class="eval-error-breakdown">
+                    </div>
+                </div>
+
+                <!-- Visualization Mode -->
+                <div class="eval-section border-t pt-3">
+                    <h3 class="text-sm font-semibold mb-2">Visualization Mode</h3>
+                    <div class="eval-viz-section-label">States</div>
+                    <div class="eval-viz-modes">
+                        <label class="eval-radio-label">
+                            <input type="radio" name="evalVizMode" value="gt">
+                            <span>Ground Truth</span>
+                        </label>
+                        <label class="eval-radio-label">
+                            <input type="radio" name="evalVizMode" value="pred">
+                            <span>Prediction</span>
+                        </label>
+                    </div>
+                    <div class="eval-viz-section-label mt-2">Comparison</div>
+                    <div class="eval-viz-modes">
+                        <label class="eval-radio-label">
+                            <input type="radio" name="evalVizMode" value="all" checked>
+                            <span>All Errors</span>
+                        </label>
+                        <label class="eval-radio-label">
+                            <input type="radio" name="evalVizMode" value="matched">
+                            <span>Matched</span>
+                        </label>
+                        <label class="eval-radio-label">
+                            <input type="radio" name="evalVizMode" value="overseg">
+                            <span>Over-seg</span>
+                        </label>
+                        <label class="eval-radio-label">
+                            <input type="radio" name="evalVizMode" value="underseg">
+                            <span>Under-seg</span>
+                        </label>
+                        <label class="eval-radio-label">
+                            <input type="radio" name="evalVizMode" value="missingGt">
+                            <span>Missing GT</span>
+                        </label>
+                        <label class="eval-radio-label">
+                            <input type="radio" name="evalVizMode" value="missingPred">
+                            <span>Hallucinated</span>
+                        </label>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2">
+                        <input type="checkbox" id="evalShowGtEdges" checked>
+                        <label for="evalShowGtEdges" class="text-sm text-gray-700">Show GT edges overlay</label>
+                    </div>
+                </div>
+
+                <!-- Color Legend -->
+                <div class="eval-section border-t pt-3">
+                    <h3 class="text-sm font-semibold mb-2">Color Legend</h3>
+                    <div id="evalColorLegend" class="eval-color-legend">
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
 
@@ -261,6 +379,7 @@ This tool allows you to annotate 3D models and is primarily developed for annota
 - **Arrows Mode**: Draw arrows on the 3D model to indicate directions or features.
 - **Model**: AI-powered annotation using the LithicServer backend.
 - **History**: View and manage your annotation history with undo/redo capabilities.
+- **Evaluation**: Compare annotations between ground truth and prediction states with detailed metrics.
 - **Update Light**: Updates the direction of the light in the scene based on the camera position.
 - **Export Annotations**: Exports the annotations to a .PLY file.
 
@@ -283,6 +402,29 @@ The History panel provides a complete view of all your annotation actions:
 - **Current State Indicator**: The active state is highlighted in blue
 - **Memory Efficient**: Only stores edge indices, not full mesh data
 - **Clear History**: Remove all history to free up memory
+- **GT/Pred Labels**: Mark states as Ground Truth or Prediction for evaluation
+
+## Evaluation Mode
+The Evaluation panel allows comparing two annotation states with comprehensive metrics:
+1. In the History panel, click "GT" button on a state to set it as Ground Truth
+2. Click "Pred" button on another state to set it as Prediction
+3. Switch to the Evaluation panel
+4. Adjust thresholds: IoU (matching), OverSeg, UnderSeg
+5. Click "Compute Metrics" to see results
+
+**Metrics include:**
+- TP/FP/FN counts, Precision, Recall, F1
+- Panoptic Quality (PQ, RQ, SQ)
+- Over-segmentation analysis (GT split across multiple predictions)
+- Under-segmentation analysis (prediction merges multiple GTs)
+- Missing GT (false negatives)
+- Hallucinated predictions (false positives)
+
+**Visualization modes:**
+- All Errors: Overview with color-coded error types
+- Matched: Show correctly matched segments
+- Over-seg/Under-seg: Highlight specific error types
+- Missing GT/Hallucinated: Show false negatives/positives
 
 ## Exported File Format
 The exported .PLY file has the standard format with "vertex" and "face" that contains the original mesh. Additionally, it contains 
@@ -731,6 +873,412 @@ Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.staros
 
 .floating-action-btn:not(:disabled):active {
     transform: scale(0.95);
+}
+
+/* ===== History Panel Evaluation Labels ===== */
+.eval-btn {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    opacity: 0.6;
+}
+
+.eval-btn:hover {
+    opacity: 1;
+}
+
+.eval-btn.gt-btn {
+    border-color: #10b981;
+    color: #10b981;
+    background: transparent;
+}
+
+.eval-btn.gt-btn.active {
+    background: #10b981;
+    color: white;
+    opacity: 1;
+}
+
+.eval-btn.pred-btn {
+    border-color: #8b5cf6;
+    color: #8b5cf6;
+    background: transparent;
+}
+
+.eval-btn.pred-btn.active {
+    background: #8b5cf6;
+    color: white;
+    opacity: 1;
+}
+
+.eval-labels {
+    display: flex;
+    gap: 4px;
+}
+
+.eval-label {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+.eval-label.gt-label {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.eval-label.pred-label {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+/* ===== Evaluation Panel Styles ===== */
+.eval-section {
+    margin-bottom: 0.5rem;
+}
+
+.eval-status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 0.8rem;
+}
+
+.eval-status-label {
+    font-weight: 600;
+    min-width: 90px;
+}
+
+.eval-status-value {
+    flex: 1;
+    font-weight: 500;
+}
+
+.eval-clear-btn {
+    padding: 2px 6px;
+    font-size: 10px;
+    background: #fee2e2;
+    color: #991b1b;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.eval-clear-btn:hover {
+    background: #fecaca;
+}
+
+.eval-param-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 0.75rem;
+}
+
+.eval-param-row label {
+    min-width: 110px;
+    color: #4b5563;
+}
+
+.eval-slider {
+    flex: 1;
+    height: 6px;
+    cursor: pointer;
+}
+
+.eval-param-value {
+    min-width: 35px;
+    text-align: right;
+    font-weight: 600;
+    color: #374151;
+}
+
+/* Evaluation Results */
+.eval-instance-counts {
+    display: flex;
+    justify-content: space-around;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.eval-count-item {
+    font-size: 0.8rem;
+    color: #475569;
+}
+
+.eval-count-item i {
+    margin-right: 4px;
+    opacity: 0.7;
+}
+
+.eval-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.eval-metric-card {
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+    cursor: help;
+    transition: transform 0.15s, box-shadow 0.15s;
+    border: 2px solid transparent;
+}
+
+.eval-metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.eval-metric-card.success {
+    background: #dcfce7;
+    border-color: #86efac;
+}
+
+.eval-metric-card.danger {
+    background: #fee2e2;
+    border-color: #fca5a5;
+}
+
+.eval-metric-card.warning {
+    background: #fef3c7;
+    border-color: #fcd34d;
+}
+
+.eval-metric-card .metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    line-height: 1.2;
+}
+
+.eval-metric-card .metric-label {
+    font-size: 0.7rem;
+    color: #4b5563;
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+.eval-metrics-section {
+    margin-bottom: 10px;
+}
+
+.eval-metrics-section-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.eval-metric-row-detailed {
+    display: flex;
+    gap: 8px;
+}
+
+.eval-metric-item {
+    flex: 1;
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 8px;
+    cursor: help;
+    transition: background 0.15s;
+}
+
+.eval-metric-item:hover {
+    background: #f1f5f9;
+}
+
+.eval-metric-item.highlight {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+}
+
+.eval-metric-item .metric-name {
+    display: block;
+    font-size: 0.7rem;
+    color: #64748b;
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.eval-metric-item .metric-val {
+    display: block;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.eval-metrics-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #4b5563;
+}
+
+/* Error Breakdown */
+.eval-error-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    padding: 8px;
+    margin-bottom: 4px;
+    background: #f8fafc;
+    border-radius: 6px;
+    cursor: help;
+    transition: background 0.15s;
+}
+
+.eval-error-item:hover {
+    background: #f1f5f9;
+}
+
+.eval-error-item .error-icon {
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.eval-error-item.overseg { border-left: 3px solid #f97316; }
+.eval-error-item.underseg { border-left: 3px solid #a855f7; }
+.eval-error-item.missing-gt { border-left: 3px solid #ef4444; }
+.eval-error-item.missing-pred { border-left: 3px solid #eab308; }
+
+.eval-error-item.overseg .error-icon { color: #f97316; }
+.eval-error-item.underseg .error-icon { color: #a855f7; }
+.eval-error-item.missing-gt .error-icon { color: #ef4444; }
+.eval-error-item.missing-pred .error-icon { color: #eab308; }
+
+.eval-error-item .error-label {
+    font-weight: 600;
+    color: #374151;
+    flex: 1;
+}
+
+.eval-error-item .error-count {
+    color: #1f2937;
+    font-weight: 500;
+}
+
+.eval-error-item .error-pct {
+    color: #6b7280;
+    font-size: 0.75rem;
+    min-width: 40px;
+    text-align: right;
+}
+
+/* Visualization Mode */
+.eval-viz-section-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+
+.eval-viz-modes {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+}
+
+.eval-radio-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.eval-radio-label:hover {
+    background: #f3f4f6;
+}
+
+.eval-radio-label input[type="radio"] {
+    margin: 0;
+}
+
+/* Color Legend */
+.eval-color-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    border: 1px solid #d1d5db;
+}
+
+.legend-label {
+    color: #4b5563;
+}
+
+/* Tooltip hint for metrics */
+.eval-metric-card::after,
+.eval-metric-item::after {
+    content: '?';
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
+    background: #cbd5e1;
+    color: #475569;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.eval-metric-card,
+.eval-metric-item {
+    position: relative;
+}
+
+.eval-metric-card:hover::after,
+.eval-metric-item:hover::after {
+    opacity: 1;
+}
+
+/* Hover hint text */
+.eval-hover-hint {
+    font-size: 0.65rem;
+    color: #94a3b8;
+    text-align: center;
+    margin-top: 8px;
+    font-style: italic;
 }
     </style>
 </body>

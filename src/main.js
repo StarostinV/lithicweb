@@ -9,6 +9,8 @@ import MeshLoader from './loaders/meshLoader.js';
 import DrawBrush from './components/drawBrush.js';
 import { HistoryPanel } from './components/historyPanel.js';
 import { ModelPanel } from './components/modelPanel.js';
+import { EvaluationManager } from './evaluation/EvaluationManager.js';
+import { EvaluationPanel } from './components/evaluationPanel.js';
 
 //colors
 const drawColor = new THREE.Color(1, 0.6, 0.2); // Orange
@@ -32,27 +34,54 @@ const drawBrush = new DrawBrush(scene, mode, meshObject);
 
 const meshLoader = new MeshLoader(meshObject, arrowDrawer);
 
-// History panel
-const historyPanel = new HistoryPanel(meshObject);
+// Evaluation manager (must be created before panels that depend on it)
+const evaluationManager = new EvaluationManager(meshObject);
 
-// Model panel (AI inference)
+// History panel (with evaluation manager for GT/Pred labels)
+const historyPanel = new HistoryPanel(meshObject);
+historyPanel.setEvaluationManager(evaluationManager);
+
+// Model panel (AI inference) - with evaluation manager to auto-assign predictions
 const modelPanel = new ModelPanel(meshObject);
+modelPanel.setEvaluationManager(evaluationManager);
+
+// Evaluation panel
+const evaluationPanel = new EvaluationPanel(meshObject, evaluationManager);
 
 document.getElementById('exportAnnotations').addEventListener('click', () => {
     exportAnnotations(meshObject.mesh, meshObject.meshColors, arrowDrawer, meshLoader);
 });
 
+// Track current panel for evaluation mode management
+let currentPanelId = 'viewPanel';
 
-
-function showHidePanel(panelId) {
+function showHidePanel(panelId, callbacks = {}) {
     const panels = document.querySelectorAll('.panel');
     const panel = document.getElementById(panelId);
+
+    // Handle leaving previous panel
+    if (currentPanelId === 'evaluationPanel' && panelId !== 'evaluationPanel') {
+        // Exiting evaluation panel - restore normal state
+        evaluationPanel.onHide();
+    }
 
     panels.forEach(p => {
         p.classList.add('hidden');
     });
 
     panel.classList.remove('hidden');
+    
+    // Handle entering new panel
+    if (panelId === 'evaluationPanel') {
+        evaluationPanel.onShow();
+    }
+    
+    currentPanelId = panelId;
+    
+    // Execute any callbacks
+    if (callbacks.onShow) {
+        callbacks.onShow();
+    }
 }
 
 // Event listeners for buttons
@@ -78,6 +107,13 @@ document.getElementById('modelPanelBtn').addEventListener('click', () => {
 
 document.getElementById('historyPanelBtn').addEventListener('click', () => {
     showHidePanel('historyPanel');
+    // Keep current mode when viewing history
+});
+
+document.getElementById('evaluationPanelBtn').addEventListener('click', () => {
+    showHidePanel('evaluationPanel');
+    // Evaluation uses VIEW mode for camera controls
+    mode.setMode(MODES.VIEW, true);
 });
 
 // Keyboard shortcuts for undo/redo
@@ -101,3 +137,7 @@ window.addEventListener('resize', () => {
     scene.camera.updateProjectionMatrix();
     scene.renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// Export for debugging
+window.debugGlobalVar.evaluationManager = evaluationManager;
+window.debugGlobalVar.meshObject = meshObject;

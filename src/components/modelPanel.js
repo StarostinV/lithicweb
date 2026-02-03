@@ -6,8 +6,9 @@
 import { lithicClient, DEFAULT_INFERENCE_CONFIG, CONFIG_PARAMS } from '../api/lithicClient.js';
 
 export class ModelPanel {
-    constructor(meshObject) {
+    constructor(meshObject, evaluationManager = null) {
         this.meshObject = meshObject;
+        this.evaluationManager = evaluationManager;
         this.currentSession = null;
         this.config = { ...DEFAULT_INFERENCE_CONFIG };
         this.isLoading = false;
@@ -15,6 +16,14 @@ export class ModelPanel {
         this.setupUI();
         this.setupEventListeners();
         this.updateConnectionStatus();
+    }
+
+    /**
+     * Set the evaluation manager (for deferred initialization).
+     * @param {EvaluationManager} evaluationManager
+     */
+    setEvaluationManager(evaluationManager) {
+        this.evaluationManager = evaluationManager;
     }
 
     setupUI() {
@@ -546,6 +555,13 @@ export class ModelPanel {
         
         // Finish draw operation to record in history (type 'model' -> 'AI segmentation')
         this.meshObject.finishDrawOperation();
+        
+        // Automatically set this state as the prediction in evaluation manager
+        if (this.evaluationManager) {
+            const currentIndex = this.meshObject.history.getCurrentIndex();
+            this.evaluationManager.setPrediction(currentIndex, 'AI Prediction');
+            console.log('[ModelPanel] Auto-assigned prediction label to state', currentIndex);
+        }
         
         // Update segments if auto-segmentation is enabled
         if (document.getElementById('auto-segments')?.checked) {
