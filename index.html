@@ -3,312 +3,991 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Annotation Tool</title>
+    <title>NeuroLithic - AI-based 3D Lithic Mesh Annotation</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link href= "https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-100">
 <script>
     window.debugGlobalVar = {}; // Declare a global debug object
 </script>
-<div class="fixed top-0 left-0 right-0 bg-white shadow-lg z-10 p-4 flex justify-between items-center">
-    <div class="flex items-center space-x-2">
-        <button id="showDoc" class="bg-green-200 text-green-800 px-4 py-2 rounded hover:bg-green-300" title="Show Documentation">
-            <i class="fas fa-book"></i>
-        </button>
-        <label for="fileInput" class="file-input-label" title="Choose a PLY or MAT file to upload">Choose File</label>
-        <input type="file" id="fileInput" accept=".ply,.mat" class="hidden-file-input">
-        <span id="fileName" class="text-gray-700"></span>
+
+<!-- Professional Navbar -->
+<nav class="navbar">
+    <div class="navbar-container">
+        <!-- Left Section: Brand + File -->
+        <div class="navbar-left">
+            <div class="navbar-brand">
+                <div class="brand-icon">
+                    <i class="fas fa-gem"></i>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-name">NeuroLithic</span>
+                    <span class="brand-subtitle">AI Lithic Annotation</span>
+                </div>
+            </div>
+            <div class="navbar-divider"></div>
+            <div class="file-section">
+                <label for="fileInput" class="file-btn" title="Open PLY or MAT file">
+                    <i class="fas fa-folder-open"></i>
+                    <span>Open</span>
+                </label>
+                <input type="file" id="fileInput" accept=".ply,.mat" class="hidden-file-input">
+                <button id="exportAnnotations" class="file-btn file-btn-export" title="Export Annotations to PLY">
+                    <i class="fas fa-download"></i>
+                    <span>Export</span>
+                </button>
+                <span id="fileName" class="file-name-display"></span>
+            </div>
+        </div>
+
+        <!-- Center Section: Main Navigation Tabs -->
+        <div class="navbar-center">
+            <div class="nav-group">
+                <span class="nav-group-label">View</span>
+                <div class="nav-group-buttons">
+                    <button id="viewPanelBtn" class="nav-btn active" title="Rendering & Display Settings">
+                        <i class="fas fa-eye"></i>
+                        <span>Rendering</span>
+                    </button>
+                </div>
+            </div>
+            <div class="nav-group">
+                <span class="nav-group-label">Annotate</span>
+                <div class="nav-group-buttons">
+                    <button id="annotationPanelBtn" class="nav-btn" title="Edge & Arrow Annotation">
+                        <i class="fas fa-pen-fancy"></i>
+                        <span>Annotation</span>
+                    </button>
+                </div>
+            </div>
+            <div class="nav-group">
+                <span class="nav-group-label">AI</span>
+                <div class="nav-group-buttons">
+                    <button id="modelPanelBtn" class="nav-btn nav-btn-ai" title="AI Model Inference">
+                        <i class="fas fa-brain"></i>
+                        <span>Model</span>
+                    </button>
+                </div>
+            </div>
+            <div class="nav-group">
+                <span class="nav-group-label">Analysis</span>
+                <div class="nav-group-buttons">
+                    <button id="historyPanelBtn" class="nav-btn" title="Undo/Redo History">
+                        <i class="fas fa-history"></i>
+                        <span>History</span>
+                    </button>
+                    <button id="metadataPanelBtn" class="nav-btn" title="View/Edit Metadata">
+                        <i class="fas fa-tags"></i>
+                        <span>Metadata</span>
+                    </button>
+                    <button id="evaluationPanelBtn" class="nav-btn" title="Compare & Evaluate">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Evaluation</span>
+                    </button>
+                </div>
+            </div>
+            <div class="nav-group">
+                <span class="nav-group-label">Config</span>
+                <div class="nav-group-buttons">
+                    <button id="settingsPanelBtn" class="nav-btn" title="Application Settings">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Section: Actions -->
+        <div class="navbar-right">
+            <button id="showDoc" class="action-btn action-btn-help" title="Documentation & Help">
+                <i class="fas fa-question-circle"></i>
+            </button>
+        </div>
     </div>
-    <div class="flex space-x-2">
-        <button id="viewPanelBtn" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to View Mode">View</button>
-        <button id="drawPanelBtn" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Draw Mode">Draw</button>
-        <button id="arrowPanelBtn" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Erase Mode">Arrows</button>
-        <button id="modelPanelBtn" class="toggle-button bg-purple-300 text-purple-800 px-4 py-2 rounded hover:bg-purple-400" title="AI Model Inference">Model</button>
-        <button id="historyPanelBtn" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="View History">History</button>
-        <button id="evaluationPanelBtn" class="toggle-button bg-teal-300 text-teal-800 px-4 py-2 rounded hover:bg-teal-400" title="Evaluation Mode">Evaluation</button>
-        <!-- <button id="invertNormals" class="toggle-button bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Invert Normals">Invert normals</button> -->        
-        <button id="updateLight" class="bg-yellow-200 text-yellow-800 px-4 py-2 rounded hover:bg-yellow-300" title="Update Light Direction">
-            <i class="fas fa-lightbulb"></i>
-        </button>
-        <button id="exportAnnotations" class="bg-blue-200 text-blue-800 px-4 py-2 rounded hover:bg-blue-300" title="Export Annotations">
-            <i class="fas fa-download"></i>
-        </button>
+</nav>
+    <!-- Main Canvas Area -->
+    <div class="canvas-container">
+        <canvas id="renderCanvas"></canvas>
     </div>
-</div>
-    <div class="pt-20">
-        <canvas id="renderCanvas" class="w-full h-screen"></canvas>
+
+    <!-- Mode Indicator (clickable: toggles between view and previous tool) -->
+    <div id="modeIndicator" class="mode-indicator" title="Click to toggle View mode">
+        <i class="fas fa-eye"></i> View
     </div>
 
     <!-- Floating Undo/Redo buttons for tablet users -->
-    <div style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-150%); z-index: 100; pointer-events: none;">
-        <div class="flex items-center space-x-8 select-none" style="pointer-events: auto;">
-            <button id="floatingUndoBtn"
-              class="text-gray-500 hover:text-white transition-transform hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed p-2"
-              title="Undo (Ctrl+Z)" disabled>
-              <i class="fas fa-undo fa-2x"></i>
-            </button>
-            <button id="floatingRedoBtn"
-              class="text-gray-500 hover:text-white transition-transform hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed p-2"
-              title="Redo (Ctrl+Shift+Z)" disabled>
-              <i class="fas fa-redo fa-2x"></i>
-            </button>
-        </div>
+    <div class="floating-controls">
+        <button id="floatingUndoBtn" class="floating-btn" title="Undo (Ctrl+Z)" disabled>
+            <i class="fas fa-undo"></i>
+        </button>
+        <button id="floatingRedoBtn" class="floating-btn" title="Redo (Ctrl+Shift+Z)" disabled>
+            <i class="fas fa-redo"></i>
+        </button>
     </div>
                         <div id="sideMenu" class="side-menu">
         <div id="sideMenuResizeHandle" class="side-menu-resize-handle"></div>
-        <div id="viewPanel" class="panel">
-            <h2 class="text-xl font-bold mb-4">View Mode</h2>
-            <div class="flex flex-col space-y-2">
-                <p class="text-sm text-gray-700">Hold left-click to rotate the camera.</p>
-                <p class="text-sm text-gray-700">Hold right-click to move the camera.</p>
-                <button id="viewMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to View Mode"
-                style="display: none;">View</button>
-                <p>Direct light intensity: <span id="sliderLightValue"></span></p>
-                <div id="sliderLight"></div>
-                <p>Ambient light intensity: <span id="sliderAmbientLightValue"></span></p>
-                <div id="sliderAmbientLight"></div>
-
-                <button id="updateLight2" class="bg-yellow-200 text-yellow-800 px-4 py-2 rounded hover:bg-yellow-300" title="Update Light Direction">
-                    <i class="fas fa-lightbulb"></i> Set Light Direction
-                </button>
         
-
-                <button id="invertNormals" class="bg-blue-200 text-blue-800 px-4 py-2 rounded hover:bg-blue-400" title="Invert Normals of the mesh">
-                    <i class="fas fa-exchange-alt"></i>   Invert Normals
-                </button>
+        <!-- ===== VIEW/RENDERING PANEL ===== -->
+        <div id="viewPanel" class="panel">
+            <div class="panel-header">
+                <div class="panel-header-icon"><i class="fas fa-eye"></i></div>
+                <div class="panel-header-text">
+                    <h2>Rendering</h2>
+                    <span class="panel-subtitle">Display & lighting settings</span>
+                </div>
+            </div>
+            <button id="viewMode" class="hidden" title="Switch to View Mode">View</button>
+            
+            <div class="panel-content">
+                <!-- Quick Tips -->
+                <div class="quick-tips">
+                    <div class="tip-item"><i class="fas fa-mouse"></i> Left-click drag to rotate</div>
+                    <div class="tip-item"><i class="fas fa-arrows-alt"></i> Right-click drag to pan</div>
+                </div>
                 
-                <div class="flex items-center gap-2 mt-3">
-                    <div class="auto-seg-toggle-container">
-                        <input type="checkbox" id="showGizmo" checked />
-                        <span class="auto-seg-slider auto-seg-round"></span>
+                <!-- Lighting Section -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>Lighting</span>
                     </div>
-                    <span class="text-sm text-gray-700">Show rotation controls</span>
+                    <div class="section-content">
+                        <div class="control-row">
+                            <label for="lightingPreset">Preset</label>
+                            <select id="lightingPreset" class="control-select">
+                                <option value="default">Default</option>
+                                <option value="studio">Studio</option>
+                                <option value="warm">Warm</option>
+                                <option value="cool">Cool</option>
+                                <option value="dramatic">Dramatic</option>
+                                <option value="flat">Flat (Documentation)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="light-card">
+                            <div class="light-card-header">
+                                <span>Key Light</span>
+                                <input type="color" id="keyLightColor" value="#ffffff" class="mini-color-picker" title="Key light color">
+                            </div>
+                            <div class="slider-row">
+                                <input type="range" id="keyLightIntensity" min="0" max="5" step="0.1" value="2.0" class="styled-slider">
+                                <span id="keyLightIntensityValue" class="slider-value">2.0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="light-card">
+                            <div class="light-card-header">
+                                <span>Fill Light</span>
+                            </div>
+                            <div class="slider-row">
+                                <input type="range" id="fillLightIntensity" min="0" max="3" step="0.1" value="1.0" class="styled-slider">
+                                <span id="fillLightIntensityValue" class="slider-value">1.0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="light-card">
+                            <div class="light-card-header">
+                                <span>Ambient</span>
+                            </div>
+                            <div class="slider-row">
+                                <input type="range" id="ambientLightIntensity" min="0" max="2" step="0.1" value="0.3" class="styled-slider">
+                                <span id="ambientLightIntensityValue" class="slider-value">0.3</span>
+                            </div>
+                        </div>
+                        
+                        <div class="toggle-row">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="lightFollowsCamera">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>Light follows camera</span>
+                        </div>
+                        <button id="setLightFromCamera" class="btn btn-secondary btn-sm btn-full">
+                            <i class="fas fa-camera"></i> Set Light from Camera
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <div id="drawPanel" class="panel hidden">
-            <h2 class="text-xl font-bold mb-4">Edge Annotation</h2>
-            <div class="flex flex-col space-y-2">
-                <p class="text-sm text-gray-700">Hold left-click to draw continuously.</p>
-                <p class="text-sm text-gray-700">Hold Alt to go to view mode.</p>
-                <button id="drawMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Draw Mode">Draw</button>
-                <button id="drawLinesMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Draw Mode">Draw lines (Right click to stop)</button>
-                <button id="eraseMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Erase Mode">Erase</button>  
-                <button id="useBrush" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Use brush">Enable brush</button>
-                <p id="sliderBrushSizeLabel">Brush size: <span id="sliderBrushSizeValue"></span></p>
-                <div id="sliderBrushSize"></div>
 
-            </div>
-            <h2 class="text-xl font-bold mb-4">Segmentation</h2>
-            <div class="flex flex-col space-y-2">
-                <div class="flex items-center gap-2">
-                    <div class="auto-seg-toggle-container">
-                        <input type="checkbox" id="show-segments" checked />
-                        <span class="auto-seg-slider auto-seg-round"></span>
+                <!-- Display Section -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-desktop"></i>
+                        <span>Display</span>
                     </div>
-                    <span class="text-sm text-gray-700">Show segmentation</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <div class="auto-seg-toggle-container">
-                        <input type="checkbox" id="auto-segments" checked />
-                        <span class="auto-seg-slider auto-seg-round"></span>
+                    <div class="section-content">
+                        <div class="control-row">
+                            <label for="annotationMode">Annotations</label>
+                            <select id="annotationMode" class="control-select">
+                                <option value="full">Edges + Segments</option>
+                                <option value="edges">Edges Only</option>
+                                <option value="segments">Segments Only</option>
+                                <option value="none">None (Plain Mesh)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="toggle-row">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="wireframeMode">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>Wireframe mode</span>
+                        </div>
+                        <div class="toggle-row">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="flatShading">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>Flat shading</span>
+                        </div>
+                        <div class="toggle-row">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="showGizmo" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>Show rotation controls</span>
+                        </div>
                     </div>
-                    <span class="text-sm text-gray-700">Auto segmentation</span>
                 </div>
-                <button id="update-segments" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Update segmentation">Update segmentation</button>
-                <button id="update-segment-colors" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Update segmentation colors">Update face colors</button>
-            </div>
-        </div>
-        <div id="arrowPanel" class="panel hidden">
-            <h2 class="text-xl font-bold mb-4">Arrow Annotation</h2>
-            <div class="flex flex-col space-y-2">
-                <button id="arrowMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Erase Mode">Draw Arrows</button>
-                <button id="deleteArrowsMode" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400" title="Switch to Delete Arrows Mode">Delete arrows</button>
-            </div>
 
+                <!-- Segmentation Section -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-th-large"></i>
+                        <span>Segmentation</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="toggle-row">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="auto-segments" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>Auto-update segments</span>
+                        </div>
+                        
+                        <div class="btn-group-vertical">
+                            <button id="update-segments" class="btn btn-primary btn-sm">
+                                <i class="fas fa-sync-alt"></i> Update Segmentation
+                            </button>
+                            <button id="update-segment-colors" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-fill-drip"></i> Refresh Colors
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Appearance Section -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-palette"></i>
+                        <span>Appearance</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="color-control">
+                            <span>Background</span>
+                            <input type="color" id="backgroundColor" value="#201944" class="color-picker" title="Background color">
+                        </div>
+                        <div class="color-presets">
+                            <button class="bg-preset" data-color="#201944" title="Default" style="background-color: #201944;"></button>
+                            <button class="bg-preset" data-color="#000000" title="Black" style="background-color: #000000;"></button>
+                            <button class="bg-preset" data-color="#FFFFFF" title="White" style="background-color: #FFFFFF;"></button>
+                            <button class="bg-preset" data-color="#1a1a2e" title="Navy" style="background-color: #1a1a2e;"></button>
+                            <button class="bg-preset" data-color="#2d3436" title="Gray" style="background-color: #2d3436;"></button>
+                            <button class="bg-preset" data-color="#f5f5f5" title="Light" style="background-color: #f5f5f5;"></button>
+                            <button class="bg-preset" data-color="#0a192f" title="Deep Blue" style="background-color: #0a192f;"></button>
+                            <button class="bg-preset" data-color="#1e3a5f" title="Ocean" style="background-color: #1e3a5f;"></button>
+                        </div>
+                        
+                        <div class="color-control">
+                            <span>Edge Color</span>
+                            <input type="color" id="edgeColorPicker" value="#ff9933" class="color-picker" title="Edge annotation color">
+                        </div>
+                        <div class="color-control">
+                            <span>Object Color</span>
+                            <input type="color" id="objectColorPicker" value="#808080" class="color-picker" title="Object base color">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Material Section -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-gem"></i>
+                        <span>Material</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="control-row">
+                            <label for="materialType">Type</label>
+                            <select id="materialType" class="control-select">
+                                <option value="lambert">Lambert (Matte)</option>
+                                <option value="phong">Phong (Shiny)</option>
+                                <option value="standard">Standard PBR</option>
+                            </select>
+                        </div>
+                        
+                        <div id="pbrControls" class="pbr-controls hidden">
+                            <div class="slider-row-labeled">
+                                <label>Metalness</label>
+                                <input type="range" id="metalness" min="0" max="1" step="0.01" value="0" class="styled-slider">
+                                <span id="metalnessValue" class="slider-value">0.00</span>
+                            </div>
+                            <div class="slider-row-labeled">
+                                <label>Roughness</label>
+                                <input type="range" id="roughness" min="0" max="1" step="0.01" value="0.5" class="styled-slider">
+                                <span id="roughnessValue" class="slider-value">0.50</span>
+                            </div>
+                            <div class="slider-row-labeled">
+                                <label>Env Map</label>
+                                <input type="range" id="envMapIntensity" min="0" max="3" step="0.1" value="1" class="styled-slider">
+                                <span id="envMapIntensityValue" class="slider-value">1.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mesh Tools Section -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-tools"></i>
+                        <span>Mesh Tools</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="btn-group-vertical">
+                            <button id="invertNormals" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-exchange-alt"></i> Invert Normals
+                            </button>
+                            <button id="resetRenderingBtn" class="btn btn-ghost btn-sm">
+                                <i class="fas fa-undo"></i> Reset Rendering
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+        
+        <!-- ===== COMBINED ANNOTATION PANEL ===== -->
+        <div id="annotationPanel" class="panel hidden">
+            <div class="panel-header">
+                <div class="panel-header-icon annotation-icon"><i class="fas fa-pen-fancy"></i></div>
+                <div class="panel-header-text">
+                    <h2>Annotation</h2>
+                    <span class="panel-subtitle">Edges & arrows</span>
+                </div>
+            </div>
+            
+            <div class="panel-content">
+                <!-- Mode Selector Tabs -->
+                <div class="annotation-mode-tabs">
+                    <button class="mode-tab active" data-mode="edges">
+                        <i class="fas fa-draw-polygon"></i>
+                        <span>Edges</span>
+                    </button>
+                    <button class="mode-tab" data-mode="arrows">
+                        <i class="fas fa-arrow-right"></i>
+                        <span>Arrows</span>
+                    </button>
+                </div>
+                
+                <!-- Edge Annotation Section -->
+                <div id="edgeAnnotationSection" class="annotation-section">
+                    <div class="quick-tips">
+                        <div class="tip-item"><i class="fas fa-mouse-pointer"></i> Hold left-click to draw</div>
+                        <div class="tip-item"><kbd>Alt</kbd> Hold to rotate view</div>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <div class="section-header">
+                            <i class="fas fa-pencil-alt"></i>
+                            <span>Drawing Tools</span>
+                        </div>
+                        <div class="section-content">
+                            <div class="tool-grid">
+                                <button id="viewModeEdge" class="tool-btn tool-btn-view" title="View Mode (rotate/pan)">
+                                    <i class="fas fa-eye"></i>
+                                    <span>View</span>
+                                </button>
+                                <button id="drawMode" class="tool-btn" title="Freehand Draw">
+                                    <i class="fas fa-pen"></i>
+                                    <span>Draw</span>
+                                </button>
+                                <button id="drawLinesMode" class="tool-btn" title="Draw Lines (Right-click to stop)">
+                                    <i class="fas fa-project-diagram"></i>
+                                    <span>Lines</span>
+                                </button>
+                                <button id="eraseMode" class="tool-btn" title="Erase Annotations">
+                                    <i class="fas fa-eraser"></i>
+                                    <span>Erase</span>
+                                </button>
+                                <button id="useBrush" class="tool-btn" title="Toggle Brush Mode">
+                                    <i class="fas fa-paint-brush"></i>
+                                    <span>Brush</span>
+                                </button>
+                            </div>
+                            
+                            <div class="brush-controls">
+                                <div class="slider-row-labeled">
+                                    <label id="sliderBrushSizeLabel">Brush Size</label>
+                                    <div id="sliderBrushSize" class="brush-slider"></div>
+                                    <span id="sliderBrushSizeValue" class="slider-value">5</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Arrow Annotation Section -->
+                <div id="arrowAnnotationSection" class="annotation-section hidden">
+                    <div class="quick-tips">
+                        <div class="tip-item"><i class="fas fa-mouse-pointer"></i> Click start, then end point</div>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <div class="section-header">
+                            <i class="fas fa-location-arrow"></i>
+                            <span>Arrow Tools</span>
+                        </div>
+                        <div class="section-content">
+                            <div class="tool-grid tool-grid-3">
+                                <button id="viewModeArrow" class="tool-btn tool-btn-view" title="View Mode (rotate/pan)">
+                                    <i class="fas fa-eye"></i>
+                                    <span>View</span>
+                                </button>
+                                <button id="arrowMode" class="tool-btn" title="Draw Arrows">
+                                    <i class="fas fa-arrow-right"></i>
+                                    <span>Arrows</span>
+                                </button>
+                                <button id="deleteArrowsMode" class="tool-btn" title="Delete Arrows">
+                                    <i class="fas fa-trash-alt"></i>
+                                    <span>Delete</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Hidden legacy panels for JS compatibility -->
+        <div id="drawPanel" class="panel hidden" style="display: none !important;"></div>
+        <div id="arrowPanel" class="panel hidden" style="display: none !important;"></div>
+        
+        <!-- ===== HISTORY PANEL ===== -->
         <div id="historyPanel" class="panel hidden">
-            <h2 class="text-xl font-bold mb-4">History</h2>
-            <div class="flex flex-col space-y-2">
-                <div class="flex space-x-2 mb-2">
-                    <button id="undoBtn" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed" title="Undo (Ctrl+Z)" disabled>
-                        <i class="fas fa-undo"></i> Undo
-                    </button>
-                    <button id="redoBtn" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed" title="Redo (Ctrl+Shift+Z)" disabled>
-                        <i class="fas fa-redo"></i> Redo
-                    </button>
+            <div class="panel-header">
+                <div class="panel-header-icon history-icon"><i class="fas fa-history"></i></div>
+                <div class="panel-header-text">
+                    <h2>History</h2>
+                    <span class="panel-subtitle">Undo, redo & action timeline</span>
                 </div>
-                <button id="clearHistoryBtn" class="bg-red-200 text-red-800 px-4 py-2 rounded hover:bg-red-300" title="Clear all history">
-                    <i class="fas fa-trash"></i> Clear History
-                </button>
-                <div class="text-xs text-gray-600 mt-2">
-                    <span id="historyStats">History: 0 actions</span>
+            </div>
+            
+            <div class="panel-content">
+                <!-- Quick Actions -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-bolt"></i>
+                        <span>Quick Actions</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="undo-redo-buttons">
+                            <button id="undoBtn" class="btn btn-undo" title="Undo (Ctrl+Z)" disabled>
+                                <i class="fas fa-undo"></i>
+                                <span>Undo</span>
+                            </button>
+                            <button id="redoBtn" class="btn btn-redo" title="Redo (Ctrl+Shift+Z)" disabled>
+                                <i class="fas fa-redo"></i>
+                                <span>Redo</span>
+                            </button>
+                        </div>
+                        <div class="history-stats">
+                            <span id="historyStats"><i class="fas fa-layer-group"></i> 0 actions</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="border-t pt-2 mt-2 flex-1 flex flex-col min-h-0">
-                    <h3 class="text-sm font-semibold mb-2">Action History</h3>
-                    <div id="historyList" class="space-y-1 overflow-y-auto flex-1">
-                        <p class="text-sm text-gray-500 italic">No actions yet</p>
+                
+                <!-- Timeline -->
+                <div class="panel-section flex-grow">
+                    <div class="section-header">
+                        <i class="fas fa-stream"></i>
+                        <span>Timeline</span>
+                        <button id="clearHistoryBtn" class="btn-icon btn-icon-danger" title="Clear all history">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="section-content history-timeline">
+                        <div id="historyList" class="history-list">
+                            <div class="history-empty">
+                                <i class="fas fa-clock"></i>
+                                <p>No actions yet</p>
+                                <p class="text-muted">Your annotation history will appear here</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+        <!-- ===== AI MODEL PANEL ===== -->
         <div id="modelPanel" class="panel hidden">
-            <h2 class="text-xl font-bold mb-4"><i class="fas fa-brain"></i> AI Model</h2>
-            <div class="flex flex-col space-y-3">
+            <div class="panel-header">
+                <div class="panel-header-icon ai-icon"><i class="fas fa-brain"></i></div>
+                <div class="panel-header-text">
+                    <h2>AI Model</h2>
+                    <span class="panel-subtitle">Neural network inference</span>
+                </div>
+            </div>
+            
+            <div class="panel-content">
                 <!-- Connection Status -->
-                <div class="flex items-center justify-between">
-                    <span id="connectionStatus" class="text-sm text-red-700">
-                        <i class="fas fa-circle text-red-500"></i> Not configured
-                    </span>
-                    <button id="modelSettingsBtn" class="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300 text-sm" title="Server Settings">
-                        <i class="fas fa-cog"></i>
-                    </button>
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-plug"></i>
+                        <span>Connection</span>
+                        <button id="modelSettingsBtn" class="btn-icon" title="Server Settings">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                    </div>
+                    <div class="section-content">
+                        <div class="connection-status" id="connectionStatus">
+                            <i class="fas fa-circle status-dot disconnected"></i>
+                            <span>Not configured</span>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Current Mesh -->
-                <div class="border-t pt-3">
-                    <h3 class="text-sm font-semibold mb-2">Data</h3>
-                    <button id="uploadToServerBtn" class="w-full bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 text-sm" title="Upload current mesh and prepare for inference">
-                        <i class="fas fa-upload"></i> Upload & Prepare
-                    </button>
-                    <p class="text-xs text-gray-500 mt-1">Sends current mesh to server for processing</p>
+                <!-- Data Upload -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span>Data</span>
+                    </div>
+                    <div class="section-content">
+                        <button id="uploadToServerBtn" class="btn btn-primary btn-full">
+                            <i class="fas fa-upload"></i> Upload & Prepare
+                        </button>
+                        <p class="help-text">Sends current mesh to server for processing</p>
+                    </div>
                 </div>
 
                 <!-- Inference Configuration -->
-                <div class="border-t pt-3">
-                    <h3 class="text-sm font-semibold mb-2">Configuration</h3>
-                    <div id="configContainer" class="space-y-2">
-                        <!-- Config inputs will be generated here -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>Configuration</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="configContainer" class="config-container">
+                            <!-- Config inputs will be generated here -->
+                        </div>
                     </div>
                 </div>
 
                 <!-- Inference Actions -->
-                <div class="border-t pt-3">
-                    <button id="runInferenceBtn" class="w-full bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600" title="Run AI inference and apply results">
-                        <i class="fas fa-brain"></i> Run Inference
-                    </button>
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-play-circle"></i>
+                        <span>Run Inference</span>
+                    </div>
+                    <div class="section-content">
+                        <button id="runInferenceBtn" class="btn btn-ai btn-full btn-lg">
+                            <i class="fas fa-brain"></i> Run Inference
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Status -->
-                <div id="inferenceStatus" class="text-sm p-2 rounded bg-gray-50 text-gray-600">
-                    Ready. Configure server settings to begin.
+                <div class="inference-status" id="inferenceStatus">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Ready. Configure server settings to begin.</span>
                 </div>
             </div>
         </div>
+        <!-- ===== METADATA PANEL ===== -->
+        <div id="metadataPanel" class="panel hidden">
+            <div class="panel-header">
+                <div class="panel-header-icon metadata-icon"><i class="fas fa-tags"></i></div>
+                <div class="panel-header-text">
+                    <h2>Metadata</h2>
+                    <span class="panel-subtitle">Properties & attributes</span>
+                </div>
+            </div>
+            <div class="panel-content">
+                <!-- Shared Metadata -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-globe"></i>
+                        <span>Shared Metadata</span>
+                    </div>
+                    <div class="section-content">
+                        <p class="help-text" style="margin-top: 0; margin-bottom: 8px;">Persisted across all history states</p>
+                        <div id="metadataList" class="metadata-list">
+                            <div class="metadata-empty">
+                                <i class="fas fa-inbox"></i>
+                                <p>No metadata</p>
+                                <p class="text-muted">Add metadata below or load a PLY file</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- State-Specific Metadata -->
+                <div id="stateMetadataSection" class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-layer-group"></i>
+                        <span>State Metadata</span>
+                        <span id="stateMetadataBadge" class="section-badge">(Initial State)</span>
+                    </div>
+                    <div class="section-content">
+                        <p class="help-text" style="margin-top: 0; margin-bottom: 8px;">Unique to current history state</p>
+                        <div id="stateMetadataList" class="metadata-list state-metadata-list">
+                            <div class="metadata-empty state-metadata-empty">
+                                <i class="fas fa-layer-group"></i>
+                                <p>No state-specific metadata</p>
+                                <p class="text-muted">Evaluation metrics will appear here</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add New Metadata -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Add Metadata</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="metadata-add-form">
+                            <div class="metadata-input-row">
+                                <input type="text" id="newMetadataKey" placeholder="Key" class="metadata-input key-input">
+                                <input type="text" id="newMetadataValue" placeholder="Value" class="metadata-input value-input">
+                            </div>
+                            <div class="metadata-btn-row">
+                                <button id="addMetadataBtn" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-globe"></i> Add Shared
+                                </button>
+                                <button id="addStateMetadataBtn" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-layer-group"></i> Add to State
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Message -->
+                <div id="metadataStatus" class="metadata-status"></div>
+
+                <!-- Comments Section (from PLY file) -->
+                <div id="commentsSection" class="panel-section hidden">
+                    <div class="section-header">
+                        <i class="fas fa-comment-alt"></i>
+                        <span>PLY Comments</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="commentsList" class="comments-list"></div>
+                    </div>
+                </div>
+
+                <!-- Help Section -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-question-circle"></i>
+                        <span>About Metadata</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="info-list">
+                            <div class="info-item">
+                                <i class="fas fa-save"></i>
+                                <span>Metadata is saved when you export to PLY</span>
+                            </div>
+                            <div class="info-item">
+                                <i class="fas fa-file-import"></i>
+                                <span>Metadata is loaded from PLY file comments</span>
+                            </div>
+                            <div class="info-item">
+                                <i class="fas fa-code"></i>
+                                <span>Supports: strings, numbers, booleans, objects, arrays</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- ===== EVALUATION PANEL ===== -->
         <div id="evaluationPanel" class="panel hidden">
-            <h2 class="text-xl font-bold mb-4"><i class="fas fa-chart-bar"></i> Evaluation</h2>
-            <div class="flex flex-col space-y-3">
+            <div class="panel-header">
+                <div class="panel-header-icon eval-icon"><i class="fas fa-chart-bar"></i></div>
+                <div class="panel-header-text">
+                    <h2>Evaluation</h2>
+                    <span class="panel-subtitle">Compare & analyze annotations</span>
+                </div>
+            </div>
+            <div class="panel-content">
                 <!-- GT/Pred Status -->
-                <div class="eval-section">
-                    <h3 class="text-sm font-semibold mb-2">Comparison States</h3>
-                    <div class="eval-status-row">
-                        <span class="eval-status-label">Ground Truth:</span>
-                        <span id="evalGtStatus" class="eval-status-value text-gray-400">Not set</span>
-                        <button id="evalClearGt" class="eval-clear-btn" title="Clear Ground Truth">
-                            <i class="fas fa-times"></i>
-                        </button>
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-balance-scale"></i>
+                        <span>Comparison States</span>
                     </div>
-                    <div class="eval-status-row">
-                        <span class="eval-status-label">Prediction:</span>
-                        <span id="evalPredStatus" class="eval-status-value text-gray-400">Not set</span>
-                        <button id="evalClearPred" class="eval-clear-btn" title="Clear Prediction">
-                            <i class="fas fa-times"></i>
-                        </button>
+                    <div class="section-content">
+                        <div class="comparison-status">
+                            <div class="status-row">
+                                <span class="status-label gt-label">
+                                    <i class="fas fa-bullseye"></i> Ground Truth
+                                </span>
+                                <span id="evalGtStatus" class="status-value">Not set</span>
+                                <button id="evalClearGt" class="btn-icon btn-icon-danger btn-icon-sm" title="Clear Ground Truth">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="status-row">
+                                <span class="status-label pred-label">
+                                    <i class="fas fa-crosshairs"></i> Prediction
+                                </span>
+                                <span id="evalPredStatus" class="status-value">Not set</span>
+                                <button id="evalClearPred" class="btn-icon btn-icon-danger btn-icon-sm" title="Clear Prediction">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <p class="help-text">Use GT/Pred buttons in History panel to set states</p>
                     </div>
-                    <p class="text-xs text-gray-500 mt-1">Use GT/Pred buttons in History panel to set states</p>
                 </div>
 
                 <!-- Parameters -->
-                <div class="eval-section border-t pt-3">
-                    <h3 class="text-sm font-semibold mb-2">Parameters</h3>
-                    <div class="eval-param-row">
-                        <label for="evalIouThreshold">IoU Threshold:</label>
-                        <input type="range" id="evalIouThreshold" min="0" max="1" step="0.05" value="0.5" class="eval-slider">
-                        <span id="evalIouValue" class="eval-param-value">0.50</span>
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>Parameters</span>
                     </div>
-                    <div class="eval-param-row">
-                        <label for="evalOversegThreshold">OverSeg Threshold:</label>
-                        <input type="range" id="evalOversegThreshold" min="0" max="0.5" step="0.01" value="0.1" class="eval-slider">
-                        <span id="evalOversegValue" class="eval-param-value">0.10</span>
+                    <div class="section-content">
+                        <div class="slider-row-labeled">
+                            <label>IoU Threshold</label>
+                            <input type="range" id="evalIouThreshold" min="0" max="1" step="0.05" value="0.5" class="styled-slider">
+                            <span id="evalIouValue" class="slider-value">0.50</span>
+                        </div>
+                        <div class="slider-row-labeled">
+                            <label>OverSeg</label>
+                            <input type="range" id="evalOversegThreshold" min="0" max="0.5" step="0.01" value="0.1" class="styled-slider">
+                            <span id="evalOversegValue" class="slider-value">0.10</span>
+                        </div>
+                        <div class="slider-row-labeled">
+                            <label>UnderSeg</label>
+                            <input type="range" id="evalUndersegThreshold" min="0" max="0.5" step="0.01" value="0.1" class="styled-slider">
+                            <span id="evalUndersegValue" class="slider-value">0.10</span>
+                        </div>
+                        <button id="evalComputeBtn" class="btn btn-eval btn-full" disabled>
+                            <i class="fas fa-calculator"></i> Compute Metrics
+                        </button>
                     </div>
-                    <div class="eval-param-row">
-                        <label for="evalUndersegThreshold">UnderSeg Threshold:</label>
-                        <input type="range" id="evalUndersegThreshold" min="0" max="0.5" step="0.01" value="0.1" class="eval-slider">
-                        <span id="evalUndersegValue" class="eval-param-value">0.10</span>
-                    </div>
-                    <button id="evalComputeBtn" class="w-full bg-teal-500 text-white px-4 py-2 rounded hover:bg-teal-600 mt-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        <i class="fas fa-calculator"></i> Compute Metrics
-                    </button>
                 </div>
 
                 <!-- Results -->
-                <div class="eval-section border-t pt-3">
-                    <h3 class="text-sm font-semibold mb-2">Results</h3>
-                    <div id="evalResults" class="eval-results">
-                        <p class="text-gray-400 italic">Compute metrics to see results</p>
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-poll"></i>
+                        <span>Results</span>
                     </div>
-                    <p class="eval-hover-hint"><i class="fas fa-info-circle"></i> Hover over metrics for explanations</p>
+                    <div class="section-content">
+                        <div id="evalResults" class="eval-results">
+                            <div class="results-empty">
+                                <i class="fas fa-chart-pie"></i>
+                                <p>Compute metrics to see results</p>
+                            </div>
+                        </div>
+                        <p class="help-text"><i class="fas fa-info-circle"></i> Hover over metrics for explanations</p>
+                    </div>
                 </div>
 
                 <!-- Error Breakdown -->
-                <div class="eval-section border-t pt-3">
-                    <h3 class="text-sm font-semibold mb-2">Error Breakdown</h3>
-                    <div id="evalErrorBreakdown" class="eval-error-breakdown">
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Error Breakdown</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="evalErrorBreakdown" class="eval-error-breakdown">
+                            <div class="results-empty">
+                                <p class="text-muted">Error breakdown will appear after computing</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Visualization Mode -->
-                <div class="eval-section border-t pt-3">
-                    <h3 class="text-sm font-semibold mb-2">Visualization Mode</h3>
-                    <div class="eval-viz-section-label">States</div>
-                    <div class="eval-viz-modes">
-                        <label class="eval-radio-label">
-                            <input type="radio" name="evalVizMode" value="gt">
-                            <span>Ground Truth</span>
-                        </label>
-                        <label class="eval-radio-label">
-                            <input type="radio" name="evalVizMode" value="pred">
-                            <span>Prediction</span>
-                        </label>
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-eye"></i>
+                        <span>Visualization</span>
                     </div>
-                    <div class="eval-viz-section-label mt-2">Comparison</div>
-                    <div class="eval-viz-modes">
-                        <label class="eval-radio-label">
-                            <input type="radio" name="evalVizMode" value="all" checked>
-                            <span>All Errors</span>
-                        </label>
-                        <label class="eval-radio-label">
-                            <input type="radio" name="evalVizMode" value="matched">
-                            <span>Matched</span>
-                        </label>
-                        <label class="eval-radio-label">
-                            <input type="radio" name="evalVizMode" value="overseg">
-                            <span>Over-seg</span>
-                        </label>
-                        <label class="eval-radio-label">
-                            <input type="radio" name="evalVizMode" value="underseg">
-                            <span>Under-seg</span>
-                        </label>
-                        <label class="eval-radio-label">
-                            <input type="radio" name="evalVizMode" value="missingGt">
-                            <span>Missing GT</span>
-                        </label>
-                        <label class="eval-radio-label">
-                            <input type="radio" name="evalVizMode" value="missingPred">
-                            <span>Hallucinated</span>
-                        </label>
-                    </div>
-                    <div class="flex items-center gap-2 mt-2">
-                        <input type="checkbox" id="evalShowGtEdges" checked>
-                        <label for="evalShowGtEdges" class="text-sm text-gray-700">Show GT edges overlay</label>
+                    <div class="section-content">
+                        <div class="viz-group">
+                            <span class="viz-group-label">States</span>
+                            <div class="viz-options">
+                                <label class="viz-option">
+                                    <input type="radio" name="evalVizMode" value="gt">
+                                    <span class="viz-option-label">Ground Truth</span>
+                                </label>
+                                <label class="viz-option">
+                                    <input type="radio" name="evalVizMode" value="pred">
+                                    <span class="viz-option-label">Prediction</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="viz-group">
+                            <span class="viz-group-label">Comparison</span>
+                            <div class="viz-options viz-options-grid">
+                                <label class="viz-option">
+                                    <input type="radio" name="evalVizMode" value="all" checked>
+                                    <span class="viz-option-label">All Errors</span>
+                                </label>
+                                <label class="viz-option">
+                                    <input type="radio" name="evalVizMode" value="matched">
+                                    <span class="viz-option-label">Matched</span>
+                                </label>
+                                <label class="viz-option">
+                                    <input type="radio" name="evalVizMode" value="overseg">
+                                    <span class="viz-option-label">Over-seg</span>
+                                </label>
+                                <label class="viz-option">
+                                    <input type="radio" name="evalVizMode" value="underseg">
+                                    <span class="viz-option-label">Under-seg</span>
+                                </label>
+                                <label class="viz-option">
+                                    <input type="radio" name="evalVizMode" value="missingGt">
+                                    <span class="viz-option-label">Missing GT</span>
+                                </label>
+                                <label class="viz-option">
+                                    <input type="radio" name="evalVizMode" value="missingPred">
+                                    <span class="viz-option-label">Hallucinated</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="toggle-row">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="evalShowGtEdges" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>Show GT edges overlay</span>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Color Legend -->
-                <div class="eval-section border-t pt-3">
-                    <h3 class="text-sm font-semibold mb-2">Color Legend</h3>
-                    <div id="evalColorLegend" class="eval-color-legend">
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-palette"></i>
+                        <span>Color Legend</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="evalColorLegend" class="eval-color-legend">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ===== SETTINGS PANEL ===== -->
+        <div id="settingsPanel" class="panel hidden">
+            <div class="panel-header">
+                <div class="panel-header-icon settings-icon"><i class="fas fa-cog"></i></div>
+                <div class="panel-header-text">
+                    <h2>Settings</h2>
+                    <span class="panel-subtitle">Application configuration</span>
+                </div>
+            </div>
+            <div class="panel-content">
+                <!-- Import/Export Section -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-file-export"></i>
+                        <span>Configuration</span>
+                    </div>
+                    <div class="section-content">
+                        <p class="help-text" style="margin-top: 0;">Export your settings to a JSON file or import from a previously saved configuration.</p>
+                        <div class="btn-group-vertical">
+                            <button id="exportSettingsBtn" class="btn btn-primary btn-sm">
+                                <i class="fas fa-download"></i> Export Settings
+                            </button>
+                            <label for="importSettingsInput" class="btn btn-secondary btn-sm" style="text-align: center; cursor: pointer;">
+                                <i class="fas fa-upload"></i> Import Settings
+                            </label>
+                            <input type="file" id="importSettingsInput" accept=".json" class="hidden-file-input">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Settings Summary -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-list"></i>
+                        <span>Current Settings</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="settingsSummary" class="settings-summary">
+                            <div class="settings-group">
+                                <span class="settings-group-title"><i class="fas fa-palette"></i> Rendering</span>
+                                <div class="settings-items" id="renderingSettingsSummary">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                            <div class="settings-group">
+                                <span class="settings-group-title"><i class="fas fa-lightbulb"></i> Lighting</span>
+                                <div class="settings-items" id="lightingSettingsSummary">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reset Section -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-undo-alt"></i>
+                        <span>Reset</span>
+                    </div>
+                    <div class="section-content">
+                        <button id="resetAllSettingsBtn" class="btn btn-danger btn-sm btn-full">
+                            <i class="fas fa-trash-restore"></i> Reset All to Defaults
+                        </button>
+                        <p class="help-text">This will reset all rendering and lighting settings to their default values.</p>
+                    </div>
+                </div>
+
+                <!-- Storage Info -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-database"></i>
+                        <span>Storage</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="storage-info">
+                            <div class="info-item">
+                                <i class="fas fa-save"></i>
+                                <span>Settings are automatically saved to browser storage</span>
+                            </div>
+                            <div class="info-item">
+                                <i class="fas fa-sync"></i>
+                                <span>Changes are applied immediately and persist across sessions</span>
+                            </div>
+                        </div>
+                        <button id="clearStorageBtn" class="btn btn-ghost btn-sm btn-full" style="margin-top: 8px;">
+                            <i class="fas fa-broom"></i> Clear Local Storage
+                        </button>
+                    </div>
+                </div>
+
+                <!-- About -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-info-circle"></i>
+                        <span>About</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="about-info">
+                            <p><strong>NeuroLithic</strong> - AI Lithic Annotation Tool</p>
+                            <p class="text-muted">Settings are stored locally in your browser and will persist across sessions.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -379,6 +1058,7 @@ This tool allows you to annotate 3D models and is primarily developed for annota
 - **Arrows Mode**: Draw arrows on the 3D model to indicate directions or features.
 - **Model**: AI-powered annotation using the LithicServer backend.
 - **History**: View and manage your annotation history with undo/redo capabilities.
+- **Metadata**: View and edit metadata associated with the mesh (author, version, etc.).
 - **Evaluation**: Compare annotations between ground truth and prediction states with detailed metrics.
 - **Update Light**: Updates the direction of the light in the scene based on the camera position.
 - **Export Annotations**: Exports the annotations to a .PLY file.
@@ -393,6 +1073,21 @@ The Model panel connects to a LithicServer backend for AI-powered edge detection
 6. Click "Run Inference" to process
 7. Click "Apply Results" to add AI predictions as annotations
 8. Use Undo/Redo to revert if needed
+
+## Metadata Management
+The Metadata panel allows you to view and edit metadata associated with your mesh:
+- **View Metadata**: See all key-value pairs loaded from PLY files or added manually
+- **Add Metadata**: Enter a key and value to add new metadata
+- **Edit Metadata**: Click the edit button to modify existing values
+- **Delete Metadata**: Remove metadata entries you no longer need
+- **Auto-save**: Metadata is automatically included when you export to PLY
+
+**Supported value types:**
+- Strings: Plain text values
+- Numbers: Integer or decimal values
+- Booleans: true/false values
+- Objects: JSON objects like {"key": "value"}
+- Arrays: JSON arrays like [1, 2, 3]
 
 ## History & Undo/Redo
 The History panel provides a complete view of all your annotation actions:
@@ -527,41 +1222,1656 @@ Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.staros
                 localStorage.setItem(STORAGE_KEY_WIDTH, sideMenu.offsetWidth);
             }
         });
+        
+        // Annotation panel tab switching
+        const modeTabs = document.querySelectorAll('.mode-tab');
+        const edgeSection = document.getElementById('edgeAnnotationSection');
+        const arrowSection = document.getElementById('arrowAnnotationSection');
+        
+        modeTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active tab
+                modeTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Show corresponding section
+                const tabMode = tab.dataset.mode;
+                edgeSection.classList.toggle('hidden', tabMode !== 'edges');
+                arrowSection.classList.toggle('hidden', tabMode !== 'arrows');
+                
+                // Trigger mode change via clicking the appropriate default tool button
+                // This ensures the mode system is properly updated
+                if (tabMode === 'edges') {
+                    const drawBtn = document.getElementById('drawMode');
+                    if (drawBtn) drawBtn.click();
+                } else if (tabMode === 'arrows') {
+                    const arrowBtn = document.getElementById('arrowMode');
+                    if (arrowBtn) arrowBtn.click();
+                }
+            });
+        });
     });
     </script>
     <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #a5b4fc;
+            --secondary: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --purple: #8b5cf6;
+            --teal: #14b8a6;
+            
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            
+            --navbar-height: 64px;
+            --sidebar-width: 380px;
+            --border-radius: 8px;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
         body {
-    overflow: hidden; /* Remove scrolling */
+            overflow: hidden;
+            background: var(--gray-100);
+        }
+
+        .hidden { display: none !important; }
+
+        /* ===== NAVBAR ===== */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--navbar-height);
+            background: linear-gradient(135deg, var(--gray-900) 0%, var(--gray-800) 100%);
+            box-shadow: var(--shadow-lg);
+            z-index: 100;
+        }
+        
+        .navbar-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 100%;
+            padding: 0 16px;
+            max-width: 100%;
+        }
+        
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .brand-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--purple) 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+        }
+        
+        .brand-text {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .brand-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: -0.5px;
+        }
+        
+        .brand-subtitle {
+            font-size: 10px;
+            color: var(--gray-400);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .navbar-divider {
+            width: 1px;
+            height: 32px;
+            background: var(--gray-700);
+        }
+        
+        .file-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .file-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: var(--gray-700);
+            color: var(--gray-200);
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 1px solid var(--gray-600);
+        }
+        
+        .file-btn:hover {
+            background: var(--gray-600);
+            border-color: var(--gray-500);
+        }
+        
+        .file-btn-export {
+            background: var(--primary-600);
+            border-color: var(--primary-500);
+        }
+        
+        .file-btn-export:hover {
+            background: var(--primary-500);
+            border-color: var(--primary-400);
+        }
+        
+        .file-name-display {
+            font-size: 12px;
+            color: var(--gray-400);
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .hidden-file-input {
+            display: none;
+        }
+        
+        /* Navbar Center - Navigation */
+        .navbar-center {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .nav-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 4px 8px;
+        }
+        
+        .nav-group-label {
+            font-size: 9px;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .nav-group-buttons {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .nav-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 8px 12px;
+            background: transparent;
+            color: var(--gray-400);
+            border: none;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            min-width: 64px;
+        }
+        
+        .nav-btn i {
+            font-size: 16px;
+        }
+        
+        .nav-btn:hover {
+            background: var(--gray-700);
+            color: var(--gray-200);
+        }
+        
+        .nav-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .nav-btn-ai {
+            color: var(--purple);
+        }
+        
+        .nav-btn-ai:hover {
+            background: rgba(139, 92, 246, 0.2);
+            color: var(--primary-light);
+        }
+        
+        .nav-btn-ai.active {
+            background: var(--purple);
+            color: white;
+        }
+        
+        /* Navbar Right */
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        
+        .action-btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .action-btn-primary:hover {
+            background: var(--primary-dark);
+        }
+        
+        .action-btn-help {
+            background: transparent;
+            color: var(--gray-400);
+            padding: 8px 10px;
+        }
+        
+        .action-btn-help:hover {
+            background: var(--gray-700);
+            color: white;
+        }
+/* ===== SIDE MENU ===== */
+.side-menu {
+    position: fixed;
+    top: var(--navbar-height);
+    right: 0;
+    width: var(--sidebar-width);
+    min-width: 320px;
+    max-width: 500px;
+    height: calc(100vh - var(--navbar-height));
+    background: white;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    z-index: 50;
+    border-left: 1px solid var(--gray-200);
 }
 
-.hidden-file-input {
+.side-menu-resize-handle {
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: ew-resize;
+    z-index: 51;
+}
+
+.side-menu-resize-handle::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 40px;
+    background: var(--gray-300);
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.side-menu-resize-handle:hover::before,
+.side-menu-resize-handle.dragging::before {
+    opacity: 1;
+    background: var(--primary);
+}
+
+/* ===== PANEL STYLES ===== */
+.panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: white;
+}
+
+.panel.hidden {
     display: none;
 }
-.file-input-label {
-    display: inline-block;
-    background-color: #E2E8F0; /* bg-gray-300 */
-    color: #4A5568; /* text-gray-700 */
-    padding: 8px 16px; /* px-4 py-2 */
-    border-radius: 8px; /* rounded */
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, var(--gray-50) 0%, white 100%);
+    border-bottom: 1px solid var(--gray-200);
+    flex-shrink: 0;
+}
+
+.panel-header-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+}
+
+.panel-header-icon.annotation-icon {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.panel-header-icon.history-icon {
+    background: linear-gradient(135deg, var(--secondary) 0%, var(--gray-600) 100%);
+}
+
+.panel-header-text h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin: 0;
+    border: none;
+    padding: 0;
+}
+
+.panel-subtitle {
+    font-size: 12px;
+    color: var(--gray-500);
+}
+
+.panel-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+}
+
+.panel-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.panel-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.panel-content::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: 3px;
+}
+
+.panel-content::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-400);
+}
+
+/* Quick Tips */
+.quick-tips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--gray-50);
+    border-radius: var(--border-radius);
+    margin-bottom: 16px;
+    border: 1px solid var(--gray-200);
+}
+
+.tip-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--gray-600);
+}
+
+.tip-item i {
+    color: var(--primary);
+    font-size: 10px;
+}
+
+.tip-item kbd {
+    padding: 2px 6px;
+    background: var(--gray-200);
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: monospace;
+}
+
+/* Panel Sections */
+.panel-section {
+    margin-bottom: 16px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.panel-section.flex-grow {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 200px;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.section-header i {
+    color: var(--primary);
+    font-size: 12px;
+}
+
+.section-header .btn-icon {
+    margin-left: auto;
+}
+
+.section-content {
+    padding: 14px;
+}
+
+.section-content.history-timeline {
+    flex: 1;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Control Elements */
+.control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.control-row label {
+    font-size: 12px;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.control-select {
+    padding: 6px 10px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 12px;
+    background: white;
+    color: var(--gray-700);
     cursor: pointer;
-    margin-right: 8px; /* mr-2 */
+    min-width: 140px;
 }
-.file-input-label:hover {
-    background-color: #CBD5E0; /* hover:bg-gray-400 */
+
+.control-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
+
+/* Light Cards */
+.light-card {
+    background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);
+    border: 1px solid #fef08a;
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 8px;
+}
+
+.light-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.light-card-header span {
+    font-size: 11px;
+    font-weight: 600;
+    color: #854d0e;
+}
+
+.mini-color-picker {
+    width: 24px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Slider Styles */
+.slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.slider-row-labeled {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.slider-row-labeled label {
+    font-size: 11px;
+    color: var(--gray-600);
+    min-width: 65px;
+}
+
+.styled-slider {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--gray-200);
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.styled-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--primary);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+
+.styled-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+.light-card .styled-slider {
+    background: #fde68a;
+}
+
+.light-card .styled-slider::-webkit-slider-thumb {
+    background: #f59e0b;
+}
+
+.slider-value {
+    min-width: 32px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray-600);
+    text-align: right;
+}
+
+/* Toggle Switches */
+.toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+}
+
+.toggle-row span {
+    font-size: 12px;
+    color: var(--gray-700);
+}
+
+.toggle-switch {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--gray-300);
+    transition: 0.2s;
+    border-radius: 20px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.2s;
+    border-radius: 50%;
+    box-shadow: var(--shadow-sm);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(16px);
+}
+
+/* Color Controls */
+.color-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+}
+
+.color-control span {
+    font-size: 12px;
+    color: var(--gray-600);
+}
+
+.color-picker {
+    width: 36px;
+    height: 28px;
+    padding: 0;
+    border: 2px solid var(--gray-300);
+    border-radius: 6px;
+    cursor: pointer;
+    background: none;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+.color-picker::-webkit-color-swatch {
+    border: none;
+    border-radius: 3px;
+}
+
+.color-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 0;
+}
+
+.bg-preset {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1);
+}
+
+.bg-preset:hover {
+    transform: scale(1.1);
+    border-color: var(--primary);
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-sm {
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+.btn-full {
+    width: 100%;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+.btn-secondary {
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-300);
+}
+
+.btn-secondary:hover {
+    background: var(--gray-200);
+}
+
+.btn-ghost {
+    background: transparent;
+    color: var(--gray-600);
+}
+
+.btn-ghost:hover {
+    background: var(--gray-100);
+}
+
+.btn-group-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.btn-icon {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--gray-400);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.btn-icon:hover {
+    background: var(--gray-100);
+    color: var(--gray-600);
+}
+
+.btn-icon-danger:hover {
+    background: #fee2e2;
+    color: var(--danger);
+}
+
+/* PBR Controls */
+.pbr-controls {
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--gray-50);
+    border-radius: 6px;
+    border: 1px solid var(--gray-200);
+}
+
+.pbr-controls.hidden {
+    display: none;
+}
+
+/* ===== ANNOTATION PANEL ===== */
+.annotation-mode-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--gray-100);
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.mode-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 8px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--gray-500);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.mode-tab i {
+    font-size: 16px;
+}
+
+.mode-tab:hover {
+    background: white;
+    color: var(--gray-700);
+}
+
+.mode-tab.active {
+    background: white;
+    color: var(--primary);
+    box-shadow: var(--shadow);
+}
+
+.annotation-section {
+    display: block;
+}
+
+.annotation-section.hidden {
+    display: none;
+}
+
+/* Tool Grid */
+.tool-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.tool-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.tool-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.tool-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 8px;
+    background: var(--gray-50);
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.tool-btn i {
+    font-size: 18px;
+}
+
+.tool-btn:hover {
+    background: white;
+    border-color: var(--primary-light);
+    color: var(--primary);
+}
+
+.tool-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.tool-btn-lg {
+    padding: 16px 12px;
+}
+
+.tool-btn-lg i {
+    font-size: 24px;
+}
+
+/* View mode button - distinct styling */
+.tool-btn-view {
+    border-color: var(--primary-light);
+}
+
+.tool-btn-view:hover {
+    background: var(--primary-50, #eef2ff);
+    border-color: var(--primary);
+}
+
+.tool-btn-view.active {
+    background: #6366f1;
+    border-color: #6366f1;
+    color: white;
+}
+
+.brush-controls {
+    padding-top: 8px;
+    border-top: 1px solid var(--gray-200);
+}
+
+.brush-slider {
+    flex: 1;
+}
+
+/* ===== HISTORY PANEL ===== */
+.undo-redo-buttons {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.btn-undo, .btn-redo {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    background: white;
+    color: var(--gray-600);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-undo:hover:not(:disabled), .btn-redo:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.btn-undo:disabled, .btn-redo:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.history-stats {
+    text-align: center;
+    font-size: 12px;
+    color: var(--gray-500);
+    padding: 8px;
+    background: var(--gray-50);
+    border-radius: 6px;
+}
+
+.history-stats i {
+    margin-right: 4px;
+}
+
+.history-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.history-empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--gray-400);
+}
+
+.history-empty i {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.history-empty p {
+    margin: 4px 0;
+}
+
+.text-muted {
+    font-size: 11px;
+    color: var(--gray-400);
+}
+
+/* ===== AI MODEL PANEL ===== */
+.panel-header-icon.ai-icon {
+    background: linear-gradient(135deg, var(--purple) 0%, #7c3aed 100%);
+}
+
+.panel-header-icon.metadata-icon {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+}
+
+.panel-header-icon.eval-icon {
+    background: linear-gradient(135deg, var(--teal) 0%, #0d9488 100%);
+}
+
+.panel-header-icon.settings-icon {
+    background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+}
+
+/* ===== SETTINGS PANEL ===== */
+.settings-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.settings-group {
+    background: var(--gray-800);
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.settings-group-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray-300);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.settings-group-title i {
+    font-size: 10px;
+    color: var(--primary-400);
+}
+
+.settings-items {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.settings-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--gray-700);
+}
+
+.settings-item:last-child {
+    border-bottom: none;
+}
+
+.settings-item-key {
+    color: var(--gray-400);
+}
+
+.settings-item-value {
+    color: var(--gray-200);
+    font-family: monospace;
+    font-size: 11px;
+}
+
+.settings-item-color {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid var(--gray-600);
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
+.storage-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.about-info {
+    font-size: 12px;
+    color: var(--gray-300);
+}
+
+.about-info p {
+    margin: 0 0 8px 0;
+}
+
+.about-info p:last-child {
+    margin-bottom: 0;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--gray-50);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--gray-600);
+}
+
+.status-dot {
+    font-size: 8px;
+}
+
+.status-dot.disconnected {
+    color: var(--danger);
+}
+
+.status-dot.connected {
+    color: var(--success);
+}
+
+.status-dot.connecting {
+    color: var(--warning);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.help-text {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-top: 8px;
+}
+
+.config-container {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.btn-ai {
+    background: linear-gradient(135deg, var(--purple) 0%, #7c3aed 100%);
+    color: white;
+}
+
+.btn-ai:hover {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+}
+
+.btn-lg {
+    padding: 14px 20px;
+    font-size: 14px;
+}
+
+.inference-status {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--gray-50);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--gray-600);
+    border: 1px solid var(--gray-200);
+}
+
+.inference-status i {
+    color: var(--primary);
+    margin-top: 2px;
+}
+
+.inference-status.success {
+    background: #dcfce7;
+    border-color: #86efac;
+    color: #166534;
+}
+
+.inference-status.success i {
+    color: var(--success);
+}
+
+.inference-status.error {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #991b1b;
+}
+
+.inference-status.error i {
+    color: var(--danger);
+}
+
+.inference-status.loading {
+    background: #fef3c7;
+    border-color: #fcd34d;
+    color: #92400e;
+}
+
+.inference-status.loading i {
+    color: var(--warning);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Additional button styles */
+.btn-warning {
+    background: var(--warning);
+    color: white;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+}
+
+.btn-eval {
+    background: linear-gradient(135deg, var(--teal) 0%, #0d9488 100%);
+    color: white;
+}
+
+.btn-eval:hover:not(:disabled) {
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+}
+
+.btn-eval:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-icon-sm {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+}
+
+/* Section badge */
+.section-badge {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--gray-500);
+    background: var(--gray-100);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+/* Info list */
+.info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--gray-600);
+}
+
+.info-item i {
+    width: 16px;
+    color: var(--primary);
+    text-align: center;
+}
+
+/* Results empty state */
+.results-empty {
+    text-align: center;
+    padding: 20px;
+    color: var(--gray-400);
+}
+
+.results-empty i {
+    font-size: 24px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+}
+
+.results-empty p {
+    margin: 0;
+    font-size: 12px;
+}
+
+/* Comparison status */
+.comparison-status {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--gray-50);
+    border-radius: 6px;
+}
+
+.status-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 110px;
+}
+
+.status-label.gt-label {
+    color: var(--success);
+}
+
+.status-label.pred-label {
+    color: var(--purple);
+}
+
+.status-value {
+    flex: 1;
+    font-size: 12px;
+    color: var(--gray-500);
+}
+
+/* Visualization options */
+.viz-group {
+    margin-bottom: 12px;
+}
+
+.viz-group-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.viz-options {
+    display: flex;
+    gap: 6px;
+}
+
+.viz-options-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+
+.viz-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.viz-option:hover {
+    background: white;
+    border-color: var(--primary-light);
+}
+
+.viz-option input[type="radio"] {
+    margin: 0;
+    width: 14px;
+    height: 14px;
+    accent-color: var(--primary);
+}
+
+.viz-option input[type="radio"]:checked + .viz-option-label {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.viz-option-label {
+    font-size: 11px;
+    color: var(--gray-600);
+}
+
+/* Config item styling */
+.config-item {
+    margin-bottom: 12px;
+}
+
+.control-input {
+    padding: 6px 10px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 12px;
+    background: white;
+    color: var(--gray-700);
+    min-width: 80px;
+}
+
+.control-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Connection status - additional styles */
+.connection-status.connected {
+    color: var(--success);
+}
+
+.connection-status.connected .status-dot {
+    color: var(--success);
+}
+
+/* ===== MODAL ===== */
 .modal {
     display: none; 
     position: fixed; 
-    z-index: 50; 
+    z-index: 200; 
     left: 0; 
     top: 0; 
     width: 100%; 
     height: 100%; 
     overflow: auto; 
-    background-color: rgb(0,0,0); 
-    background-color: rgba(0,0,0,0.4); 
+    background-color: rgba(0,0,0,0.5); 
     justify-content: center;
     align-items: center;
+    backdrop-filter: blur(4px);
+}
+
+/* Settings Modal */
+.settings-modal {
+    max-width: 480px;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.modal-header h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-800);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    border: none;
+    padding: 0;
+}
+
+.modal-header h2 i {
+    color: var(--primary);
+}
+
+.modal-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--gray-400);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.modal-close:hover {
+    background: var(--gray-200);
+    color: var(--gray-600);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+/* Form styles */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 6px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--gray-700);
+    transition: all 0.15s;
+    box-sizing: border-box;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-input::placeholder {
+    color: var(--gray-400);
+}
+
+.form-hint {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-top: 4px;
+}
+
+.input-with-action {
+    display: flex;
+    gap: 8px;
+}
+
+.input-with-action .form-input {
+    flex: 1;
+}
+
+.input-action-btn {
+    width: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--gray-300);
+    background: var(--gray-50);
+    border-radius: 6px;
+    color: var(--gray-500);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.input-action-btn:hover {
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.form-actions .btn {
+    flex: 1;
+}
+
+/* Settings result */
+.settings-result {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    margin-top: 16px;
+}
+
+.settings-result.success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.settings-result.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.settings-result.warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.settings-result.hidden {
+    display: none;
 }
 .modal-content {
     background-color: #fefefe;
@@ -618,120 +2928,7 @@ Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.staros
     cursor: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMCIgY3k9IjEwIiByPSI1IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjUiLz48L3N2Zz4='), auto;
 }
 
-.side-menu {
-    position: fixed;
-    top: 72px; /* Account for header height */
-    right: 0;
-    width: 360px;
-    min-width: 280px;
-    max-width: 600px;
-    height: calc(100vh - 72px); /* Full height minus header */
-    background-color: #fff;
-    box-shadow: -2px 0 8px rgba(0,0,0,0.15);
-    border-radius: 12px 0 0 0;
-    display: flex;
-    flex-direction: column;
-    z-index: 20;
-}
-
-.side-menu-resize-handle {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 6px;
-    cursor: ew-resize;
-    background: transparent;
-    transition: background 0.2s;
-    z-index: 25;
-    border-radius: 12px 0 0 0;
-}
-
-.side-menu-resize-handle:hover,
-.side-menu-resize-handle.dragging {
-    background: linear-gradient(90deg, rgba(99, 102, 241, 0.4) 0%, transparent 100%);
-}
-
-.side-menu-resize-handle::before {
-    content: '';
-    position: absolute;
-    left: 1px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 40px;
-    background: #d1d5db;
-    border-radius: 2px;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.side-menu-resize-handle:hover::before,
-.side-menu-resize-handle.dragging::before {
-    opacity: 1;
-}
-
-.panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 16px;
-    margin: 0;
-    width: 100%;
-    box-sizing: border-box;
-    background-color: #fff;
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-.panel > .flex.flex-col,
-.panel > div:last-child {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.panel.hidden {
-    display: none;
-}
-
-/* Custom scrollbar for panels */
-.panel::-webkit-scrollbar {
-    width: 8px;
-}
-
-.panel::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-
-.panel::-webkit-scrollbar-thumb {
-    background: #c4c4c4;
-    border-radius: 4px;
-}
-
-.panel::-webkit-scrollbar-thumb:hover {
-    background: #999;
-}
-
-/* Panel headers */
-.panel h2 {
-    font-size: 1.125rem;
-    font-weight: 700;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid #e5e7eb;
-    color: #374151;
-    flex-shrink: 0;
-}
-
-.panel h3 {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #4b5563;
-    margin-bottom: 0.5rem;
-    flex-shrink: 0;
-}
+/* Legacy panel styles - keeping for backward compat but most are overridden above */
 
 /* Ensure config container scrolls if needed */
 #configContainer {
@@ -755,22 +2952,111 @@ Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.staros
 }
 
 
-.noUi-target,.noUi-target *{-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;-ms-touch-action:none;touch-action:none;-ms-user-select:none;-moz-user-select:none;user-select:none;-moz-box-sizing:border-box;box-sizing:border-box}.noUi-target{position:relative}.noUi-base,.noUi-connects{width:100%;height:100%;position:relative;z-index:1}.noUi-connects{overflow:hidden;z-index:0}.noUi-connect,.noUi-origin{will-change:transform;position:absolute;z-index:1;top:0;right:0;height:100%;width:100%;-ms-transform-origin:0 0;-webkit-transform-origin:0 0;-webkit-transform-style:preserve-3d;transform-origin:0 0;transform-style:flat}.noUi-txt-dir-rtl.noUi-horizontal .noUi-origin{left:0;right:auto}.noUi-vertical .noUi-origin{top:-100%;width:0}.noUi-horizontal .noUi-origin{height:0}.noUi-handle{-webkit-backface-visibility:hidden;backface-visibility:hidden;position:absolute}.noUi-touch-area{height:100%;width:100%}.noUi-state-tap .noUi-connect,.noUi-state-tap .noUi-origin{-webkit-transition:transform .3s;transition:transform .3s}.noUi-state-drag *{cursor:inherit!important}.noUi-horizontal{height:18px}.noUi-horizontal .noUi-handle{width:34px;height:28px;right:-17px;top:-6px}.noUi-vertical{width:18px}.noUi-vertical .noUi-handle{width:28px;height:34px;right:-6px;bottom:-17px}.noUi-txt-dir-rtl.noUi-horizontal .noUi-handle{left:-17px;right:auto}.noUi-target{background:#FAFAFA;border-radius:4px;border:1px solid #D3D3D3;box-shadow:inset 0 1px 1px #F0F0F0,0 3px 6px -5px #BBB}.noUi-connects{border-radius:3px}.noUi-connect{background:#3FB8AF}.noUi-draggable{cursor:ew-resize}.noUi-vertical .noUi-draggable{cursor:ns-resize}.noUi-handle{border:1px solid #D9D9D9;border-radius:3px;background:#FFF;cursor:default;box-shadow:inset 0 0 1px #FFF,inset 0 1px 7px #EBEBEB,0 3px 6px -3px #BBB}.noUi-active{box-shadow:inset 0 0 1px #FFF,inset 0 1px 7px #DDD,0 3px 6px -3px #BBB}.noUi-handle:after,.noUi-handle:before{content:"";display:block;position:absolute;height:14px;width:1px;background:#E8E7E6;left:14px;top:6px}.noUi-handle:after{left:17px}.noUi-vertical .noUi-handle:after,.noUi-vertical .noUi-handle:before{width:14px;height:1px;left:6px;top:14px}.noUi-vertical .noUi-handle:after{top:17px}[disabled] .noUi-connect{background:#B8B8B8}[disabled] .noUi-handle,[disabled].noUi-handle,[disabled].noUi-target{cursor:not-allowed}.noUi-pips,.noUi-pips *{-moz-box-sizing:border-box;box-sizing:border-box}.noUi-pips{position:absolute;color:#999}.noUi-value{position:absolute;white-space:nowrap;text-align:center}.noUi-value-sub{color:#ccc;font-size:10px}.noUi-marker{position:absolute;background:#CCC}.noUi-marker-sub{background:#AAA}.noUi-marker-large{background:#AAA}.noUi-pips-horizontal{padding:10px 0;height:80px;top:100%;left:0;width:100%}.noUi-value-horizontal{-webkit-transform:translate(-50%,50%);transform:translate(-50%,50%)}.noUi-rtl .noUi-value-horizontal{-webkit-transform:translate(50%,50%);transform:translate(50%,50%)}.noUi-marker-horizontal.noUi-marker{margin-left:-1px;width:2px;height:5px}.noUi-marker-horizontal.noUi-marker-sub{height:10px}.noUi-marker-horizontal.noUi-marker-large{height:15px}.noUi-pips-vertical{padding:0 10px;height:100%;top:0;left:100%}.noUi-value-vertical{-webkit-transform:translate(0,-50%);transform:translate(0,-50%);padding-left:25px}.noUi-rtl .noUi-value-vertical{-webkit-transform:translate(0,50%);transform:translate(0,50%)}.noUi-marker-vertical.noUi-marker{width:5px;height:2px;margin-top:-1px}.noUi-marker-vertical.noUi-marker-sub{width:10px}.noUi-marker-vertical.noUi-marker-large{width:15px}.noUi-tooltip{display:block;position:absolute;border:1px solid #D9D9D9;border-radius:3px;background:#fff;color:#000;padding:5px;text-align:center;white-space:nowrap}.noUi-horizontal .noUi-tooltip{-webkit-transform:translate(-50%,0);transform:translate(-50%,0);left:50%;bottom:120%}.noUi-vertical .noUi-tooltip{-webkit-transform:translate(0,-50%);transform:translate(0,-50%);top:50%;right:120%}.noUi-horizontal .noUi-origin>.noUi-tooltip{-webkit-transform:translate(50%,0);transform:translate(50%,0);left:auto;bottom:10px}.noUi-vertical .noUi-origin>.noUi-tooltip{-webkit-transform:translate(0,-18px);transform:translate(0,-18px);top:auto;right:28px}
+/* Canvas Container */
+.canvas-container {
+    position: fixed;
+    top: var(--navbar-height);
+    left: 0;
+    right: var(--sidebar-width);
+    bottom: 0;
+    z-index: 1;
+}
 
+.canvas-container canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Mode Indicator */
+.mode-indicator {
+    --mode-color: #6366f1;
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid var(--mode-color);
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mode-color);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(8px);
+    z-index: 50;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    user-select: none;
+}
+
+.mode-indicator:hover {
+    transform: scale(1.05);
+    box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1));
+}
+
+.mode-indicator:active {
+    transform: scale(0.98);
+}
+
+.mode-indicator i {
+    font-size: 14px;
+}
+
+/* Floating Controls */
+.floating-controls {
+    position: fixed;
+    bottom: 24px;
+    /* Center in visible canvas area (excluding sidebar) */
+    left: calc((100vw - var(--sidebar-width)) / 2);
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    z-index: 50;
+}
+
+.floating-btn {
+    width: 48px;
+    height: 48px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--gray-600);
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(8px);
+}
+
+.floating-btn:hover:not(:disabled) {
+    background: white;
+    color: var(--primary);
+    transform: scale(1.1);
+}
+
+.floating-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* noUiSlider styles (keeping for brush slider) */
+.noUi-target,.noUi-target *{-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;-ms-touch-action:none;touch-action:none;-ms-user-select:none;-moz-user-select:none;user-select:none;-moz-box-sizing:border-box;box-sizing:border-box}.noUi-target{position:relative}.noUi-base,.noUi-connects{width:100%;height:100%;position:relative;z-index:1}.noUi-connects{overflow:hidden;z-index:0}.noUi-connect,.noUi-origin{will-change:transform;position:absolute;z-index:1;top:0;right:0;height:100%;width:100%;-ms-transform-origin:0 0;-webkit-transform-origin:0 0;-webkit-transform-style:preserve-3d;transform-origin:0 0;transform-style:flat}.noUi-txt-dir-rtl.noUi-horizontal .noUi-origin{left:0;right:auto}.noUi-vertical .noUi-origin{top:-100%;width:0}.noUi-horizontal .noUi-origin{height:0}.noUi-handle{-webkit-backface-visibility:hidden;backface-visibility:hidden;position:absolute}.noUi-touch-area{height:100%;width:100%}.noUi-state-tap .noUi-connect,.noUi-state-tap .noUi-origin{-webkit-transition:transform .3s;transition:transform .3s}.noUi-state-drag *{cursor:inherit!important}.noUi-horizontal{height:8px}.noUi-horizontal .noUi-handle{width:18px;height:18px;right:-9px;top:-5px;border-radius:50%;}.noUi-vertical{width:18px}.noUi-vertical .noUi-handle{width:28px;height:34px;right:-6px;bottom:-17px}.noUi-txt-dir-rtl.noUi-horizontal .noUi-handle{left:-17px;right:auto}.noUi-target{background:var(--gray-200);border-radius:4px;border:none;box-shadow:none;}.noUi-connects{border-radius:4px}.noUi-connect{background:var(--primary)}.noUi-draggable{cursor:ew-resize}.noUi-vertical .noUi-draggable{cursor:ns-resize}.noUi-handle{border:2px solid var(--primary);border-radius:50%;background:#FFF;cursor:pointer;box-shadow:var(--shadow)}.noUi-active{box-shadow:var(--shadow-md)}[disabled] .noUi-connect{background:var(--gray-300)}[disabled] .noUi-handle,[disabled].noUi-handle,[disabled].noUi-target{cursor:not-allowed}
+
+/* Legacy toggle styles for backwards compat */
 .auto-seg-toggle-container {
     position: relative;
     display: inline-block;
-    width: 80px;
-    height: 40px;
-    pointer-events: none;
-    user-select: none;
+    width: 36px;
+    height: 20px;
 }
 
 .auto-seg-toggle-container input {
     opacity: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: all;
+    width: 0;
+    height: 0;
 }
 
 .auto-seg-slider {
@@ -780,59 +3066,58 @@ Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.staros
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #808080;
-    transition: 0.4s;
-    pointer-events: none;
+    background-color: var(--gray-300);
+    transition: 0.2s;
+    border-radius: 20px;
 }
 
 .auto-seg-slider:before {
     position: absolute;
     content: "";
-    height: 24px;
-    width: 24px;
-    left: 8px;
-    bottom: 8px;
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
     background-color: #fff;
     transition: 0.2s;
-    pointer-events: none;
+    border-radius: 50%;
+    box-shadow: var(--shadow-sm);
 }
 
 .auto-seg-slider:after {
-    position: absolute;
-    content: "off";
-    height: 24px;
-    width: 24px;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    transition: 0.2s;
-    pointer-events: none;
-    display: flex;
-    align-items: center;
-    color: white;
+    display: none;
 }
 
 .auto-seg-toggle-container input:checked + .auto-seg-slider {
-    background-color: #2196f3;
+    background-color: var(--primary);
 }
 
 .auto-seg-toggle-container input:checked + .auto-seg-slider:before {
-    transform: translateX(40px);
-}
-
-.auto-seg-toggle-container input:checked + .auto-seg-slider:after {
-    content: "on";
-    left: 8px;
-    right: auto;
-    color: white;
+    transform: translateX(16px);
 }
 
 .auto-seg-slider.auto-seg-round {
-    border-radius: 34px;
+    border-radius: 20px;
 }
 
 .auto-seg-slider.auto-seg-round:before {
     border-radius: 50%;
+}
+
+.auto-seg-toggle-container.small-toggle {
+    width: 36px;
+    height: 20px;
+}
+
+.auto-seg-toggle-container.small-toggle .auto-seg-slider:before {
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+}
+
+.auto-seg-toggle-container.small-toggle input:checked + .auto-seg-slider:before {
+    transform: translateX(16px);
 }
 
 /* History panel custom scrollbar */
@@ -1279,6 +3564,911 @@ Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.staros
     text-align: center;
     margin-top: 8px;
     font-style: italic;
+}
+
+/* ===== Metadata Panel Styles ===== */
+.metadata-section {
+    margin-bottom: 0.5rem;
+}
+
+.metadata-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+}
+
+.metadata-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.metadata-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.metadata-list::-webkit-scrollbar-thumb {
+    background: #c4c4c4;
+    border-radius: 3px;
+}
+
+.metadata-empty {
+    padding: 24px;
+    text-align: center;
+    color: #9ca3af;
+}
+
+.metadata-empty i {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    opacity: 0.5;
+}
+
+.metadata-empty p {
+    margin: 4px 0;
+}
+
+.metadata-item {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    background: white;
+    transition: background 0.15s;
+}
+
+.metadata-item:first-child {
+    border-radius: 8px 8px 0 0;
+}
+
+.metadata-item:last-child {
+    border-bottom: none;
+    border-radius: 0 0 8px 8px;
+}
+
+.metadata-item:only-child {
+    border-radius: 8px;
+}
+
+.metadata-item:hover {
+    background: #f0f9ff;
+}
+
+.metadata-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.metadata-key {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.key-name {
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 0.875rem;
+}
+
+.type-badge {
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: lowercase;
+}
+
+.type-badge.type-string {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.type-badge.type-number {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.type-badge.type-boolean {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.type-badge.type-object {
+    background: #f3e8ff;
+    color: #7e22ce;
+}
+
+/* State-specific metadata badge */
+.state-badge {
+    font-size: 0.6rem;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: #fef3c7;
+    color: #92400e;
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+/* State metadata list styling */
+.state-metadata-list {
+    border-radius: 8px;
+}
+
+.state-metadata-item {
+    background: #fffbeb;
+}
+
+.state-metadata-item:hover {
+    background: #fef3c7;
+}
+
+.state-metadata-empty i {
+    color: #d97706;
+}
+
+/* Evaluation metrics special view */
+.evaluation-item {
+    padding: 12px;
+}
+
+.eval-computed-at {
+    font-size: 0.7rem;
+    color: #6b7280;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.eval-computed-at i {
+    margin-right: 4px;
+}
+
+.eval-table-view {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.eval-section {
+    background: #f9fafb;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.eval-section-small {
+    background: transparent;
+    padding: 6px 0;
+}
+
+.eval-section-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.eval-metrics-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.eval-metrics-row:last-child {
+    margin-bottom: 0;
+}
+
+.eval-metric {
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+}
+
+.eval-metric.highlight {
+    background: #eff6ff;
+    border-color: #3b82f6;
+}
+
+.eval-metric-value {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.eval-metric-value.success {
+    color: #059669;
+}
+
+.eval-metric-value.danger {
+    color: #dc2626;
+}
+
+.eval-metric-value.warning {
+    color: #d97706;
+}
+
+.eval-metric-label {
+    display: block;
+    font-size: 0.65rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+.eval-errors-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.eval-error-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    background: white;
+    border-radius: 4px;
+}
+
+.eval-error-label {
+    color: #4b5563;
+}
+
+.eval-error-value {
+    color: #6b7280;
+    font-family: monospace;
+}
+
+.eval-info-row {
+    display: flex;
+    justify-content: space-around;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.eval-info-row.thresholds {
+    font-family: monospace;
+    font-size: 0.7rem;
+    color: #9ca3af;
+}
+
+.eval-view-toggle {
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.eval-view-toggle:hover {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.eval-raw-view pre {
+    margin: 0;
+    font-size: 0.7rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Metadata add button row */
+.metadata-btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.metadata-btn-row .btn {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.metadata-add-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.metadata-add-btn.shared-btn {
+    background: #6366f1;
+    color: white;
+}
+
+.metadata-add-btn.shared-btn:hover {
+    background: #4f46e5;
+}
+
+.metadata-add-btn.state-btn {
+    background: #f59e0b;
+    color: white;
+}
+
+.metadata-add-btn.state-btn:hover {
+    background: #d97706;
+}
+
+.metadata-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.metadata-edit-btn,
+.metadata-delete-btn {
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.metadata-edit-btn:hover {
+    background: #dbeafe;
+    color: #3b82f6;
+}
+
+.metadata-delete-btn:hover {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.metadata-value {
+    font-size: 0.8rem;
+    color: #4b5563;
+    word-break: break-all;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    background: #f3f4f6;
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+
+.metadata-value.long-value {
+    white-space: pre-wrap;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.metadata-value.type-number {
+    color: #059669;
+}
+
+.metadata-value.type-boolean {
+    color: #d97706;
+}
+
+.metadata-value.type-object {
+    color: #7c3aed;
+}
+
+/* Add Metadata Form */
+.metadata-add-form {
+    background: #f9fafb;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.metadata-input-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.metadata-input {
+    flex: 1;
+    min-width: 0; /* Allow shrinking below content size in flexbox */
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.metadata-input:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.metadata-input.key-input {
+    flex: 0.4;
+}
+
+.metadata-input.value-input {
+    flex: 0.6;
+}
+
+/* Edit Mode */
+.metadata-edit-container {
+    margin-top: 4px;
+}
+
+.metadata-edit-input,
+.metadata-edit-textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 2px solid #6366f1;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    background: white;
+}
+
+.metadata-edit-textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.metadata-edit-input:focus,
+.metadata-edit-textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.metadata-edit-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.metadata-edit-actions button {
+    flex: 1;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.metadata-edit-actions .save-btn {
+    background: #10b981;
+    color: white;
+}
+
+.metadata-edit-actions .save-btn:hover {
+    background: #059669;
+}
+
+.metadata-edit-actions .cancel-btn {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+.metadata-edit-actions .cancel-btn:hover {
+    background: #e5e7eb;
+}
+
+/* Status Message */
+.metadata-status {
+    font-size: 0.75rem;
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-align: center;
+    min-height: 32px;
+}
+
+.metadata-status.success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.metadata-status.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.metadata-status.info {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+/* Comments Section */
+.comments-list {
+    max-height: 120px;
+    overflow-y: auto;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+}
+
+.comment-item {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    color: #6b7280;
+    border-bottom: 1px solid #e5e7eb;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+}
+
+.comment-item:last-child {
+    border-bottom: none;
+}
+
+/* Help Section */
+.metadata-help {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.metadata-help p {
+    margin: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.metadata-help i {
+    width: 16px;
+    text-align: center;
+}
+
+/* ===== Rendering Panel Styles ===== */
+.render-section {
+    margin-bottom: 0.5rem;
+}
+
+.render-section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #4b5563;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.render-section-title i {
+    color: #6366f1;
+    font-size: 0.7rem;
+}
+
+/* Small toggle variant */
+.auto-seg-toggle-container.small-toggle {
+    width: 56px;
+    height: 28px;
+}
+
+.auto-seg-toggle-container.small-toggle .auto-seg-slider:before {
+    height: 18px;
+    width: 18px;
+    left: 5px;
+    bottom: 5px;
+}
+
+.auto-seg-toggle-container.small-toggle input:checked + .auto-seg-slider:before {
+    transform: translateX(28px);
+}
+
+.auto-seg-toggle-container.small-toggle .auto-seg-slider:after {
+    font-size: 9px;
+    right: 6px;
+}
+
+.auto-seg-toggle-container.small-toggle input:checked + .auto-seg-slider:after {
+    left: 6px;
+}
+
+/* Color Picker */
+.color-picker {
+    width: 40px;
+    height: 28px;
+    padding: 0;
+    border: 2px solid #d1d5db;
+    border-radius: 6px;
+    cursor: pointer;
+    background: none;
+}
+
+.color-picker:hover {
+    border-color: #6366f1;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+.color-picker::-webkit-color-swatch {
+    border: none;
+    border-radius: 3px;
+}
+
+/* Background Presets */
+.bg-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.bg-preset {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    border: 2px solid transparent;
+}
+
+.bg-preset:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.bg-preset:active {
+    transform: scale(0.95);
+}
+
+/* Color Row */
+.color-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Material Select */
+.material-select-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.material-select {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: white;
+    cursor: pointer;
+}
+
+.material-select:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* PBR Controls */
+.pbr-controls {
+    margin-top: 12px;
+    padding: 10px;
+    background: #f9fafb;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.pbr-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.pbr-slider-row:last-child {
+    margin-bottom: 0;
+}
+
+.pbr-slider-row label {
+    min-width: 70px;
+    font-size: 0.7rem;
+}
+
+.pbr-slider {
+    flex: 1;
+    height: 6px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #e5e7eb;
+    border-radius: 3px;
+}
+
+.pbr-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #6366f1;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.pbr-slider::-webkit-slider-thumb:hover {
+    background: #4f46e5;
+}
+
+.pbr-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: #6366f1;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+.pbr-value {
+    min-width: 32px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #374151;
+    text-align: right;
+}
+
+/* Annotation Mode Selector */
+.annotation-mode-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.annotation-mode-row label {
+    min-width: 75px;
+}
+
+.annotation-mode-select {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: white;
+    cursor: pointer;
+}
+
+.annotation-mode-select:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* ===== Lighting Controls Styles ===== */
+.lighting-preset-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.lighting-preset-row label {
+    min-width: 45px;
+}
+
+.lighting-preset-select {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: white;
+    cursor: pointer;
+}
+
+.lighting-preset-select:focus {
+    outline: none;
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+.light-control-group {
+    background: #fefce8;
+    border: 1px solid #fef08a;
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+
+.light-control-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.light-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #854d0e;
+}
+
+.light-color-picker {
+    width: 28px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    cursor: pointer;
+    background: none;
+}
+
+.light-color-picker::-webkit-color-swatch-wrapper {
+    padding: 1px;
+}
+
+.light-color-picker::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px;
+}
+
+.light-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.light-slider {
+    flex: 1;
+    height: 6px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #fde68a;
+    border-radius: 3px;
+}
+
+.light-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #f59e0b;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.light-slider::-webkit-slider-thumb:hover {
+    background: #d97706;
+}
+
+.light-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: #f59e0b;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+.light-value {
+    min-width: 28px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #92400e;
+    text-align: right;
+}
+
+.light-direction-controls {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #e5e7eb;
 }
     </style>
 </body>

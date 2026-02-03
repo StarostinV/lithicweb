@@ -2,12 +2,46 @@ import CustomPLYLoader from "./customPLYLoader";
 import { read as readmat } from "mat-for-js"
 
 
+/**
+ * MeshLoader handles loading mesh files (PLY, MAT) and managing their metadata.
+ * 
+ * Metadata is stored separately from geometry and can be:
+ * - Loaded from PLY file comments
+ * - Modified programmatically via getMetadata/setMetadata/updateMetadata
+ * - Exported back to PLY files via meshExporter
+ * 
+ * @example
+ * // Access metadata after loading
+ * const author = meshLoader.getMetadata('author');
+ * 
+ * // Modify metadata
+ * meshLoader.setMetadata('author', 'John Doe');
+ * meshLoader.updateMetadata({ version: '2.0', modified: true });
+ */
 export default class MeshLoader {
     constructor(meshObject, arrowDrawer) {
         this.meshObject = meshObject;
         this.arrowDrawer = arrowDrawer;
         this.loader = new CustomPLYLoader();
-        this.currentFileName = null; 
+        this.currentFileName = null;
+        
+        /**
+         * Metadata loaded from the mesh file or set programmatically.
+         * @type {Object}
+         */
+        this.metadata = {};
+        
+        /**
+         * Raw comments from the PLY file (non-metadata comments).
+         * @type {string[]}
+         */
+        this.comments = [];
+        
+        /**
+         * Listeners to be notified when a file is loaded.
+         * @type {Function[]}
+         */
+        this.loadListeners = [];
 
         this.load = this.load.bind(this);
 
@@ -16,7 +50,117 @@ export default class MeshLoader {
         });
         
     }
+    
+    /**
+     * Add a listener to be notified when a file is loaded.
+     * The listener receives an object with { fileName, metadata, comments }.
+     * @param {Function} listener - Callback function
+     */
+    addLoadListener(listener) {
+        this.loadListeners.push(listener);
+    }
+    
+    /**
+     * Remove a load listener.
+     * @param {Function} listener - The listener to remove
+     */
+    removeLoadListener(listener) {
+        const index = this.loadListeners.indexOf(listener);
+        if (index > -1) {
+            this.loadListeners.splice(index, 1);
+        }
+    }
+    
+    /**
+     * Notify all listeners that a file was loaded.
+     * @private
+     */
+    notifyLoadListeners() {
+        const data = {
+            fileName: this.currentFileName,
+            metadata: this.metadata,
+            comments: this.comments
+        };
+        this.loadListeners.forEach(listener => listener(data));
+    }
+    
+    /**
+     * Get a specific metadata value by key.
+     * @param {string} key - The metadata key to retrieve
+     * @returns {*} The metadata value, or undefined if not found
+     */
+    getMetadata(key) {
+        return this.metadata[key];
+    }
+    
+    /**
+     * Set a specific metadata value.
+     * @param {string} key - The metadata key to set
+     * @param {*} value - The value to set (can be string, number, boolean, object, or array)
+     */
+    setMetadata(key, value) {
+        this.metadata[key] = value;
+        // Also update meshObject's metadata if it exists
+        if (this.meshObject && this.meshObject.metadata) {
+            this.meshObject.metadata[key] = value;
+        }
+    }
+    
+    /**
+     * Get all metadata as an object.
+     * @returns {Object} Copy of all metadata key-value pairs
+     */
+    getAllMetadata() {
+        return { ...this.metadata };
+    }
+    
+    /**
+     * Update multiple metadata values at once.
+     * @param {Object} updates - Object containing key-value pairs to update
+     */
+    updateMetadata(updates) {
+        this.metadata = { ...this.metadata, ...updates };
+        // Also update meshObject's metadata if it exists
+        if (this.meshObject && this.meshObject.metadata) {
+            this.meshObject.metadata = { ...this.meshObject.metadata, ...updates };
+        }
+    }
+    
+    /**
+     * Clear all metadata.
+     */
+    clearMetadata() {
+        this.metadata = {};
+        if (this.meshObject && this.meshObject.metadata) {
+            this.meshObject.metadata = {};
+        }
+    }
+    
+    /**
+     * Delete a specific metadata key.
+     * @param {string} key - The metadata key to delete
+     */
+    deleteMetadata(key) {
+        delete this.metadata[key];
+        if (this.meshObject && this.meshObject.metadata) {
+            delete this.meshObject.metadata[key];
+        }
+    }
+    
+    /**
+     * Get all raw comments from the PLY file (non-metadata comments).
+     * @returns {string[]} Array of comment strings
+     */
+    getComments() {
+        return [...this.comments];
+    }
 
+    /**
+     * Load a mesh file from a file input event.
+     * Supports PLY and MAT file formats.
+     * 
+     * @param {Event} event - File input change event
+     */
     load(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -25,18 +169,20 @@ export default class MeshLoader {
         const reader = new FileReader();
         reader.onload = (event) => {
             const data = event.target.result;
-            let positions, labels, indices, arrows; 
+            let positions, labels, indices, arrows, metadata, comments; 
 
             if (file.name.endsWith('.ply')) {
-                ({ positions, labels, indices, arrows } = this.readPLY(data));
+                ({ positions, labels, indices, arrows, metadata, comments } = this.readPLY(data));
                 debugGlobalVar['ply'] = {
                     positions: positions,
                     labels: labels,
                     indices: indices,
-                    arrows: arrows
+                    arrows: arrows,
+                    metadata: metadata,
+                    comments: comments
                 }
             } else if (file.name.endsWith('.mat')) {
-                ({ positions, labels, indices, arrows } = this.readMAT(data));
+                ({ positions, labels, indices, arrows, metadata, comments } = this.readMAT(data));
             } else {
                 console.error('Unsupported file format');
                 return;
@@ -46,15 +192,34 @@ export default class MeshLoader {
                 console.error('No data found in the file');
                 return;
             }
+            
+            // Store metadata and comments
+            this.metadata = metadata || {};
+            this.comments = comments || [];
         
-            this.meshObject.setMesh(positions, labels, indices);
+            this.meshObject.setMesh(positions, labels, indices, this.metadata);
             this.arrowDrawer.clear();
             this.arrowDrawer.load(arrows);
+            
+            // Apply state-metadata to initial state if present in loaded metadata
+            if (this.metadata['state-metadata']) {
+                this.meshObject.history.updateStateMetadata(0, this.metadata['state-metadata']);
+                delete this.metadata['state-metadata'];
+            }
+            
+            // Notify listeners that a file was loaded
+            this.notifyLoadListeners();
         };
     
         reader.readAsArrayBuffer(file);
     }
     
+    /**
+     * Parse PLY file data and extract geometry, labels, arrows, and metadata.
+     * 
+     * @param {ArrayBuffer} data - PLY file content as ArrayBuffer
+     * @returns {Object} Parsed data containing positions, labels, indices, arrows, metadata, and comments
+     */
     readPLY(data) {
         const geometry = this.loader.parse(data);
 
@@ -70,15 +235,28 @@ export default class MeshLoader {
         }
 
         const arrows = geometry.userData.arrows ? geometry.userData.arrows : [];
+        
+        // Extract metadata and comments from geometry userData
+        const metadata = geometry.userData.metadata || {};
+        const comments = geometry.userData.comments || [];
 
         return {
             positions,
             labels,
             indices,
-            arrows
+            arrows,
+            metadata,
+            comments
         };
     }
 
+    /**
+     * Parse MAT file data and extract geometry and labels.
+     * Note: MAT files do not support metadata, so empty metadata is returned.
+     * 
+     * @param {ArrayBuffer} data - MAT file content as ArrayBuffer
+     * @returns {Object} Parsed data containing positions, labels, indices, arrows, metadata, and comments
+     */
     readMAT(data) {
         const mat = readmat(data).data;
 
@@ -94,28 +272,22 @@ export default class MeshLoader {
 
         const labels = calculateVertexEdgeLabels(indices, faceLabels);
 
-
-
         debugGlobalVar['mat'] = {
             positions: positions,
             labels: labels,
             indices: indices,
-            arrows: []
+            arrows: [],
+            metadata: {},
+            comments: []
         }
         return {
             positions: positions,
             labels: labels,
             indices: indices,
-            arrows: []
+            arrows: [],
+            metadata: {},  // MAT files don't support metadata
+            comments: []   // MAT files don't support comments
         }
-
-        // return empty object
-        // return {
-        //     positions: [],
-        //     labels: [],
-        //     indices: [],
-        //     arrows: []
-        // }
     }
 }
 

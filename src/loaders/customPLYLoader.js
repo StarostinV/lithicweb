@@ -1,9 +1,36 @@
 import * as THREE from 'three';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
+/**
+ * Metadata prefix used to identify metadata comments in PLY files.
+ * Format: "comment metadata <key> <value>"
+ * 
+ * For JSON values (objects/arrays), format is:
+ * "comment metadata:json <key> <json_value>"
+ */
+const METADATA_PREFIX = 'metadata ';
+const METADATA_JSON_PREFIX = 'metadata:json ';
 
+/**
+ * Custom PLY loader that extends THREE.js PLYLoader with support for:
+ * - Standard PLY elements (vertices, faces)
+ * - Custom elements (arrows, labels)
+ * - Metadata stored in PLY comments
+ * 
+ * Metadata Convention:
+ * - Simple key-value: "comment metadata author John Doe"
+ * - JSON values: "comment metadata:json settings {"scale":1.5,"visible":true}"
+ * 
+ * Parsed metadata is available in geometry.userData.metadata
+ * Raw comments are available in geometry.userData.comments
+ */
 class CustomPLYLoader extends PLYLoader {
     parse(data) {
+        /**
+         * Parse the PLY header to extract format, elements, properties, comments, and metadata.
+         * @param {string} data - The PLY file content as a string
+         * @returns {Object} Parsed header containing format, elements, comments, and metadata
+         */
         function parseHeader(data) {
             const patternHeader = /^ply([\s\S]*)end_header\s/;
             let headerText = '';
@@ -16,7 +43,8 @@ class CustomPLYLoader extends PLYLoader {
             }
 
             const header = {
-                comments: [],
+                comments: [],      // Raw comments (non-metadata)
+                metadata: {},      // Parsed metadata key-value pairs
                 elements: [],
                 headerLength: headerLength,
                 objInfo: ''
@@ -24,6 +52,12 @@ class CustomPLYLoader extends PLYLoader {
             const lines = headerText.split('\n');
             let currentElement;
 
+            /**
+             * Parse a PLY property definition line.
+             * @param {string[]} propertyValues - Property definition tokens
+             * @param {Object} propertyNameMapping - Optional name remapping
+             * @returns {Object} Parsed property object
+             */
             function make_ply_element_property(propertyValues, propertyNameMapping) {
                 const property = {
                     type: propertyValues[0]
@@ -44,6 +78,67 @@ class CustomPLYLoader extends PLYLoader {
                 return property;
             }
 
+            /**
+             * Parse a comment line, extracting metadata if present.
+             * Metadata format: "metadata <key> <value>" or "metadata:json <key> <json>"
+             * @param {string} commentText - The comment text (without "comment" prefix)
+             * @param {Object} header - Header object to populate
+             */
+            function parseComment(commentText, header) {
+                if (commentText.startsWith(METADATA_JSON_PREFIX)) {
+                    // JSON metadata: "metadata:json key {json_value}"
+                    const content = commentText.substring(METADATA_JSON_PREFIX.length);
+                    const spaceIndex = content.indexOf(' ');
+                    if (spaceIndex !== -1) {
+                        const key = content.substring(0, spaceIndex);
+                        const jsonValue = content.substring(spaceIndex + 1);
+                        try {
+                            header.metadata[key] = JSON.parse(jsonValue);
+                        } catch (e) {
+                            console.warn(`Failed to parse JSON metadata for key "${key}":`, e);
+                            // Store as string if JSON parsing fails
+                            header.metadata[key] = jsonValue;
+                        }
+                    }
+                } else if (commentText.startsWith(METADATA_PREFIX)) {
+                    // Simple metadata: "metadata key value"
+                    const content = commentText.substring(METADATA_PREFIX.length);
+                    const spaceIndex = content.indexOf(' ');
+                    if (spaceIndex !== -1) {
+                        const key = content.substring(0, spaceIndex);
+                        const value = content.substring(spaceIndex + 1);
+                        // Try to parse as number or boolean, otherwise keep as string
+                        header.metadata[key] = parseMetadataValue(value);
+                    } else {
+                        // Key with no value (treat as boolean true)
+                        header.metadata[content] = true;
+                    }
+                } else {
+                    // Regular comment (non-metadata)
+                    header.comments.push(commentText);
+                }
+            }
+
+            /**
+             * Parse a metadata value string into appropriate type.
+             * @param {string} value - The value string to parse
+             * @returns {string|number|boolean} Parsed value
+             */
+            function parseMetadataValue(value) {
+                // Check for boolean
+                if (value === 'true') return true;
+                if (value === 'false') return false;
+                
+                // Check for number
+                const num = Number(value);
+                if (!isNaN(num) && value.trim() !== '') {
+                    return num;
+                }
+                
+                // Return as string
+                return value;
+            }
+
             for (let i = 0; i < lines.length; i++) {
                 let line = lines[i].trim();
                 if (line === '') continue;
@@ -57,7 +152,7 @@ class CustomPLYLoader extends PLYLoader {
                         header.version = lineValues[1];
                         break;
                     case 'comment':
-                        header.comments.push(line);
+                        parseComment(line, header);
                         break;
                     case 'element':
                         if (currentElement !== undefined) {
@@ -129,6 +224,12 @@ class CustomPLYLoader extends PLYLoader {
             return element;
         }
 
+        /**
+         * Parse ASCII format PLY data.
+         * @param {string} data - The PLY file content
+         * @param {Object} header - Parsed header
+         * @returns {THREE.BufferGeometry} Parsed geometry
+         */
         function parseASCII(data, header) {
             const buffer = {
                 indices: [],
@@ -169,7 +270,7 @@ class CustomPLYLoader extends PLYLoader {
                 currentElementCount++;
             }
 
-            return postProcess(buffer);
+            return postProcess(buffer, header);
         }
 
         function binaryRead(dataview, at, type, little_endian) {
@@ -228,6 +329,12 @@ class CustomPLYLoader extends PLYLoader {
         }
 
 
+        /**
+         * Parse binary format PLY data (little or big endian).
+         * @param {ArrayBuffer} data - The PLY file content as binary
+         * @param {Object} header - Parsed header
+         * @returns {THREE.BufferGeometry} Parsed geometry
+         */
         function parseBinary(data, header) {
             const buffer = {
                 indices: [],
@@ -253,7 +360,7 @@ class CustomPLYLoader extends PLYLoader {
                 }
             }
 
-            return postProcess(buffer);
+            return postProcess(buffer, header);
         }
 
 
@@ -301,7 +408,14 @@ class CustomPLYLoader extends PLYLoader {
             }
         }
 
-        function postProcess(buffer) {
+        /**
+         * Post-process the parsed buffer into a THREE.BufferGeometry.
+         * Attaches parsed metadata and comments to geometry.userData.
+         * @param {Object} buffer - Parsed vertex/face/arrow data
+         * @param {Object} header - Parsed header containing metadata and comments
+         * @returns {THREE.BufferGeometry} The constructed geometry
+         */
+        function postProcess(buffer, header) {
             let geometry = new THREE.BufferGeometry();
             if (buffer.indices.length > 0) {
                 geometry.setIndex(buffer.indices);
@@ -316,7 +430,13 @@ class CustomPLYLoader extends PLYLoader {
                 geometry.setAttribute('labelid', new THREE.Int32BufferAttribute(buffer.labelIds, 1));
             }
 
+            // Store arrows in userData
             geometry.userData.arrows = buffer.arrows;
+            
+            // Store parsed metadata and raw comments in userData
+            geometry.userData.metadata = header.metadata || {};
+            geometry.userData.comments = header.comments || [];
+
             geometry.computeBoundingSphere();
             return geometry;
         }

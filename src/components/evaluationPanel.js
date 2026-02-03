@@ -217,10 +217,69 @@ export class EvaluationPanel {
         if (result) {
             this._displayMetrics(result);
             
+            // Save metrics to state-metadata of the prediction state
+            this._saveMetricsToStateMetadata(result);
+            
             // Apply default visualization
             const selectedMode = document.querySelector('input[name="evalVizMode"]:checked')?.value || 'all';
             this._setVisualizationMode(selectedMode);
         }
+    }
+    
+    /**
+     * Save evaluation metrics to the state-metadata of the prediction state.
+     * @private
+     * @param {Object} result - The metrics result object
+     */
+    _saveMetricsToStateMetadata(result) {
+        const predIndex = this.evaluationManager.getPredictionIndex();
+        const gtIndex = this.evaluationManager.getGroundTruthIndex();
+        
+        if (predIndex === null) return;
+        
+        // Create a well-structured, serializable summary of the metrics
+        const metricsSummary = {
+            general: {
+                computedAt: new Date().toISOString(),
+                gtStateIndex: gtIndex,
+                nGtInstances: result.nGtInstances,
+                nPredInstances: result.nPredInstances
+            },
+            thresholds: {
+                iouThresh: this.iouThreshold,
+                oversegThresh: this.oversegThreshold,
+                undersegThresh: this.undersegThreshold
+            },
+            detection: {
+                TP: result.TP,
+                FP: result.FP,
+                FN: result.FN,
+                precision: result.precision,
+                recall: result.recall,
+                f1: result.f1
+            },
+            panoptic: {
+                PQ: result.PQ,
+                RQ: result.RQ,
+                SQ: result.SQ,
+                meanIou: result.meanIou
+            },
+            errors: {
+                nOversegGt: result.nOversegGt,
+                nUndersegPred: result.nUndersegPred,
+                nMissingGt: result.nMissingGt,
+                nMissingPred: result.nMissingPred,
+                oversegFrac: result.oversegFrac,
+                undersegFrac: result.undersegFrac,
+                missingGtFrac: result.missingGtFrac,
+                missingPredFrac: result.missingPredFrac
+            }
+        };
+        
+        // Save to state-metadata
+        this.meshObject.setStateMetadata(predIndex, 'evaluation', metricsSummary);
+        
+        console.log(`Saved evaluation metrics to state #${predIndex} metadata`);
     }
 
     /**

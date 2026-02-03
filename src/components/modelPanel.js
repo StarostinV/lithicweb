@@ -50,35 +50,39 @@ export class ModelPanel {
         modal.id = 'settingsModal';
         modal.className = 'modal';
         modal.innerHTML = `
-            <div class="modal-content" style="max-width: 500px;">
-                <span class="close" id="closeSettingsModal">&times;</span>
-                <h2 class="text-xl font-bold mb-4"><i class="fas fa-cog"></i> Server Settings</h2>
-                <div class="flex flex-col space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Server URL</label>
-                        <input type="text" id="serverUrlInput" 
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="https://uninvadable-northerly-fredia.ngrok-free.dev">
-                        <p class="text-xs text-gray-500 mt-1">Include http:// or https:// (use http:// for localhost)</p>
+            <div class="modal-content settings-modal">
+                <div class="modal-header">
+                    <h2><i class="fas fa-cog"></i> Server Settings</h2>
+                    <button class="modal-close" id="closeSettingsModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Server URL</label>
+                        <input type="text" id="serverUrlInput" class="form-input"
+                            placeholder="https://your-server.ngrok-free.dev">
+                        <p class="form-hint">Include http:// or https:// (use http:// for localhost)</p>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Collaborator Token</label>
-                        <input type="password" id="apiTokenInput"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Your collaborator token">
-                        <button id="toggleTokenVisibility" class="text-sm text-blue-600 mt-1 hover:underline">Show token</button>
+                    <div class="form-group">
+                        <label class="form-label">Collaborator Token</label>
+                        <div class="input-with-action">
+                            <input type="password" id="apiTokenInput" class="form-input"
+                                placeholder="Your collaborator token">
+                            <button id="toggleTokenVisibility" class="input-action-btn" type="button">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="flex space-x-2">
-                        <button id="testConnectionBtn" 
-                            class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
+                    <div class="form-actions">
+                        <button id="testConnectionBtn" class="btn btn-secondary">
                             <i class="fas fa-plug"></i> Test Connection
                         </button>
-                        <button id="saveSettingsBtn"
-                            class="flex-1 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        <button id="saveSettingsBtn" class="btn btn-primary">
                             <i class="fas fa-save"></i> Save Settings
                         </button>
                     </div>
-                    <div id="settingsTestResult" class="text-sm p-2 rounded hidden"></div>
+                    <div id="settingsTestResult" class="settings-result hidden"></div>
                 </div>
             </div>
         `;
@@ -92,17 +96,16 @@ export class ModelPanel {
         
         for (const [key, meta] of Object.entries(CONFIG_PARAMS)) {
             const wrapper = document.createElement('div');
-            wrapper.className = 'mb-3';
-            
-            const label = document.createElement('label');
-            label.className = 'block text-sm font-medium text-gray-700 mb-1';
-            label.textContent = meta.label;
-            label.title = meta.description;
-            wrapper.appendChild(label);
+            wrapper.className = 'config-item';
             
             if (meta.type === 'slider') {
-                const container = document.createElement('div');
-                container.className = 'flex items-center space-x-2';
+                // Use slider-row-labeled for consistent styling
+                wrapper.className = 'slider-row-labeled';
+                
+                const label = document.createElement('label');
+                label.textContent = meta.label;
+                label.title = meta.description;
+                wrapper.appendChild(label);
                 
                 const slider = document.createElement('input');
                 slider.type = 'range';
@@ -111,11 +114,11 @@ export class ModelPanel {
                 slider.max = meta.max;
                 slider.step = meta.step;
                 slider.value = this.config[key];
-                slider.className = 'flex-1';
+                slider.className = 'styled-slider';
                 
                 const valueDisplay = document.createElement('span');
                 valueDisplay.id = `config_${key}_value`;
-                valueDisplay.className = 'text-sm text-gray-600 w-12 text-right';
+                valueDisplay.className = 'slider-value';
                 valueDisplay.textContent = this.config[key];
                 
                 slider.addEventListener('input', (e) => {
@@ -124,10 +127,16 @@ export class ModelPanel {
                     this.config[key] = value;
                 });
                 
-                container.appendChild(slider);
-                container.appendChild(valueDisplay);
-                wrapper.appendChild(container);
+                wrapper.appendChild(slider);
+                wrapper.appendChild(valueDisplay);
             } else if (meta.type === 'number') {
+                wrapper.className = 'control-row';
+                
+                const label = document.createElement('label');
+                label.textContent = meta.label;
+                label.title = meta.description;
+                wrapper.appendChild(label);
+                
                 const input = document.createElement('input');
                 input.type = 'number';
                 input.id = `config_${key}`;
@@ -135,7 +144,7 @@ export class ModelPanel {
                 input.max = meta.max;
                 input.step = meta.step;
                 input.value = this.config[key];
-                input.className = 'w-full px-2 py-1 border border-gray-300 rounded text-sm';
+                input.className = 'control-input';
                 
                 input.addEventListener('change', (e) => {
                     this.config[key] = parseInt(e.target.value);
@@ -143,9 +152,16 @@ export class ModelPanel {
                 
                 wrapper.appendChild(input);
             } else if (meta.type === 'select') {
+                wrapper.className = 'control-row';
+                
+                const label = document.createElement('label');
+                label.textContent = meta.label;
+                label.title = meta.description;
+                wrapper.appendChild(label);
+                
                 const select = document.createElement('select');
                 select.id = `config_${key}`;
-                select.className = 'w-full px-2 py-1 border border-gray-300 rounded text-sm';
+                select.className = 'control-select';
                 
                 meta.options.forEach(opt => {
                     const option = document.createElement('option');
@@ -197,7 +213,9 @@ export class ModelPanel {
             toggleBtn.addEventListener('click', () => {
                 const isPassword = tokenInput.type === 'password';
                 tokenInput.type = isPassword ? 'text' : 'password';
-                toggleBtn.textContent = isPassword ? 'Hide token' : 'Show token';
+                toggleBtn.innerHTML = isPassword 
+                    ? '<i class="fas fa-eye-slash"></i>' 
+                    : '<i class="fas fa-eye"></i>';
             });
         }
 
@@ -250,8 +268,8 @@ export class ModelPanel {
         const apiToken = tokenInput.value.trim();
         
         if (!serverUrl || !apiToken) {
-            resultDiv.textContent = 'Please enter both server URL and API token';
-            resultDiv.className = 'text-sm p-2 rounded bg-yellow-100 text-yellow-800';
+            resultDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Please enter both server URL and API token';
+            resultDiv.className = 'settings-result warning';
             resultDiv.classList.remove('hidden');
             return;
         }
@@ -270,10 +288,11 @@ export class ModelPanel {
             lithicClient.configure(oldConfig.serverUrl, oldConfig.apiToken);
         }
         
-        resultDiv.textContent = result.message;
+        const icon = result.success ? 'fa-check-circle' : 'fa-times-circle';
+        resultDiv.innerHTML = `<i class="fas ${icon}"></i> ${result.message}`;
         resultDiv.className = result.success 
-            ? 'text-sm p-2 rounded bg-green-100 text-green-800'
-            : 'text-sm p-2 rounded bg-red-100 text-red-800';
+            ? 'settings-result success'
+            : 'settings-result error';
         resultDiv.classList.remove('hidden');
         
         testBtn.disabled = false;
@@ -290,8 +309,8 @@ export class ModelPanel {
         
         lithicClient.configure(serverUrl, apiToken);
         
-        resultDiv.textContent = 'Settings saved!';
-        resultDiv.className = 'text-sm p-2 rounded bg-green-100 text-green-800';
+        resultDiv.innerHTML = '<i class="fas fa-check-circle"></i> Settings saved!';
+        resultDiv.className = 'settings-result success';
         resultDiv.classList.remove('hidden');
         
         this.updateConnectionStatus();
@@ -307,12 +326,12 @@ export class ModelPanel {
         
         if (lithicClient.isConfigured()) {
             const { serverUrl } = lithicClient.getConfig();
-            this.connectionStatus.innerHTML = `<i class="fas fa-circle text-green-500"></i> Connected`;
-            this.connectionStatus.className = 'text-sm text-green-700';
+            this.connectionStatus.innerHTML = `<i class="fas fa-circle status-dot connected"></i> <span>Connected</span>`;
+            this.connectionStatus.className = 'connection-status connected';
             this.connectionStatus.title = serverUrl;
         } else {
-            this.connectionStatus.innerHTML = '<i class="fas fa-circle text-red-500"></i> Not configured';
-            this.connectionStatus.className = 'text-sm text-red-700';
+            this.connectionStatus.innerHTML = '<i class="fas fa-circle status-dot disconnected"></i> <span>Not configured</span>';
+            this.connectionStatus.className = 'connection-status';
         }
     }
 
@@ -574,15 +593,15 @@ export class ModelPanel {
     setStatus(message, type = 'info') {
         if (!this.inferenceStatus) return;
         
-        const colors = {
-            info: 'text-blue-700 bg-blue-50',
-            success: 'text-green-700 bg-green-50',
-            error: 'text-red-700 bg-red-50',
-            warning: 'text-yellow-700 bg-yellow-50'
+        const icons = {
+            info: 'fa-info-circle',
+            success: 'fa-check-circle',
+            error: 'fa-exclamation-circle',
+            warning: 'fa-exclamation-triangle'
         };
         
-        this.inferenceStatus.textContent = message;
-        this.inferenceStatus.className = `text-sm p-2 rounded ${colors[type] || colors.info}`;
+        this.inferenceStatus.innerHTML = `<i class="fas ${icons[type] || icons.info}"></i> <span>${message}</span>`;
+        this.inferenceStatus.className = `inference-status ${type}`;
     }
 
     setLoading(loading) {

@@ -10,8 +10,11 @@ export default class DrawLines {
         this.line = null;
         this.isDrawing = false;
         this.resolution = resolution;
-        this.startPoint = null;
-        this.endPoint = null;
+        // Store vertex indices and local positions for annotation
+        this.startVertexIndex = null;
+        this.endVertexIndex = null;
+        this.startPointLocal = null;  // Local space for BVH queries
+        this.endPointLocal = null;    // Local space for BVH queries
 
         this.leftClick = this.leftClick.bind(this);
         this.rightClick = this.rightClick.bind(this);
@@ -66,14 +69,24 @@ export default class DrawLines {
         }
         this.line = null;
         this.isDrawing = false;
-        this.startPoint = null;
-        this.endPoint = null;
+        this.startVertexIndex = null;
+        this.endVertexIndex = null;
+        this.startPointLocal = null;
+        this.endPointLocal = null;
     }
 
     startLine(vertexIndex) {
-        this.startPoint = this.meshObject.indexToVertex(vertexIndex);
-        // Create a new geometry
-        const geometry = new THREE.BufferGeometry().setFromPoints([this.startPoint, this.startPoint.clone()]);
+        this.startVertexIndex = vertexIndex;
+        // Store local position for BVH queries during annotation
+        this.startPointLocal = this.meshObject.indexToVertex(vertexIndex);
+        
+        // Convert to world space for rendering
+        const mesh = this.meshObject.mesh;
+        mesh.updateMatrixWorld(true);
+        const startPointWorld = this.startPointLocal.clone().applyMatrix4(mesh.matrixWorld);
+        
+        // Create a new geometry in world space
+        const geometry = new THREE.BufferGeometry().setFromPoints([startPointWorld, startPointWorld.clone()]);
 
         // Create a new material
         const material = new THREE.LineBasicMaterial({ color: this.meshObject.edgeColor });
@@ -88,9 +101,18 @@ export default class DrawLines {
     }
 
     updateLine(vertexIndex) {
-        this.endPoint = this.meshObject.indexToVertex(vertexIndex);
-        // Update the start and end points of the line
-        this.line.geometry.setFromPoints([this.startPoint, this.endPoint]);
+        this.endVertexIndex = vertexIndex;
+        // Store local position for BVH queries during annotation
+        this.endPointLocal = this.meshObject.indexToVertex(vertexIndex);
+        
+        // Convert both points to world space for rendering
+        const mesh = this.meshObject.mesh;
+        mesh.updateMatrixWorld(true);
+        const startPointWorld = this.startPointLocal.clone().applyMatrix4(mesh.matrixWorld);
+        const endPointWorld = this.endPointLocal.clone().applyMatrix4(mesh.matrixWorld);
+        
+        // Update the line geometry in world space
+        this.line.geometry.setFromPoints([startPointWorld, endPointWorld]);
     }
 
     dispose() {
@@ -102,16 +124,17 @@ export default class DrawLines {
     }
 
     colorVerticesAlongLine() {
-        if ((!this.startPoint) || (!this.endPoint)) return;
+        // Use local space positions for BVH queries
+        if ((!this.startPointLocal) || (!this.endPointLocal)) return;
 
-        // generate linspace between start and end points based on resolution
-        const numPoints = Math.floor(this.startPoint.distanceTo(this.endPoint) / this.resolution);
+        // generate linspace between start and end points based on resolution (in local space)
+        const numPoints = Math.floor(this.startPointLocal.distanceTo(this.endPointLocal) / this.resolution);
 
         const points = new Array(numPoints).fill().map((_, i) => {
-            return new THREE.Vector3().lerpVectors(this.startPoint, this.endPoint, i / numPoints);
+            return new THREE.Vector3().lerpVectors(this.startPointLocal, this.endPointLocal, i / numPoints);
         });
 
-        // find the vertices that are closest to the points
+        // find the vertices that are closest to the points (BVH operates in local space)
         const faceIndices = points.map(point => {
             return this.meshObject.mesh.geometry.boundsTree.closestPointToPoint(point).faceIndex;
         });

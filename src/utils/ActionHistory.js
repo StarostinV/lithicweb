@@ -5,6 +5,13 @@ export class ActionHistory {
         this.maxHistorySize = maxHistorySize;
         this.listeners = [];
         this.currentViewIndex = 0; // Track which state we're viewing (0 = initial)
+        
+        /**
+         * State-metadata for the initial state (index 0).
+         * Each action has its own stateMetadata property.
+         * @type {Object}
+         */
+        this.initialStateMetadata = {};
     }
 
     /**
@@ -28,6 +35,12 @@ export class ActionHistory {
         // Add timestamp if not present
         if (!action.timestamp) {
             action.timestamp = Date.now();
+        }
+        
+        // Initialize empty state-metadata for new actions
+        // State-metadata is unique per state and NOT carried to new states
+        if (!action.stateMetadata) {
+            action.stateMetadata = {};
         }
 
         // If we're viewing an old state, handle truncation with protection
@@ -139,6 +152,7 @@ export class ActionHistory {
         this.undoStack = [];
         this.redoStack = [];
         this.currentViewIndex = 0;
+        this.initialStateMetadata = {};
         this.notifyListeners();
     }
 
@@ -241,6 +255,116 @@ export class ActionHistory {
 
     notifyListeners() {
         this.listeners.forEach(callback => callback(this));
+    }
+
+    // ========================================
+    // State Metadata Methods
+    // ========================================
+    
+    /**
+     * Get state-metadata for a specific state.
+     * State-metadata is unique per state and NOT shared across states.
+     * @param {number} stateIndex - State index (0 for initial state)
+     * @returns {Object} The state metadata object (empty {} if none)
+     */
+    getStateMetadata(stateIndex) {
+        if (stateIndex === 0) {
+            return this.initialStateMetadata;
+        }
+        
+        const action = this.getActionAtIndex(stateIndex);
+        if (action) {
+            return action.stateMetadata || {};
+        }
+        
+        return {};
+    }
+    
+    /**
+     * Set a specific key in state-metadata for a state.
+     * @param {number} stateIndex - State index (0 for initial state)
+     * @param {string} key - The metadata key
+     * @param {*} value - The value to set
+     */
+    setStateMetadataKey(stateIndex, key, value) {
+        if (stateIndex === 0) {
+            this.initialStateMetadata[key] = value;
+            this.notifyListeners();
+            return;
+        }
+        
+        const action = this.getActionAtIndex(stateIndex);
+        if (action) {
+            if (!action.stateMetadata) {
+                action.stateMetadata = {};
+            }
+            action.stateMetadata[key] = value;
+            this.notifyListeners();
+        }
+    }
+    
+    /**
+     * Delete a key from state-metadata for a state.
+     * @param {number} stateIndex - State index (0 for initial state)
+     * @param {string} key - The metadata key to delete
+     * @returns {boolean} True if the key existed and was deleted
+     */
+    deleteStateMetadataKey(stateIndex, key) {
+        let metadata;
+        if (stateIndex === 0) {
+            metadata = this.initialStateMetadata;
+        } else {
+            const action = this.getActionAtIndex(stateIndex);
+            if (!action || !action.stateMetadata) return false;
+            metadata = action.stateMetadata;
+        }
+        
+        if (key in metadata) {
+            delete metadata[key];
+            this.notifyListeners();
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Update multiple keys in state-metadata for a state.
+     * @param {number} stateIndex - State index (0 for initial state)
+     * @param {Object} updates - Object containing key-value pairs to update
+     */
+    updateStateMetadata(stateIndex, updates) {
+        if (stateIndex === 0) {
+            this.initialStateMetadata = { ...this.initialStateMetadata, ...updates };
+            this.notifyListeners();
+            return;
+        }
+        
+        const action = this.getActionAtIndex(stateIndex);
+        if (action) {
+            if (!action.stateMetadata) {
+                action.stateMetadata = {};
+            }
+            Object.assign(action.stateMetadata, updates);
+            this.notifyListeners();
+        }
+    }
+    
+    /**
+     * Clear all state-metadata for a state.
+     * @param {number} stateIndex - State index (0 for initial state)
+     */
+    clearStateMetadata(stateIndex) {
+        if (stateIndex === 0) {
+            this.initialStateMetadata = {};
+            this.notifyListeners();
+            return;
+        }
+        
+        const action = this.getActionAtIndex(stateIndex);
+        if (action) {
+            action.stateMetadata = {};
+            this.notifyListeners();
+        }
     }
 
     // Get memory usage estimate in bytes

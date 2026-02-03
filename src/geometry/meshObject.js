@@ -6,6 +6,21 @@ import { buildAdjacencyGraph } from '../utils/graphUtils.js';
 import { MeshSegmenter } from './segmentation.js';
 import { ActionHistory } from '../utils/ActionHistory.js';
 
+/**
+ * MeshObject manages a 3D mesh with annotations, segments, and metadata.
+ * 
+ * Features:
+ * - Mesh display and manipulation
+ * - Edge/vertex labeling and coloring
+ * - Segmentation with automatic/manual segment detection
+ * - Undo/redo history for editing operations
+ * - Metadata storage for PLY export/import
+ * 
+ * @example
+ * const meshObj = new MeshObject(scene, edgeColor, objectColor);
+ * meshObj.setMesh(positions, labels, indices, { author: 'John' });
+ * meshObj.setMetadata('version', '1.0');
+ */
 export class MeshObject {
     constructor(scene, edgeColor, objectColor) {
         this.scene = scene;
@@ -29,6 +44,13 @@ export class MeshObject {
         this.pendingAction = null; // Store state before draw operation
         this.currentEdgeIndices = new Set(); // Track edge indices in real-time
         this.initialState = new Set(); // Store the loaded mesh's initial state
+        
+        /**
+         * Metadata associated with the mesh.
+         * Loaded from PLY files and exported back when saving.
+         * @type {Object}
+         */
+        this.metadata = {};
 
         this.invertMeshNormals = this.invertMeshNormals.bind(this);
 
@@ -37,32 +59,15 @@ export class MeshObject {
         });
 
         document.getElementById('update-segments').addEventListener('click', () => {
-            if (this.showSegments) {
-                this.updateSegments();
-            }
+            this.updateSegments();
         });
 
         document.getElementById('update-segment-colors').addEventListener('click', () => {
             this.regenerateColors();
         });
 
-        document.getElementById('show-segments').addEventListener('click', () => {
-            this.showSegments = !this.showSegments;
-            if (!this.showSegments) {
-                document.getElementById('update-segment-colors').disabled = true;
-            } else {
-                document.getElementById('update-segment-colors').disabled = false;
-                if (!document.getElementById('auto-segments').checked) {
-                    this.updateSegments();
-                }
-            }
-            this.updateSegmentColors();
-        });
-
         document.getElementById('auto-segments').addEventListener('click', () => {
-            if (document.getElementById('show-segments').checked) {
-                this.updateSegments();
-            }
+            this.updateSegments();
         });
     }
 
@@ -70,6 +75,10 @@ export class MeshObject {
         return this.mesh === null;
     }
 
+    /**
+     * Remove the current mesh from the scene and reset state.
+     * Clears mesh, colors, history, and metadata.
+     */
     clear() {
         if (this.mesh) {
             this.scene.scene.remove(this.mesh);
@@ -79,10 +88,16 @@ export class MeshObject {
             this.meshColors = null;
         }
         this.history.clear();
+        this.metadata = {};
     }
 
+    /**
+     * Invert mesh normals by reversing triangle winding order.
+     * Preserves existing metadata.
+     */
     invertMeshNormals() {
         const indices = this.indices;
+        const currentMetadata = { ...this.metadata }; // Preserve metadata
 
         for (let i = 0; i < indices.length; i += 3) {
             const temp = indices[i];
@@ -90,10 +105,18 @@ export class MeshObject {
             indices[i + 1] = temp;
         }
 
-        this.setMesh(this.positions, this.edgeLabels, indices);
+        this.setMesh(this.positions, this.edgeLabels, indices, currentMetadata);
     }
 
-    setMesh(positions, labels, indices) {
+    /**
+     * Set the mesh geometry and initialize all related structures.
+     * 
+     * @param {Float32Array} positions - Vertex positions (x, y, z triplets)
+     * @param {Uint8Array|Array} labels - Edge labels (0 or 1 for each vertex)
+     * @param {Array} indices - Face indices (triangles)
+     * @param {Object} [metadata={}] - Optional metadata to associate with the mesh
+     */
+    setMesh(positions, labels, indices, metadata = {}) {
         // if labels is empty, set all to 0
         if (labels.length === 0) {
             labels = new Uint8Array(positions.length / 3).fill(0);
@@ -105,6 +128,9 @@ export class MeshObject {
 
         // Remove existing mesh if it exists
         this.clear();
+        
+        // Set metadata after clear() since clear() resets metadata
+        this.metadata = { ...metadata };
 
         // Initialize currentEdgeIndices from labels
         this.currentEdgeIndices = new Set();
@@ -542,6 +568,141 @@ export class MeshObject {
 
         console.log('Mesh is fully connected - all vertices are used in triangles');
         return true;
+    }
+    
+    // ========================================
+    // Metadata Methods
+    // ========================================
+    
+    /**
+     * Get a specific metadata value by key.
+     * @param {string} key - The metadata key to retrieve
+     * @returns {*} The metadata value, or undefined if not found
+     */
+    getMetadata(key) {
+        return this.metadata[key];
+    }
+    
+    /**
+     * Set a specific metadata value.
+     * @param {string} key - The metadata key to set
+     * @param {*} value - The value to set (string, number, boolean, object, or array)
+     */
+    setMetadata(key, value) {
+        this.metadata[key] = value;
+    }
+    
+    /**
+     * Get all metadata as an object.
+     * @returns {Object} Copy of all metadata key-value pairs
+     */
+    getAllMetadata() {
+        return { ...this.metadata };
+    }
+    
+    /**
+     * Update multiple metadata values at once.
+     * Existing keys not in updates are preserved.
+     * @param {Object} updates - Object containing key-value pairs to update
+     */
+    updateMetadata(updates) {
+        this.metadata = { ...this.metadata, ...updates };
+    }
+    
+    /**
+     * Clear all metadata.
+     */
+    clearMetadata() {
+        this.metadata = {};
+    }
+    
+    /**
+     * Delete a specific metadata key.
+     * @param {string} key - The metadata key to delete
+     * @returns {boolean} True if the key existed and was deleted
+     */
+    deleteMetadata(key) {
+        if (key in this.metadata) {
+            delete this.metadata[key];
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Check if a metadata key exists.
+     * @param {string} key - The metadata key to check
+     * @returns {boolean} True if the key exists
+     */
+    hasMetadata(key) {
+        return key in this.metadata;
+    }
+    
+    // ========================================
+    // State Metadata Methods
+    // ========================================
+    // State metadata is unique per history state and NOT shared across states.
+    // Use this for state-specific data like evaluation metrics.
+    
+    /**
+     * Get the current state index being viewed.
+     * @returns {number} The current state index (0 = initial state)
+     */
+    getCurrentStateIndex() {
+        return this.history.getCurrentIndex();
+    }
+    
+    /**
+     * Get state-metadata for the current state.
+     * @returns {Object} The state metadata object
+     */
+    getCurrentStateMetadata() {
+        return this.history.getStateMetadata(this.getCurrentStateIndex());
+    }
+    
+    /**
+     * Get state-metadata for a specific state.
+     * @param {number} stateIndex - The state index
+     * @returns {Object} The state metadata object
+     */
+    getStateMetadata(stateIndex) {
+        return this.history.getStateMetadata(stateIndex);
+    }
+    
+    /**
+     * Set a key in the current state's metadata.
+     * @param {string} key - The metadata key
+     * @param {*} value - The value to set
+     */
+    setCurrentStateMetadata(key, value) {
+        this.history.setStateMetadataKey(this.getCurrentStateIndex(), key, value);
+    }
+    
+    /**
+     * Set a key in a specific state's metadata.
+     * @param {number} stateIndex - The state index
+     * @param {string} key - The metadata key
+     * @param {*} value - The value to set
+     */
+    setStateMetadata(stateIndex, key, value) {
+        this.history.setStateMetadataKey(stateIndex, key, value);
+    }
+    
+    /**
+     * Delete a key from the current state's metadata.
+     * @param {string} key - The metadata key to delete
+     * @returns {boolean} True if the key was deleted
+     */
+    deleteCurrentStateMetadata(key) {
+        return this.history.deleteStateMetadataKey(this.getCurrentStateIndex(), key);
+    }
+    
+    /**
+     * Update multiple keys in the current state's metadata.
+     * @param {Object} updates - Object containing key-value pairs
+     */
+    updateCurrentStateMetadata(updates) {
+        this.history.updateStateMetadata(this.getCurrentStateIndex(), updates);
     }
 }
 

@@ -1,4 +1,70 @@
-export function exportAnnotations(mesh, meshColors, arrowDrawer, meshLoader) {
+/**
+ * Metadata prefix used when writing metadata to PLY comments.
+ * Must match the prefix used in customPLYLoader.js for consistency.
+ */
+const METADATA_PREFIX = 'metadata ';
+const METADATA_JSON_PREFIX = 'metadata:json ';
+
+/**
+ * Serialize a metadata object into PLY comment lines.
+ * - Simple values (string, number, boolean) are written as: "comment metadata key value"
+ * - Complex values (objects, arrays) are written as: "comment metadata:json key {json}"
+ * 
+ * @param {Object} metadata - Key-value pairs to serialize
+ * @returns {string} PLY comment lines for the metadata
+ */
+function serializeMetadata(metadata) {
+    if (!metadata || typeof metadata !== 'object') {
+        return '';
+    }
+
+    const lines = [];
+    
+    for (const [key, value] of Object.entries(metadata)) {
+        // Skip null/undefined values
+        if (value === null || value === undefined) {
+            continue;
+        }
+        
+        // Validate key (no spaces or newlines allowed)
+        if (/[\s\n\r]/.test(key)) {
+            console.warn(`Skipping metadata key "${key}": keys cannot contain whitespace`);
+            continue;
+        }
+
+        if (typeof value === 'object') {
+            // Complex value: serialize as JSON
+            try {
+                const jsonStr = JSON.stringify(value);
+                lines.push(`comment ${METADATA_JSON_PREFIX}${key} ${jsonStr}`);
+            } catch (e) {
+                console.warn(`Failed to serialize metadata key "${key}":`, e);
+            }
+        } else {
+            // Simple value: string, number, or boolean
+            lines.push(`comment ${METADATA_PREFIX}${key} ${value}`);
+        }
+    }
+
+    return lines.length > 0 ? lines.join('\n') + '\n' : '';
+}
+
+/**
+ * Export mesh with annotations, arrows, and metadata to a PLY file.
+ * 
+ * The exported PLY file contains:
+ * - Vertex positions (x, y, z) and labels
+ * - Face indices (triangles)
+ * - Arrow elements (start_index, end_index)
+ * - Metadata stored as PLY comments
+ * 
+ * @param {THREE.Mesh} mesh - The Three.js mesh to export
+ * @param {Float32Array} meshColors - Vertex colors array (used to determine labels)
+ * @param {Object} arrowDrawer - Arrow drawer containing arrows array
+ * @param {MeshLoader} meshLoader - Mesh loader containing filename and metadata
+ * @param {Object} [additionalMetadata={}] - Optional additional metadata to include
+ */
+export function exportAnnotations(mesh, meshColors, arrowDrawer, meshLoader, additionalMetadata = {}) {
     if (!mesh) {
         console.error("No mesh to export.");
         return;
@@ -15,10 +81,22 @@ export function exportAnnotations(mesh, meshColors, arrowDrawer, meshLoader) {
     const faceCount = indices.length / 3;
     const arrowCount = arrowDrawer.arrows.length;
 
-    // PLY file header
+    // Merge metadata from meshLoader with additional metadata
+    // Additional metadata takes precedence over loaded metadata
+    const metadata = {
+        ...(meshLoader.metadata || {}),
+        ...additionalMetadata,
+        // Add export timestamp
+        exportedAt: new Date().toISOString()
+    };
+
+    // Serialize metadata to PLY comment lines
+    const metadataComments = serializeMetadata(metadata);
+
+    // PLY file header with metadata comments
     const header = `ply
 format binary_little_endian 1.0
-element vertex ${vertexCount}
+${metadataComments}element vertex ${vertexCount}
 property float x
 property float y
 property float z

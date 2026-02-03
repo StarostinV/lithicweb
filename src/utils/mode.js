@@ -7,6 +7,16 @@ export const MODES = Object.freeze({
     DRAWLINES: 'drawLines'
 });
 
+// Mode display names for the UI indicator
+const MODE_LABELS = {
+    [MODES.VIEW]: { label: 'View', icon: 'fa-eye', color: '#6366f1' },
+    [MODES.DRAW]: { label: 'Draw', icon: 'fa-pen', color: '#f59e0b' },
+    [MODES.ERASE]: { label: 'Erase', icon: 'fa-eraser', color: '#ef4444' },
+    [MODES.ARROW]: { label: 'Arrows', icon: 'fa-arrow-right', color: '#10b981' },
+    [MODES.DELETEARROWS]: { label: 'Delete Arrows', icon: 'fa-trash-alt', color: '#ef4444' },
+    [MODES.DRAWLINES]: { label: 'Lines', icon: 'fa-project-diagram', color: '#8b5cf6' }
+};
+
 /**
  * Mode - Manages application interaction modes and integrates with rotation controls.
  * 
@@ -33,8 +43,20 @@ export class Mode {
         this._onKeyDown = this._onKeyDown.bind(this);
         this._onKeyUp = this._onKeyUp.bind(this);
 
+        // Add event listeners to mode buttons (if they exist)
         ['view', 'draw', 'drawLines', 'erase', 'arrow', 'deleteArrows'].forEach(modeType => {
-            document.getElementById(`${modeType}Mode`).addEventListener('click', this.handleModeSwitch);
+            const element = document.getElementById(`${modeType}Mode`);
+            if (element) {
+                element.addEventListener('click', this.handleModeSwitch);
+            }
+        });
+        
+        // Add event listeners for view mode buttons in annotation panels
+        ['viewModeEdge', 'viewModeArrow'].forEach(btnId => {
+            const element = document.getElementById(btnId);
+            if (element) {
+                element.addEventListener('click', () => this.setMode(MODES.VIEW, true));
+            }
         });
 
         // Gizmo visibility toggle
@@ -48,6 +70,28 @@ export class Mode {
 
         window.addEventListener('keydown', this._onKeyDown);
         window.addEventListener('keyup', this._onKeyUp);
+        
+        // Make mode indicator clickable - toggle between view and previous tool
+        const modeIndicator = document.getElementById('modeIndicator');
+        if (modeIndicator) {
+            modeIndicator.addEventListener('click', () => {
+                if (this.currentMode === MODES.VIEW) {
+                    // In view mode - switch to previous tool (default to DRAW if no previous)
+                    if (this.previousMode !== MODES.VIEW) {
+                        this.toPreviousMode();
+                    } else {
+                        // No previous tool yet - default to Draw
+                        this.setMode(MODES.DRAW, true);
+                    }
+                } else {
+                    // In any tool mode - switch to view
+                    this.setMode(MODES.VIEW);
+                }
+            });
+        }
+        
+        // Initialize UI state to match default mode (VIEW)
+        this.update();
     }
     
     _onKeyDown(event) {
@@ -110,7 +154,53 @@ export class Mode {
         this.updateCursor();
         this.updateControls();
         this.updateGizmo();
-        updatePanelBtnStates(this.getPanel());
+        this.updateToolButtonStates();
+        this.updateModeIndicator();
+        // Note: Nav button highlighting is now handled by setActiveNavBtn in main.js
+        // Mode changes no longer affect which tab appears active
+    }
+    
+    /**
+     * Updates the visual state of tool buttons to show which mode is active.
+     */
+    updateToolButtonStates() {
+        // Tool buttons in the annotation panel
+        const toolButtons = document.querySelectorAll('.tool-btn');
+        toolButtons.forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Activate the correct button based on current mode
+        const modeToButtonIds = {
+            [MODES.VIEW]: ['viewModeEdge', 'viewModeArrow'],
+            [MODES.DRAW]: ['drawMode'],
+            [MODES.DRAWLINES]: ['drawLinesMode'],
+            [MODES.ERASE]: ['eraseMode'],
+            [MODES.ARROW]: ['arrowMode'],
+            [MODES.DELETEARROWS]: ['deleteArrowsMode']
+        };
+        
+        const activeButtonIds = modeToButtonIds[this.currentMode] || [];
+        activeButtonIds.forEach(btnId => {
+            const activeBtn = document.getElementById(btnId);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+        });
+    }
+    
+    /**
+     * Updates the mode indicator in the UI to show current interaction mode.
+     */
+    updateModeIndicator() {
+        const indicator = document.getElementById('modeIndicator');
+        if (!indicator) return;
+        
+        const modeInfo = MODE_LABELS[this.currentMode];
+        if (modeInfo) {
+            indicator.innerHTML = `<i class="fas ${modeInfo.icon}"></i> ${modeInfo.label}`;
+            indicator.style.setProperty('--mode-color', modeInfo.color);
+        }
     }
 
     updateControls() {
@@ -158,21 +248,11 @@ export class Mode {
         updateCursor(this.currentMode);
     }
 
-    getPanel() {
-        if (this.currentMode === MODES.VIEW) {
-            return 'view';
-        }
-        if (this.currentMode === MODES.DRAW || this.currentMode === MODES.ERASE || this.currentMode === MODES.DRAWLINES) {
-            return 'draw';
-        }
-        if (this.currentMode === MODES.ARROW || this.currentMode === MODES.DELETEARROWS) {
-            return 'arrow';
-        }
-    }
-
     handleModeSwitch(event) {
-        console.log('handleModeSwitch', event.target.id);
-        this.setMode(event.target.id.replace('Mode', ''), true);        
+        // Use currentTarget to get the button element, not the icon/span inside it
+        const button = event.currentTarget;
+        console.log('handleModeSwitch', button.id);
+        this.setMode(button.id.replace('Mode', ''), true);        
     }
 
 }
@@ -190,28 +270,6 @@ function updateCursor(mode) {
     }
 }
 
-function updatePanelBtnStates(modePanel) {
-    const buttons = document.querySelectorAll('.toggle-button');
-    buttons.forEach(button => {
-        // Skip special colored buttons (model, evaluation) unless they're the active panel
-        const isModelBtn = button.id === 'modelPanelBtn';
-        const isEvalBtn = button.id === 'evaluationPanelBtn';
-        const isHistoryBtn = button.id === 'historyPanelBtn';
-        
-        button.classList.remove('bg-blue-500', 'text-white');
-        
-        if (button.id === `${modePanel}PanelBtn`) {
-            button.classList.add('bg-blue-500', 'text-white');
-        } else if (isModelBtn) {
-            // Restore model button's default purple style
-            button.classList.remove('bg-gray-300', 'text-gray-700');
-            button.classList.add('bg-purple-300', 'text-purple-800');
-        } else if (isEvalBtn) {
-            // Restore evaluation button's default teal style
-            button.classList.remove('bg-gray-300', 'text-gray-700');
-            button.classList.add('bg-teal-300', 'text-teal-800');
-        } else {
-            button.classList.add('bg-gray-300', 'text-gray-700');
-        }
-    });
-}
+// Note: Nav button highlighting is now handled solely by setActiveNavBtn() in main.js.
+// The mode no longer affects which navigation tab appears active.
+// This provides Photoshop-like behavior where tools and panels are independent.

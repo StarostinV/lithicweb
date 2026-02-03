@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import RotationController from './RotationController.js';
-import Slider from './slider';
 
 /**
  * Scene - Main Three.js scene manager.
  * 
  * Handles scene setup, rendering, lighting, and rotation controls.
  * Provides access to both camera orbit and object manipulation gizmo.
+ * 
+ * Lighting system:
+ * - Key Light (DirectionalLight): Main directional light, can follow camera
+ * - Fill Light (HemisphereLight): Soft sky/ground fill
+ * - Ambient Light: Base illumination
  */
 export default class Scene {
     constructor() {
@@ -25,29 +29,25 @@ export default class Scene {
         // Legacy alias for compatibility - points to orbit controls
         this.controls = this.rotationController.orbitControls;
         
+        // Lighting state
+        this.lightFollowsCamera = false;
+        
         this.createLights();
-        this.updateLightIntensity = this.updateLightIntensity.bind(this);
-
-        this.sliderLight = new Slider("Light", 2, 0, 10, (value) => {this.updateLightIntensity(value, this.light)});
-        this.sliderAmbientLight = new Slider("AmbientLight", 2, 0, 50, (value) => {this.updateLightIntensity(value, this.ambientLight)});
 
         // Bind the animate method to the class instance
         this.animate = this.animate.bind(this);
-        this.updateLightDirection = this.updateLightDirection.bind(this);
-        document.getElementById('updateLight').addEventListener('click', this.updateLightDirection);
-        document.getElementById('updateLight2').addEventListener('click', this.updateLightDirection);
-    }
-
-    updateLightIntensity(value, light) {
-        light.intensity = value;
     }
 
     createCamera() {
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // Account for navbar height and sidebar width when calculating initial aspect ratio
+        const navbarHeight = 64; // Match CSS --navbar-height
+        const sidebarWidth = 380; // Match CSS --sidebar-width
+        const width = window.innerWidth - sidebarWidth;
+        const height = window.innerHeight - navbarHeight;
+        const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
         camera.position.set(30, 30, 30);
         return camera;
     }
-    
     
     /**
      * Attaches an object to the transform gizmo.
@@ -83,11 +83,15 @@ export default class Scene {
         // Use device pixel ratio for sharp rendering on high-DPI displays
         renderer.setPixelRatio(window.devicePixelRatio);
         
+        // Account for navbar height and sidebar width when setting initial size
+        const navbarHeight = 64; // Match CSS --navbar-height
+        const sidebarWidth = 380; // Match CSS --sidebar-width
         renderer.setClearColor(0x201944); // Set the background color of the canvas
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(window.innerWidth - sidebarWidth, window.innerHeight - navbarHeight);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        document.body.appendChild(renderer.domElement);
+        // Canvas is already in the HTML, don't append again
+        // document.body.appendChild(renderer.domElement);
         renderer.domElement.addEventListener('contextmenu', function(event) {
             event.preventDefault();
         });
@@ -95,23 +99,182 @@ export default class Scene {
         return renderer;
     }
 
+    /**
+     * Creates the lighting setup:
+     * - Key Light: DirectionalLight for main illumination (can follow camera)
+     * - Fill Light: HemisphereLight for soft ambient fill
+     * - Ambient Light: Base level illumination
+     */
     createLights() {
-        const light = new THREE.HemisphereLight(0xffffff, 0x444444, 2);
-        light.position.set(0, 20, 0); // Position of the light source
-        this.scene.add(light);
+        // Key Light - DirectionalLight for sharp, directional illumination
+        // This is the main light that can follow the camera direction
+        this.keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        this.keyLight.position.set(1, 1, 1).normalize();
+        this.scene.add(this.keyLight);
 
-        const ambientLight = new THREE.AmbientLight(0x0c0c0c, 1);
-        this.scene.add(ambientLight);
+        // Fill Light - HemisphereLight for soft sky/ground fill
+        // Provides natural-looking ambient lighting
+        this.fillLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+        this.fillLight.position.set(0, 1, 0); // Sky direction
+        this.scene.add(this.fillLight);
 
-        this.light = light;
-        this.ambientLight = ambientLight;
+        // Ambient Light - Base illumination to prevent pure black shadows
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+        this.scene.add(this.ambientLight);
+
+        // Legacy alias for compatibility
+        this.light = this.keyLight;
     }
 
-    updateLightDirection() {
+    /**
+     * Update key light direction from camera view.
+     * Called manually via button or automatically when lightFollowsCamera is true.
+     */
+    updateLightFromCamera() {
         const forward = new THREE.Vector3();
         this.camera.getWorldDirection(forward);
-        forward.negate();
-        this.light.position.copy(forward);
+        // Light comes from camera direction (like a headlamp)
+        this.keyLight.position.copy(forward).negate();
+    }
+    
+    /**
+     * Set whether the key light should follow the camera.
+     * @param {boolean} follow - Whether light follows camera
+     */
+    setLightFollowsCamera(follow) {
+        this.lightFollowsCamera = follow;
+        if (follow) {
+            this.updateLightFromCamera();
+        }
+    }
+    
+    /**
+     * Set key light intensity.
+     * @param {number} intensity - Light intensity (0-10 typical range)
+     */
+    setKeyLightIntensity(intensity) {
+        this.keyLight.intensity = intensity;
+    }
+    
+    /**
+     * Set fill light intensity.
+     * @param {number} intensity - Light intensity (0-5 typical range)
+     */
+    setFillLightIntensity(intensity) {
+        this.fillLight.intensity = intensity;
+    }
+    
+    /**
+     * Set ambient light intensity.
+     * @param {number} intensity - Light intensity (0-2 typical range)
+     */
+    setAmbientLightIntensity(intensity) {
+        this.ambientLight.intensity = intensity;
+    }
+    
+    /**
+     * Set key light color.
+     * @param {string|number} color - Color as hex string or number
+     */
+    setKeyLightColor(color) {
+        this.keyLight.color.set(color);
+    }
+    
+    /**
+     * Set fill light colors (sky and ground).
+     * @param {string|number} skyColor - Sky color
+     * @param {string|number} groundColor - Ground color
+     */
+    setFillLightColors(skyColor, groundColor) {
+        this.fillLight.color.set(skyColor);
+        this.fillLight.groundColor.set(groundColor);
+    }
+    
+    /**
+     * Set ambient light color.
+     * @param {string|number} color - Color as hex string or number
+     */
+    setAmbientLightColor(color) {
+        this.ambientLight.color.set(color);
+    }
+    
+    /**
+     * Set key light direction manually.
+     * @param {number} x - X component
+     * @param {number} y - Y component  
+     * @param {number} z - Z component
+     */
+    setKeyLightDirection(x, y, z) {
+        this.keyLight.position.set(x, y, z).normalize();
+    }
+    
+    /**
+     * Apply a lighting preset.
+     * @param {string} presetName - Name of the preset
+     */
+    applyLightingPreset(presetName) {
+        switch (presetName) {
+            case 'studio':
+                // Classic studio lighting
+                this.setKeyLightIntensity(2.5);
+                this.setFillLightIntensity(0.8);
+                this.setAmbientLightIntensity(0.3);
+                this.setKeyLightColor(0xffffff);
+                this.setFillLightColors(0xf0f0ff, 0x404040);
+                this.setKeyLightDirection(1, 1, 1);
+                break;
+                
+            case 'warm':
+                // Warm, golden lighting
+                this.setKeyLightIntensity(2.0);
+                this.setFillLightIntensity(0.6);
+                this.setAmbientLightIntensity(0.4);
+                this.setKeyLightColor(0xfff4e0);
+                this.setFillLightColors(0xffeedd, 0x443322);
+                this.setKeyLightDirection(1, 0.8, 0.5);
+                break;
+                
+            case 'cool':
+                // Cool, blue lighting
+                this.setKeyLightIntensity(2.0);
+                this.setFillLightIntensity(0.7);
+                this.setAmbientLightIntensity(0.3);
+                this.setKeyLightColor(0xe8f0ff);
+                this.setFillLightColors(0xd0e0ff, 0x303040);
+                this.setKeyLightDirection(0.5, 1, 1);
+                break;
+                
+            case 'dramatic':
+                // High contrast dramatic lighting
+                this.setKeyLightIntensity(3.5);
+                this.setFillLightIntensity(0.3);
+                this.setAmbientLightIntensity(0.1);
+                this.setKeyLightColor(0xffffff);
+                this.setFillLightColors(0x808080, 0x202020);
+                this.setKeyLightDirection(1, 0.5, 0);
+                break;
+                
+            case 'flat':
+                // Flat, even lighting (good for documentation)
+                this.setKeyLightIntensity(1.5);
+                this.setFillLightIntensity(1.5);
+                this.setAmbientLightIntensity(0.8);
+                this.setKeyLightColor(0xffffff);
+                this.setFillLightColors(0xffffff, 0x808080);
+                this.setKeyLightDirection(0, 1, 0);
+                break;
+                
+            case 'default':
+            default:
+                // Default balanced lighting
+                this.setKeyLightIntensity(2.0);
+                this.setFillLightIntensity(1.0);
+                this.setAmbientLightIntensity(0.3);
+                this.setKeyLightColor(0xffffff);
+                this.setFillLightColors(0xffffff, 0x444444);
+                this.setKeyLightDirection(1, 1, 1);
+                break;
+        }
     }
 
     animate() {
@@ -119,6 +282,11 @@ export default class Scene {
         
         // Update rotation controller for smooth damping
         this.rotationController.update();
+        
+        // Update light position if following camera
+        if (this.lightFollowsCamera) {
+            this.updateLightFromCamera();
+        }
         
         this.renderer.render(this.scene, this.camera);
     }
