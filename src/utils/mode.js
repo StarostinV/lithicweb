@@ -13,7 +13,7 @@ export const MODES = Object.freeze({
  * Modes: VIEW, DRAW, ERASE, ARROW, DELETEARROWS, DRAWLINES
  * 
  * In VIEW mode:
- * - Gizmo is shown for object manipulation
+ * - Gizmo is shown for object manipulation (can be toggled off)
  * - Default: Rotate mode
  * - Hold Ctrl: Move (translate) mode
  * 
@@ -25,6 +25,7 @@ export class Mode {
         this.currentMode = MODES.VIEW;
         this.previousMode = MODES.VIEW;
         this.ctrlHeld = false;
+        this.showGizmo = true;  // User preference for gizmo visibility
 
         this.handleModeSwitch = this.handleModeSwitch.bind(this);
         this.setMode = this.setMode.bind(this);
@@ -35,6 +36,15 @@ export class Mode {
         ['view', 'draw', 'drawLines', 'erase', 'arrow', 'deleteArrows'].forEach(modeType => {
             document.getElementById(`${modeType}Mode`).addEventListener('click', this.handleModeSwitch);
         });
+
+        // Gizmo visibility toggle
+        const showGizmoToggle = document.getElementById('showGizmo');
+        if (showGizmoToggle) {
+            showGizmoToggle.addEventListener('change', (e) => {
+                this.showGizmo = e.target.checked;
+                this.updateGizmo();
+            });
+        }
 
         window.addEventListener('keydown', this._onKeyDown);
         window.addEventListener('keyup', this._onKeyUp);
@@ -112,12 +122,13 @@ export class Mode {
     }
     
     /**
-     * Updates gizmo visibility based on current mode.
-     * Gizmo is shown in VIEW mode, hidden otherwise.
+     * Updates gizmo visibility based on current mode and user preference.
+     * Gizmo is shown in VIEW mode if user hasn't disabled it.
      */
     updateGizmo() {
         const isViewMode = this.currentMode === MODES.VIEW;
-        this.scene.setGizmoVisible(isViewMode);
+        // Show gizmo only if in view mode AND user wants to see it
+        this.scene.setGizmoVisible(isViewMode && this.showGizmo);
         
         // Set appropriate transform mode based on Ctrl state
         if (isViewMode) {
