@@ -565,9 +565,9 @@ export class RenderingPanel {
     updateColors() {
         if (this.meshObject.isNull()) return;
         
-        // Update mesh object's colors
-        this.meshObject.edgeColor = new THREE.Color(this.edgeColor);
-        this.meshObject.objectColor = new THREE.Color(this.objectColor);
+        // Update colors in place so all references (including faceColors) stay in sync
+        this.meshObject.edgeColor.set(this.edgeColor);
+        this.meshObject.objectColor.set(this.objectColor);
         
         // Re-apply annotation display with new colors
         this.updateAnnotationDisplay();

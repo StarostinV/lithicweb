@@ -51,7 +51,7 @@ export class CloudStoragePanel {
         /**
          * Cloud mesh connection info. Tracks which cloud mesh the current viewer mesh is linked to.
          * null when no cloud connection (local file loaded).
-         * @type {{meshId: string, numVertices: number, numFaces: number}|null}
+         * @type {{meshId: string, numVertices: number, numFaces: number, meshMetadata: Object|null}|null}
          */
         this.cloudMeshInfo = null;
         
@@ -111,15 +111,28 @@ export class CloudStoragePanel {
      * @param {string} meshId - The cloud mesh ID
      * @param {number} numVertices - Number of vertices in the mesh
      * @param {number} numFaces - Number of faces in the mesh
+     * @param {Object|null} meshMetadata - Optional mesh metadata from server
      */
-    setCloudConnection(meshId, numVertices, numFaces) {
+    setCloudConnection(meshId, numVertices, numFaces, meshMetadata = null) {
         this.cloudMeshInfo = {
             meshId: meshId,
             numVertices: numVertices,
-            numFaces: numFaces
+            numFaces: numFaces,
+            meshMetadata: meshMetadata
         };
         console.log('[CloudStorage] Cloud connection set:', this.cloudMeshInfo);
+        if (meshMetadata) {
+            console.log('[CloudStorage] Mesh metadata from server:', meshMetadata);
+        }
         this.updateCloudConnectionUI();
+    }
+    
+    /**
+     * Get the current mesh metadata from cloud connection.
+     * @returns {Object|null} The mesh metadata or null if not connected
+     */
+    getCloudMeshMetadata() {
+        return this.cloudMeshInfo?.meshMetadata || null;
     }
     
     /**
@@ -252,6 +265,14 @@ export class CloudStoragePanel {
         try {
             const response = await lithicClient.listFiles();
             this.meshes = response.files || [];
+            
+            // Log mesh metadata from server
+            const meshesWithMetadata = this.meshes.filter(m => m.mesh_metadata);
+            console.log(`[CloudStorage] Loaded ${this.meshes.length} meshes, ${meshesWithMetadata.length} have mesh_metadata`);
+            if (meshesWithMetadata.length > 0) {
+                console.log('[CloudStorage] Sample mesh_metadata:', meshesWithMetadata[0].mesh_metadata);
+            }
+            
             this.renderMeshList();
             this.setStatus(`${this.meshes.length} mesh${this.meshes.length !== 1 ? 'es' : ''} found`, 'success');
         } catch (e) {
@@ -332,8 +353,8 @@ export class CloudStoragePanel {
                         <div class="mesh-item-name">${mesh.original_name}</div>
                         <div class="mesh-item-meta">
                             ${mesh.num_vertices.toLocaleString()} vertices · ${sizeStr} · ${date}
-                            ${mesh.state_count > 0 ? `· <span class="state-count">${mesh.state_count} states</span>` : ''}
                         </div>
+                        ${mesh.state_count > 0 ? `<div class="mesh-item-meta"><span class="state-count">${mesh.state_count} annotation(s)</span></div>` : ''}
                     </div>
                     <div class="mesh-item-actions">
                         <button class="icon-btn load-mesh-btn" title="Load mesh">
@@ -384,8 +405,11 @@ export class CloudStoragePanel {
         if (!statesContainer) return;
         
         try {
+            console.log('[CloudStorage] Loading states for mesh:', meshId);
             const response = await lithicClient.listStates(meshId);
+            console.log('[CloudStorage] States response:', response);
             this.states = response.states || [];
+            console.log('[CloudStorage] Loaded', this.states.length, 'states');
             this.renderStatesList(meshId, statesContainer);
         } catch (e) {
             console.error('[CloudStorage] Failed to load states:', e);
@@ -543,6 +567,16 @@ export class CloudStoragePanel {
         const uploadResult = await lithicClient.uploadFile(meshFile);
         const meshId = uploadResult.filename;
         
+        // If the PLY file had metadata, save it to the server
+        if (metadata && Object.keys(metadata).length > 0) {
+            console.log(`[CloudStorage] Saving mesh metadata for ${file.name}:`, metadata);
+            try {
+                await lithicClient.updateMeshMetadata(meshId, metadata);
+            } catch (e) {
+                console.warn(`[CloudStorage] Failed to save mesh metadata for ${file.name}:`, e);
+            }
+        }
+        
         // If there are annotations, save them as a state
         if (hasAnnotation) {
             // Convert labels array to edge indices (indices where label is non-zero)
@@ -678,10 +712,18 @@ export class CloudStoragePanel {
             
             // Log mesh metadata that was loaded from the PLY file
             const loadedMeshMetadata = this.meshLoader.getAllMetadata();
-            console.log('[CloudStorage] Mesh metadata loaded from PLY:', loadedMeshMetadata);
+            console.log('[CloudStorage] Mesh metadata loaded from PLY file:', loadedMeshMetadata);
+            console.log('[CloudStorage] Mesh metadata from server (mesh_metadata):', meta.mesh_metadata);
             
-            // Set cloud connection with mesh info from metadata
-            this.setCloudConnection(meshId, meta.num_vertices, meta.num_faces);
+            // Merge server's mesh_metadata into meshLoader's metadata
+            // This makes the CSV data (stored on server) available alongside PLY file metadata
+            if (meta.mesh_metadata && typeof meta.mesh_metadata === 'object') {
+                console.log('[CloudStorage] Merging server mesh_metadata into meshLoader');
+                this.meshLoader.updateMetadata(meta.mesh_metadata);
+            }
+            
+            // Set cloud connection with mesh info from metadata (including server mesh_metadata)
+            this.setCloudConnection(meshId, meta.num_vertices, meta.num_faces, meta.mesh_metadata);
             
             // Update file name display in navbar
             const fileNameDisplay = document.getElementById('fileName');
@@ -1101,11 +1143,29 @@ export class CloudStoragePanel {
             const file = new File([plyBlob], filename, { type: 'application/octet-stream' });
             
             const result = await lithicClient.uploadFile(file);
+            console.log('[CloudStorage] Upload result:', result);
+            
+            const meshId = result.filename;
+            
+            // If we have mesh metadata in meshLoader, save it to the server
+            const currentMeshMetadata = this.meshLoader.getAllMetadata();
+            console.log('[CloudStorage] Current meshLoader metadata:', currentMeshMetadata);
+            
+            if (Object.keys(currentMeshMetadata).length > 0) {
+                console.log('[CloudStorage] Saving mesh metadata to server...');
+                try {
+                    await lithicClient.updateMeshMetadata(meshId, currentMeshMetadata);
+                    console.log('[CloudStorage] Mesh metadata saved successfully');
+                } catch (e) {
+                    console.warn('[CloudStorage] Failed to save mesh metadata:', e);
+                    // Don't fail the upload, just warn
+                }
+            }
             
             // Set cloud connection with current mesh info
             const numVertices = this.meshObject.positions.length / 3;
             const numFaces = this.meshObject.indices.length / 3;
-            this.setCloudConnection(result.filename, numVertices, numFaces);
+            this.setCloudConnection(meshId, numVertices, numFaces, currentMeshMetadata);
             
             this.setStatus('Mesh uploaded!', 'success');
             await this.refreshMeshList();

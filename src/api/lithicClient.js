@@ -271,6 +271,19 @@ class LithicClient {
         });
     }
 
+    /**
+     * Update mesh metadata (additional metadata like CSV data)
+     * @param {string} meshId - The mesh folder ID
+     * @param {Object} meshMetadata - The metadata dictionary to set
+     * @returns {Promise<FileMetadataResponse>}
+     */
+    async updateMeshMetadata(meshId, meshMetadata) {
+        return this.request(`/files/${encodeURIComponent(meshId)}/mesh-metadata`, {
+            method: 'PATCH',
+            body: JSON.stringify({ mesh_metadata: meshMetadata })
+        });
+    }
+
     // ============== State Management Endpoints ==============
 
     /**
