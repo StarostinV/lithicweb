@@ -7,38 +7,79 @@ export const MODES = Object.freeze({
     DRAWLINES: 'drawLines'
 });
 
+/**
+ * Mode - Manages application interaction modes and integrates with rotation controls.
+ * 
+ * Modes: VIEW, DRAW, ERASE, ARROW, DELETEARROWS, DRAWLINES
+ * 
+ * In VIEW mode:
+ * - Gizmo is shown for object manipulation
+ * - Default: Rotate mode
+ * - Hold Ctrl: Move (translate) mode
+ * 
+ * Hold Alt from any mode to temporarily enter VIEW mode with gizmo.
+ */
 export class Mode {
     constructor(scene) {
         this.scene = scene;
         this.currentMode = MODES.VIEW;
         this.previousMode = MODES.VIEW;
+        this.ctrlHeld = false;
 
         this.handleModeSwitch = this.handleModeSwitch.bind(this);
         this.setMode = this.setMode.bind(this);
         this.toPreviousMode = this.toPreviousMode.bind(this);
+        this._onKeyDown = this._onKeyDown.bind(this);
+        this._onKeyUp = this._onKeyUp.bind(this);
 
         ['view', 'draw', 'drawLines', 'erase', 'arrow', 'deleteArrows'].forEach(modeType => {
             document.getElementById(`${modeType}Mode`).addEventListener('click', this.handleModeSwitch);
         });
 
-
-        window.addEventListener('keydown', (event) => {
-            if (event.key === 'Alt') {
-                // event.preventDefault();
-                // Only switch to view mode if we're not already in it
-                if (this.currentMode !== MODES.VIEW) {
-                    this.setMode(MODES.VIEW);   
-                }
+        window.addEventListener('keydown', this._onKeyDown);
+        window.addEventListener('keyup', this._onKeyUp);
+    }
+    
+    _onKeyDown(event) {
+        // Alt key - temporarily switch to VIEW mode
+        if (event.key === 'Alt') {
+            if (this.currentMode !== MODES.VIEW) {
+                this.setMode(MODES.VIEW);
             }
-        });
+        }
         
-        window.addEventListener('keyup', (event) => {
-            if (event.key === 'Alt') {
-                // event.preventDefault();
-                this.toPreviousMode();
+        // Ctrl key - switch gizmo to translate mode while held
+        if (event.key === 'Control' && !this.ctrlHeld) {
+            this.ctrlHeld = true;
+            if (this.currentMode === MODES.VIEW) {
+                this._setGizmoMode('translate');
             }
-        });
+        }
+    }
+    
+    _onKeyUp(event) {
+        // Alt key - return to previous mode
+        if (event.key === 'Alt') {
+            this.toPreviousMode();
+        }
         
+        // Ctrl key released - switch gizmo back to rotate mode
+        if (event.key === 'Control') {
+            this.ctrlHeld = false;
+            if (this.currentMode === MODES.VIEW) {
+                this._setGizmoMode('rotate');
+            }
+        }
+    }
+    
+    /**
+     * Sets the gizmo transform mode.
+     * @private
+     */
+    _setGizmoMode(mode) {
+        if (this.scene.rotationController) {
+            this.scene.rotationController.setTransformMode(mode);
+        }
     }
 
     setMode(mode, rewritePrevious = false) {
@@ -58,6 +99,7 @@ export class Mode {
     update() {
         this.updateCursor();
         this.updateControls();
+        this.updateGizmo();
         updatePanelBtnStates(this.getPanel());
     }
 
@@ -66,6 +108,20 @@ export class Mode {
             this.scene.controls.enabled = true;
         } else {
             this.scene.controls.enabled = false;
+        }
+    }
+    
+    /**
+     * Updates gizmo visibility based on current mode.
+     * Gizmo is shown in VIEW mode, hidden otherwise.
+     */
+    updateGizmo() {
+        const isViewMode = this.currentMode === MODES.VIEW;
+        this.scene.setGizmoVisible(isViewMode);
+        
+        // Set appropriate transform mode based on Ctrl state
+        if (isViewMode) {
+            this._setGizmoMode(this.ctrlHeld ? 'translate' : 'rotate');
         }
     }
 

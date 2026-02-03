@@ -130,6 +130,11 @@ export class MeshObject {
         this.meshColors = meshColors;
         this.scene.light.target = this.mesh;
         this.scene.scene.add(this.mesh);
+        
+        // Attach mesh to rotation gizmo for object manipulation
+        if (this.scene.attachObjectToGizmo) {
+            this.scene.attachObjectToGizmo(this.mesh);
+        }
 
         // Build adjacency graph after setting the mesh
         this.adjacencyGraph = buildAdjacencyGraph(indices, positions.length / 3);

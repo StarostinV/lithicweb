@@ -1,20 +1,35 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import RotationController from './RotationController.js';
 import Slider from './slider';
 
+/**
+ * Scene - Main Three.js scene manager.
+ * 
+ * Handles scene setup, rendering, lighting, and rotation controls.
+ * Provides access to both camera orbit and object manipulation gizmo.
+ */
 export default class Scene {
     constructor() {
         this.scene = new THREE.Scene();
         this.canvas = document.getElementById("renderCanvas");
         this.renderer = this.createRenderer();
         this.camera = this.createCamera();
-        this.controls = this.createControls();
+        
+        // Initialize rotation controller (handles both orbit and transform controls)
+        this.rotationController = new RotationController(
+            this.camera,
+            this.canvas,
+            this.scene
+        );
+        
+        // Legacy alias for compatibility - points to orbit controls
+        this.controls = this.rotationController.orbitControls;
+        
         this.createLights();
         this.updateLightIntensity = this.updateLightIntensity.bind(this);
 
         this.sliderLight = new Slider("Light", 2, 0, 10, (value) => {this.updateLightIntensity(value, this.light)});
         this.sliderAmbientLight = new Slider("AmbientLight", 2, 0, 50, (value) => {this.updateLightIntensity(value, this.ambientLight)});
-
 
         // Bind the animate method to the class instance
         this.animate = this.animate.bind(this);
@@ -32,21 +47,46 @@ export default class Scene {
         camera.position.set(30, 30, 30);
         return camera;
     }
-
-    createControls() {
-        const controls = new OrbitControls(this.camera, this.canvas);
-        controls.target.set(0, 0, 0);
-        controls.update();
-        controls.zoomSpeed = 1.2;
-        return controls;
+    
+    
+    /**
+     * Attaches an object to the transform gizmo.
+     * Call this after loading a mesh to enable object manipulation.
+     * 
+     * @param {THREE.Object3D} object - The object to attach
+     */
+    attachObjectToGizmo(object) {
+        this.rotationController.attachObject(object);
+    }
+    
+    /**
+     * Shows or hides the transform gizmo.
+     * @param {boolean} visible - Whether gizmo should be visible
+     */
+    setGizmoVisible(visible) {
+        this.rotationController.setGizmoVisible(visible);
+    }
+    
+    /**
+     * Resets the camera to default viewing position.
+     */
+    resetCamera() {
+        this.rotationController.resetCamera(50);
     }
 
     createRenderer() {
-        const renderer = new THREE.WebGLRenderer({ canvas: this.canvas });
-        renderer.setClearColor(0x201944); // Set the background color of the canvas to light gray
+        const renderer = new THREE.WebGLRenderer({ 
+            canvas: this.canvas,
+            antialias: true  // Enable antialiasing for smoother edges
+        });
+        
+        // Use device pixel ratio for sharp rendering on high-DPI displays
+        renderer.setPixelRatio(window.devicePixelRatio);
+        
+        renderer.setClearColor(0x201944); // Set the background color of the canvas
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // You can use other types too
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
         renderer.domElement.addEventListener('contextmenu', function(event) {
             event.preventDefault();
@@ -76,7 +116,17 @@ export default class Scene {
 
     animate() {
         requestAnimationFrame(this.animate);
+        
+        // Update rotation controller for smooth damping
+        this.rotationController.update();
+        
         this.renderer.render(this.scene, this.camera);
     }
     
-};
+    /**
+     * Cleans up resources when scene is disposed.
+     */
+    dispose() {
+        this.rotationController.dispose();
+    }
+}

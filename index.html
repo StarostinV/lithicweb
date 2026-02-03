@@ -76,7 +76,6 @@
                 <button id="invertNormals" class="bg-blue-200 text-blue-800 px-4 py-2 rounded hover:bg-blue-400" title="Invert Normals of the mesh">
                     <i class="fas fa-exchange-alt"></i>   Invert Normals
                 </button>
-        
             </div>
         </div>
         <div id="drawPanel" class="panel hidden">
@@ -280,6 +279,14 @@ The History panel provides a complete view of all your annotation actions:
 ## Exported File Format
 The exported .PLY file has the standard format with "vertex" and "face" that contains the original mesh. Additionally, it contains 
 "labels" - a child property of the "vertex" property.
+
+## Object Manipulation (Gizmo)
+The gizmo is automatically shown in View Mode for direct object manipulation:
+- **Default**: Rotate mode - drag the rings to rotate the object
+- **Hold Ctrl**: Move mode - drag the arrows to move the object
+- **X/Y/Z**: Constrain transformation to a single axis
+- **Space**: Toggle between World and Local coordinate space
+- **Escape**: Reset axis constraints (show all axes)
 
 ## Keyboard Shortcuts
 - **Ctrl+Z**: Undo last action
