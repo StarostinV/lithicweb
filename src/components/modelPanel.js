@@ -6,16 +6,22 @@
 import { lithicClient, DEFAULT_INFERENCE_CONFIG, CONFIG_PARAMS } from '../api/lithicClient.js';
 
 export class ModelPanel {
-    constructor(meshObject, evaluationManager = null) {
+    constructor(meshObject, connectionManager = null) {
         this.meshObject = meshObject;
-        this.evaluationManager = evaluationManager;
+        this.connectionManager = connectionManager;
+        this.evaluationManager = null;
+        this.cloudStoragePanel = null;
         this.currentSession = null;
         this.config = { ...DEFAULT_INFERENCE_CONFIG };
         this.isLoading = false;
         
         this.setupUI();
         this.setupEventListeners();
-        this.updateConnectionStatus();
+        
+        // Listen to connection changes from the shared connection manager
+        if (this.connectionManager) {
+            this.connectionManager.addListener(() => this.onConnectionChange());
+        }
     }
 
     /**
@@ -25,11 +31,17 @@ export class ModelPanel {
     setEvaluationManager(evaluationManager) {
         this.evaluationManager = evaluationManager;
     }
+    
+    /**
+     * Set the cloud storage panel (for deferred initialization).
+     * Used to check if current mesh is already in cloud storage for optimized loading.
+     * @param {CloudStoragePanel} cloudStoragePanel
+     */
+    setCloudStoragePanel(cloudStoragePanel) {
+        this.cloudStoragePanel = cloudStoragePanel;
+    }
 
     setupUI() {
-        // Create settings modal if it doesn't exist
-        this.createSettingsModal();
-        
         // Setup existing panel elements
         this.settingsBtn = document.getElementById('modelSettingsBtn');
         this.connectionStatus = document.getElementById('connectionStatus');
@@ -42,51 +54,13 @@ export class ModelPanel {
         this.buildConfigUI();
     }
 
-    createSettingsModal() {
-        // Check if modal already exists
-        if (document.getElementById('settingsModal')) return;
-
-        const modal = document.createElement('div');
-        modal.id = 'settingsModal';
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content settings-modal">
-                <div class="modal-header">
-                    <h2><i class="fas fa-cog"></i> Server Settings</h2>
-                    <button class="modal-close" id="closeSettingsModal">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label class="form-label">Server URL</label>
-                        <input type="text" id="serverUrlInput" class="form-input"
-                            placeholder="https://your-server.ngrok-free.dev">
-                        <p class="form-hint">Include http:// or https:// (use http:// for localhost)</p>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Collaborator Token</label>
-                        <div class="input-with-action">
-                            <input type="password" id="apiTokenInput" class="form-input"
-                                placeholder="Your collaborator token">
-                            <button id="toggleTokenVisibility" class="input-action-btn" type="button">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button id="testConnectionBtn" class="btn btn-secondary">
-                            <i class="fas fa-plug"></i> Test Connection
-                        </button>
-                        <button id="saveSettingsBtn" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Save Settings
-                        </button>
-                    </div>
-                    <div id="settingsTestResult" class="settings-result hidden"></div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
+    /**
+     * Called when connection status changes from the shared ConnectionManager.
+     */
+    onConnectionChange() {
+        // Connection manager already updates the UI, but we can do additional
+        // model-panel specific updates here if needed
+        console.log('[ModelPanel] Connection status changed');
     }
 
     buildConfigUI() {
@@ -183,52 +157,11 @@ export class ModelPanel {
     }
 
     setupEventListeners() {
-        // Settings modal
-        const settingsModal = document.getElementById('settingsModal');
-        const closeBtn = document.getElementById('closeSettingsModal');
-        
-        if (this.settingsBtn) {
+        // Settings button opens the shared connection modal
+        if (this.settingsBtn && this.connectionManager) {
             this.settingsBtn.addEventListener('click', () => {
-                this.openSettingsModal();
+                this.connectionManager.openModal();
             });
-        }
-        
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                settingsModal.style.display = 'none';
-            });
-        }
-        
-        // Close modal on outside click
-        window.addEventListener('click', (e) => {
-            if (e.target === settingsModal) {
-                settingsModal.style.display = 'none';
-            }
-        });
-
-        // Toggle token visibility
-        const toggleBtn = document.getElementById('toggleTokenVisibility');
-        const tokenInput = document.getElementById('apiTokenInput');
-        if (toggleBtn && tokenInput) {
-            toggleBtn.addEventListener('click', () => {
-                const isPassword = tokenInput.type === 'password';
-                tokenInput.type = isPassword ? 'text' : 'password';
-                toggleBtn.innerHTML = isPassword 
-                    ? '<i class="fas fa-eye-slash"></i>' 
-                    : '<i class="fas fa-eye"></i>';
-            });
-        }
-
-        // Test connection
-        const testBtn = document.getElementById('testConnectionBtn');
-        if (testBtn) {
-            testBtn.addEventListener('click', () => this.testConnection());
-        }
-
-        // Save settings
-        const saveBtn = document.getElementById('saveSettingsBtn');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => this.saveSettings());
         }
 
         // Upload and inference
@@ -238,100 +171,6 @@ export class ModelPanel {
         
         if (this.runInferenceBtn) {
             this.runInferenceBtn.addEventListener('click', () => this.runInference());
-        }
-    }
-
-    openSettingsModal() {
-        const modal = document.getElementById('settingsModal');
-        const serverInput = document.getElementById('serverUrlInput');
-        const tokenInput = document.getElementById('apiTokenInput');
-        const resultDiv = document.getElementById('settingsTestResult');
-        
-        // Load current settings
-        const { serverUrl, apiToken } = lithicClient.getConfig();
-        if (serverInput) serverInput.value = serverUrl;
-        if (tokenInput) tokenInput.value = apiToken;
-        if (resultDiv) {
-            resultDiv.classList.add('hidden');
-        }
-        
-        modal.style.display = 'flex';
-    }
-
-    async testConnection() {
-        const serverInput = document.getElementById('serverUrlInput');
-        const tokenInput = document.getElementById('apiTokenInput');
-        const resultDiv = document.getElementById('settingsTestResult');
-        const testBtn = document.getElementById('testConnectionBtn');
-        
-        const serverUrl = serverInput.value.trim();
-        const apiToken = tokenInput.value.trim();
-        
-        if (!serverUrl || !apiToken) {
-            resultDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Please enter both server URL and API token';
-            resultDiv.className = 'settings-result warning';
-            resultDiv.classList.remove('hidden');
-            return;
-        }
-        
-        testBtn.disabled = true;
-        testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
-        
-        // Temporarily configure client
-        const oldConfig = lithicClient.getConfig();
-        lithicClient.configure(serverUrl, apiToken);
-        
-        const result = await lithicClient.testConnection();
-        
-        // Restore old config if test failed
-        if (!result.success) {
-            lithicClient.configure(oldConfig.serverUrl, oldConfig.apiToken);
-        }
-        
-        const icon = result.success ? 'fa-check-circle' : 'fa-times-circle';
-        resultDiv.innerHTML = `<i class="fas ${icon}"></i> ${result.message}`;
-        resultDiv.className = result.success 
-            ? 'settings-result success'
-            : 'settings-result error';
-        resultDiv.classList.remove('hidden');
-        
-        testBtn.disabled = false;
-        testBtn.innerHTML = '<i class="fas fa-plug"></i> Test Connection';
-    }
-
-    async saveSettings() {
-        const serverInput = document.getElementById('serverUrlInput');
-        const tokenInput = document.getElementById('apiTokenInput');
-        const resultDiv = document.getElementById('settingsTestResult');
-        
-        const serverUrl = serverInput.value.trim();
-        const apiToken = tokenInput.value.trim();
-        
-        lithicClient.configure(serverUrl, apiToken);
-        
-        resultDiv.innerHTML = '<i class="fas fa-check-circle"></i> Settings saved!';
-        resultDiv.className = 'settings-result success';
-        resultDiv.classList.remove('hidden');
-        
-        this.updateConnectionStatus();
-        
-        // Close modal after a short delay
-        setTimeout(() => {
-            document.getElementById('settingsModal').style.display = 'none';
-        }, 1000);
-    }
-
-    updateConnectionStatus() {
-        if (!this.connectionStatus) return;
-        
-        if (lithicClient.isConfigured()) {
-            const { serverUrl } = lithicClient.getConfig();
-            this.connectionStatus.innerHTML = `<i class="fas fa-circle status-dot connected"></i> <span>Connected</span>`;
-            this.connectionStatus.className = 'connection-status connected';
-            this.connectionStatus.title = serverUrl;
-        } else {
-            this.connectionStatus.innerHTML = '<i class="fas fa-circle status-dot disconnected"></i> <span>Not configured</span>';
-            this.connectionStatus.className = 'connection-status';
         }
     }
 
@@ -379,32 +218,53 @@ export class ModelPanel {
                 return;
             }
             
-            // Extract mesh data as arrays (no disk storage, direct to RAM)
-            const { vertices, faces } = this.extractMeshData();
-            console.log(`[ModelPanel] Extracted mesh: ${vertices.length} vertices, ${faces.length} faces`);
-            
-            this.setStatus('Sending mesh to server...', 'info');
-            
-            // Update config and load mesh directly into session (no disk storage)
+            // Update config first
             await lithicClient.updateSessionConfig(this.currentSession.session_id, this.config);
             
-            const loadResult = await lithicClient.loadMeshDirectly(
-                this.currentSession.session_id,
-                vertices,
-                faces,
-                'mesh'
-            );
-            console.log('[ModelPanel] Load result:', loadResult);
-            
-            // Mark session as having data based on successful load response
-            // This is more reliable than re-fetching session through ngrok
-            if (loadResult && loadResult.success) {
-                this.currentSession.has_data = true;
-                this.currentSession.current_filename = 'mesh';
-                console.log('[ModelPanel] Session marked as having data');
+            // Check if mesh is already in cloud storage (optimized path)
+            const cloudMeshInfo = this.cloudStoragePanel?.cloudMeshInfo;
+            if (cloudMeshInfo && this.cloudStoragePanel.verifyCloudConnection()) {
+                // Mesh is in cloud storage - load from server storage (much faster!)
+                console.log(`[ModelPanel] Mesh found in cloud storage: ${cloudMeshInfo.meshId}`);
+                this.setStatus('Loading mesh from cloud storage...', 'info');
+                
+                const loadResult = await lithicClient.loadFileIntoSession(
+                    this.currentSession.session_id,
+                    cloudMeshInfo.meshId
+                );
+                console.log('[ModelPanel] Cloud storage load result:', loadResult);
+                
+                if (loadResult && loadResult.success) {
+                    this.currentSession.has_data = true;
+                    this.currentSession.current_filename = cloudMeshInfo.meshId;
+                    console.log('[ModelPanel] Session loaded from cloud storage');
+                }
+                
+                this.setStatus('Ready! Mesh loaded from cloud. Click "Run Inference" to process.', 'success');
+            } else {
+                // No cloud connection - upload mesh directly from client (standard path)
+                const { vertices, faces } = this.extractMeshData();
+                console.log(`[ModelPanel] No cloud storage, uploading mesh: ${vertices.length} vertices, ${faces.length} faces`);
+                
+                this.setStatus('Uploading mesh to server...', 'info');
+                
+                const loadResult = await lithicClient.loadMeshDirectly(
+                    this.currentSession.session_id,
+                    vertices,
+                    faces,
+                    'mesh'
+                );
+                console.log('[ModelPanel] Direct upload result:', loadResult);
+                
+                // Mark session as having data based on successful load response
+                if (loadResult && loadResult.success) {
+                    this.currentSession.has_data = true;
+                    this.currentSession.current_filename = 'mesh';
+                    console.log('[ModelPanel] Session marked as having data');
+                }
+                
+                this.setStatus('Ready! Click "Run Inference" to process.', 'success');
             }
-            
-            this.setStatus('Ready! Click "Run Inference" to process.', 'success');
         } catch (e) {
             console.error('[ModelPanel] Upload failed:', e);
             this.setStatus('Failed: ' + e.message, 'error');

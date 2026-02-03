@@ -1,3 +1,20 @@
+/**
+ * ActionHistory manages undo/redo history for mesh annotation operations.
+ * 
+ * ## Terminology Note: "State" vs "Annotation"
+ * 
+ * In this codebase, "state" and "annotation" are used interchangeably in certain contexts:
+ * - A "state" represents a snapshot of edge annotations at a point in time
+ * - "State metadata" is metadata specific to an annotation (e.g., evaluation metrics)
+ * - This is different from "mesh metadata" which belongs to the mesh itself
+ * 
+ * The term "state" is used internally (stateMetadata, stateIndex) for historical reasons,
+ * but conceptually these represent **annotation states** with their **annotation metadata**.
+ * 
+ * When saving to cloud storage:
+ * - "state" = "annotation" (the edge annotations being saved)
+ * - "stateMetadata" = "annotation metadata" (metadata specific to that annotation)
+ */
 export class ActionHistory {
     constructor(maxHistorySize = 100) {
         this.undoStack = [];
@@ -7,8 +24,11 @@ export class ActionHistory {
         this.currentViewIndex = 0; // Track which state we're viewing (0 = initial)
         
         /**
-         * State-metadata for the initial state (index 0).
-         * Each action has its own stateMetadata property.
+         * Annotation metadata for the initial state (index 0).
+         * Each action has its own stateMetadata property for its annotation metadata.
+         * 
+         * Note: "stateMetadata" = "annotation metadata" (metadata specific to an annotation,
+         * such as evaluation metrics). This is distinct from mesh metadata.
          * @type {Object}
          */
         this.initialStateMetadata = {};
@@ -16,7 +36,7 @@ export class ActionHistory {
 
     /**
      * Check if an action is protected from deletion.
-     * Protected actions: model predictions, labeled (GT/Pred), or renamed states.
+     * Protected actions: model predictions, cloud-loaded states, labeled (GT/Pred), or renamed states.
      * @param {Object} action - The action to check
      * @returns {boolean} True if protected
      */
@@ -26,6 +46,8 @@ export class ActionHistory {
         if (action.protected) return true;
         // Model predictions are auto-protected
         if (action.type === 'model') return true;
+        // Cloud-loaded states are auto-protected
+        if (action.type === 'cloud') return true;
         // Renamed states are protected
         if (action.customDescription) return true;
         return false;
@@ -37,8 +59,8 @@ export class ActionHistory {
             action.timestamp = Date.now();
         }
         
-        // Initialize empty state-metadata for new actions
-        // State-metadata is unique per state and NOT carried to new states
+        // Initialize empty annotation metadata for new actions
+        // Annotation metadata (stateMetadata) is unique per state and NOT carried to new states
         if (!action.stateMetadata) {
             action.stateMetadata = {};
         }
@@ -262,10 +284,14 @@ export class ActionHistory {
     // ========================================
     
     /**
-     * Get state-metadata for a specific state.
-     * State-metadata is unique per state and NOT shared across states.
+     * Get annotation metadata for a specific state/annotation.
+     * 
+     * Note: "stateMetadata" = "annotation metadata" - metadata specific to an annotation,
+     * such as evaluation metrics. This is distinct from mesh metadata which is shared.
+     * Annotation metadata is unique per state and NOT shared across states.
+     * 
      * @param {number} stateIndex - State index (0 for initial state)
-     * @returns {Object} The state metadata object (empty {} if none)
+     * @returns {Object} The annotation metadata object (empty {} if none)
      */
     getStateMetadata(stateIndex) {
         if (stateIndex === 0) {
@@ -281,7 +307,10 @@ export class ActionHistory {
     }
     
     /**
-     * Set a specific key in state-metadata for a state.
+     * Set a specific key in annotation metadata for a state.
+     * 
+     * Note: "stateMetadata" = "annotation metadata" (see class documentation).
+     * 
      * @param {number} stateIndex - State index (0 for initial state)
      * @param {string} key - The metadata key
      * @param {*} value - The value to set
@@ -304,7 +333,10 @@ export class ActionHistory {
     }
     
     /**
-     * Delete a key from state-metadata for a state.
+     * Delete a key from annotation metadata for a state.
+     * 
+     * Note: "stateMetadata" = "annotation metadata" (see class documentation).
+     * 
      * @param {number} stateIndex - State index (0 for initial state)
      * @param {string} key - The metadata key to delete
      * @returns {boolean} True if the key existed and was deleted
@@ -328,7 +360,10 @@ export class ActionHistory {
     }
     
     /**
-     * Update multiple keys in state-metadata for a state.
+     * Update multiple keys in annotation metadata for a state.
+     * 
+     * Note: "stateMetadata" = "annotation metadata" (see class documentation).
+     * 
      * @param {number} stateIndex - State index (0 for initial state)
      * @param {Object} updates - Object containing key-value pairs to update
      */
@@ -350,7 +385,10 @@ export class ActionHistory {
     }
     
     /**
-     * Clear all state-metadata for a state.
+     * Clear all annotation metadata for a state.
+     * 
+     * Note: "stateMetadata" = "annotation metadata" (see class documentation).
+     * 
      * @param {number} stateIndex - State index (0 for initial state)
      */
     clearStateMetadata(stateIndex) {

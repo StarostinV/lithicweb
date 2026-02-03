@@ -342,6 +342,7 @@ export class MeshObject {
                     case 'draw': description = 'Draw edges'; break;
                     case 'erase': description = 'Erase edges'; break;
                     case 'model': description = 'AI segmentation'; break;
+                    case 'cloud': description = 'Cloud state'; break;
                     default: description = this.pendingAction.type;
                 }
             }
@@ -639,13 +640,27 @@ export class MeshObject {
     }
     
     // ========================================
-    // State Metadata Methods
+    // Annotation Metadata Methods (State Metadata)
     // ========================================
-    // State metadata is unique per history state and NOT shared across states.
-    // Use this for state-specific data like evaluation metrics.
+    // 
+    // ## Terminology: "State Metadata" = "Annotation Metadata"
+    // 
+    // In this codebase, "state" refers to an annotation state (a snapshot of edge annotations).
+    // "State metadata" is metadata specific to an annotation, such as:
+    // - Evaluation metrics (precision, recall, F1 score)
+    // - Model inference parameters used to generate the annotation
+    // - Any other annotation-specific data
+    // 
+    // This is DIFFERENT from "mesh metadata" (this.metadata / getAllMetadata()):
+    // - Mesh metadata belongs to the mesh itself and is shared across all annotations
+    // - Annotation metadata (state metadata) is unique per annotation state
+    // 
+    // The method names use "State" for historical/internal consistency, but conceptually
+    // they operate on "annotation metadata".
+    //
     
     /**
-     * Get the current state index being viewed.
+     * Get the current state/annotation index being viewed.
      * @returns {number} The current state index (0 = initial state)
      */
     getCurrentStateIndex() {
@@ -653,24 +668,34 @@ export class MeshObject {
     }
     
     /**
-     * Get state-metadata for the current state.
-     * @returns {Object} The state metadata object
+     * Get annotation metadata for the current state.
+     * 
+     * Note: "State metadata" = "annotation metadata" - metadata specific to this annotation,
+     * such as evaluation metrics. This is distinct from mesh metadata (getAllMetadata()).
+     * 
+     * @returns {Object} The annotation metadata object
      */
     getCurrentStateMetadata() {
         return this.history.getStateMetadata(this.getCurrentStateIndex());
     }
     
     /**
-     * Get state-metadata for a specific state.
+     * Get annotation metadata for a specific state.
+     * 
+     * Note: "State metadata" = "annotation metadata" (see getCurrentStateMetadata).
+     * 
      * @param {number} stateIndex - The state index
-     * @returns {Object} The state metadata object
+     * @returns {Object} The annotation metadata object
      */
     getStateMetadata(stateIndex) {
         return this.history.getStateMetadata(stateIndex);
     }
     
     /**
-     * Set a key in the current state's metadata.
+     * Set a key in the current annotation's metadata.
+     * 
+     * Note: "State metadata" = "annotation metadata" (see getCurrentStateMetadata).
+     * 
      * @param {string} key - The metadata key
      * @param {*} value - The value to set
      */
@@ -679,7 +704,10 @@ export class MeshObject {
     }
     
     /**
-     * Set a key in a specific state's metadata.
+     * Set a key in a specific annotation's metadata.
+     * 
+     * Note: "State metadata" = "annotation metadata" (see getCurrentStateMetadata).
+     * 
      * @param {number} stateIndex - The state index
      * @param {string} key - The metadata key
      * @param {*} value - The value to set
@@ -689,7 +717,10 @@ export class MeshObject {
     }
     
     /**
-     * Delete a key from the current state's metadata.
+     * Delete a key from the current annotation's metadata.
+     * 
+     * Note: "State metadata" = "annotation metadata" (see getCurrentStateMetadata).
+     * 
      * @param {string} key - The metadata key to delete
      * @returns {boolean} True if the key was deleted
      */
@@ -698,7 +729,10 @@ export class MeshObject {
     }
     
     /**
-     * Update multiple keys in the current state's metadata.
+     * Update multiple keys in the current annotation's metadata.
+     * 
+     * Note: "State metadata" = "annotation metadata" (see getCurrentStateMetadata).
+     * 
      * @param {Object} updates - Object containing key-value pairs
      */
     updateCurrentStateMetadata(updates) {

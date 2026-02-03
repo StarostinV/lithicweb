@@ -190,14 +190,14 @@ class LithicClient {
      * Get a specific session
      */
     async getSession(sessionId) {
-        return this.request(`/inference/sessions/${sessionId}`);
+        return this.request(`/inference/sessions/${encodeURIComponent(sessionId)}`);
     }
 
     /**
      * Delete a session
      */
     async deleteSession(sessionId) {
-        return this.request(`/inference/sessions/${sessionId}`, {
+        return this.request(`/inference/sessions/${encodeURIComponent(sessionId)}`, {
             method: 'DELETE'
         });
     }
@@ -206,7 +206,7 @@ class LithicClient {
      * Update session configuration
      */
     async updateSessionConfig(sessionId, config) {
-        return this.request(`/inference/sessions/${sessionId}/config`, {
+        return this.request(`/inference/sessions/${encodeURIComponent(sessionId)}/config`, {
             method: 'PATCH',
             body: JSON.stringify(config)
         });
@@ -215,11 +215,14 @@ class LithicClient {
     // ============== File Endpoints ==============
 
     /**
-     * Upload a PLY file
+     * Upload a PLY file (creates a new mesh folder)
      */
-    async uploadFile(file) {
+    async uploadFile(file, description = '') {
         const formData = new FormData();
         formData.append('file', file);
+        if (description) {
+            formData.append('description', description);
+        }
         
         return this.request('/files/upload', {
             method: 'POST',
@@ -228,24 +231,117 @@ class LithicClient {
     }
 
     /**
-     * List all files
+     * List all meshes for current user
      */
     async listFiles() {
         return this.request('/files/');
     }
 
     /**
-     * Get file metadata
+     * Get mesh metadata
      */
-    async getFileMetadata(filename) {
-        return this.request(`/files/${filename}/metadata`);
+    async getFileMetadata(meshId) {
+        return this.request(`/files/${encodeURIComponent(meshId)}/metadata`);
     }
 
     /**
-     * Delete a file
+     * Download mesh PLY file
      */
-    async deleteFile(filename) {
-        return this.request(`/files/${filename}`, {
+    async downloadFile(meshId) {
+        const response = await this.request(`/files/${encodeURIComponent(meshId)}/download`);
+        return response;
+    }
+
+    /**
+     * Rename a mesh (display name only)
+     */
+    async renameFile(meshId, newName) {
+        return this.request(`/files/${encodeURIComponent(meshId)}/rename`, {
+            method: 'PATCH',
+            body: JSON.stringify({ new_name: newName })
+        });
+    }
+
+    /**
+     * Delete a mesh and all its states
+     */
+    async deleteFile(meshId) {
+        return this.request(`/files/${encodeURIComponent(meshId)}`, {
+            method: 'DELETE'
+        });
+    }
+
+    // ============== State Management Endpoints ==============
+
+    /**
+     * List all states for a mesh
+     * @param {string} meshId - The mesh folder ID
+     * @returns {Promise<{mesh_id: string, states: Array, total_count: number}>}
+     */
+    async listStates(meshId) {
+        return this.request(`/files/${encodeURIComponent(meshId)}/states`);
+    }
+
+    /**
+     * Save an annotation state for a mesh
+     * @param {string} meshId - The mesh folder ID
+     * @param {Array<number>} edgeIndices - Array of vertex indices that are edges
+     * @param {string} name - Display name for the state
+     * @param {string} description - Optional description
+     * @param {Object} metadata - Optional additional metadata
+     * @returns {Promise<{state_id: string, name: string, created_at: string, edge_count: number}>}
+     */
+    async saveState(meshId, edgeIndices, name = '', description = '', metadata = null) {
+        return this.request(`/files/${encodeURIComponent(meshId)}/states`, {
+            method: 'POST',
+            body: JSON.stringify({
+                edge_indices: edgeIndices,
+                name: name,
+                description: description,
+                metadata: metadata
+            })
+        });
+    }
+
+    /**
+     * Load a state with full data (edge indices and metadata)
+     * @param {string} meshId - The mesh folder ID
+     * @param {string} stateId - The state ID
+     * @returns {Promise<{state_id: string, edge_indices: Array<number>, metadata: Object}>}
+     */
+    async loadState(meshId, stateId) {
+        return this.request(`/files/${encodeURIComponent(meshId)}/states/${encodeURIComponent(stateId)}`);
+    }
+
+    /**
+     * Get state metadata only (without edge indices)
+     * @param {string} meshId - The mesh folder ID
+     * @param {string} stateId - The state ID
+     */
+    async getStateMetadata(meshId, stateId) {
+        return this.request(`/files/${encodeURIComponent(meshId)}/states/${encodeURIComponent(stateId)}/metadata`);
+    }
+
+    /**
+     * Rename a state
+     * @param {string} meshId - The mesh folder ID
+     * @param {string} stateId - The state ID
+     * @param {string} newName - New display name
+     */
+    async renameState(meshId, stateId, newName) {
+        return this.request(`/files/${encodeURIComponent(meshId)}/states/${encodeURIComponent(stateId)}/rename`, {
+            method: 'PATCH',
+            body: JSON.stringify({ new_name: newName })
+        });
+    }
+
+    /**
+     * Delete a state
+     * @param {string} meshId - The mesh folder ID
+     * @param {string} stateId - The state ID
+     */
+    async deleteState(meshId, stateId) {
+        return this.request(`/files/${encodeURIComponent(meshId)}/states/${encodeURIComponent(stateId)}`, {
             method: 'DELETE'
         });
     }
@@ -256,7 +352,7 @@ class LithicClient {
      * Load data from stored file into session
      */
     async loadFileIntoSession(sessionId, filename) {
-        return this.request(`/inference/sessions/${sessionId}/load-file`, {
+        return this.request(`/inference/sessions/${encodeURIComponent(sessionId)}/load-file`, {
             method: 'POST',
             body: JSON.stringify({ filename })
         });
@@ -272,7 +368,7 @@ class LithicClient {
      * @param {string} name - Optional name for reference
      */
     async loadMeshDirectly(sessionId, vertices, faces, name = 'mesh') {
-        return this.request(`/inference/sessions/${sessionId}/load-direct`, {
+        return this.request(`/inference/sessions/${encodeURIComponent(sessionId)}/load-direct`, {
             method: 'POST',
             body: JSON.stringify({ vertices, faces, name })
         });
@@ -282,7 +378,7 @@ class LithicClient {
      * Run inference on session data
      */
     async runInference(sessionId) {
-        return this.request(`/inference/sessions/${sessionId}/run`, {
+        return this.request(`/inference/sessions/${encodeURIComponent(sessionId)}/run`, {
             method: 'POST'
         });
     }

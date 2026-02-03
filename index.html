@@ -29,6 +29,13 @@
             </div>
             <div class="navbar-divider"></div>
             <div class="file-section">
+                <button id="navbarConnectBtn" class="file-btn connect-btn" title="Not connected - Click to configure">
+                    <span id="navbarConnectionStatus" class="navbar-connection-status">
+                        <i class="fas fa-circle status-dot disconnected"></i>
+                    </span>
+                    <i class="fas fa-plug"></i>
+                    <span>Connect</span>
+                </button>
                 <label for="fileInput" class="file-btn" title="Open PLY or MAT file">
                     <i class="fas fa-folder-open"></i>
                     <span>Open</span>
@@ -85,6 +92,15 @@
                     <button id="evaluationPanelBtn" class="nav-btn" title="Compare & Evaluate">
                         <i class="fas fa-chart-bar"></i>
                         <span>Evaluation</span>
+                    </button>
+                </div>
+            </div>
+            <div class="nav-group">
+                <span class="nav-group-label">Cloud</span>
+                <div class="nav-group-buttons">
+                    <button id="cloudStoragePanelBtn" class="nav-btn" title="Cloud Storage">
+                        <i class="fas fa-cloud"></i>
+                        <span>Storage</span>
                     </button>
                 </div>
             </div>
@@ -616,7 +632,7 @@
                 <div class="panel-section">
                     <div class="section-header">
                         <i class="fas fa-globe"></i>
-                        <span>Shared Metadata</span>
+                        <span>Mesh Metadata (shared across all annotations)</span>
                     </div>
                     <div class="section-content">
                         <p class="help-text" style="margin-top: 0; margin-bottom: 8px;">Persisted across all history states</p>
@@ -630,19 +646,19 @@
                     </div>
                 </div>
                 
-                <!-- State-Specific Metadata -->
+                <!-- Annotation-Specific Metadata -->
                 <div id="stateMetadataSection" class="panel-section">
                     <div class="section-header">
                         <i class="fas fa-layer-group"></i>
-                        <span>State Metadata</span>
+                        <span>Annotation Metadata</span>
                         <span id="stateMetadataBadge" class="section-badge">(Initial State)</span>
                     </div>
                     <div class="section-content">
-                        <p class="help-text" style="margin-top: 0; margin-bottom: 8px;">Unique to current history state</p>
+                        <p class="help-text" style="margin-top: 0; margin-bottom: 8px;">Unique to current annotation (history state)</p>
                         <div id="stateMetadataList" class="metadata-list state-metadata-list">
                             <div class="metadata-empty state-metadata-empty">
                                 <i class="fas fa-layer-group"></i>
-                                <p>No state-specific metadata</p>
+                                <p>No annotation-specific metadata</p>
                                 <p class="text-muted">Evaluation metrics will appear here</p>
                             </div>
                         </div>
@@ -663,10 +679,10 @@
                             </div>
                             <div class="metadata-btn-row">
                                 <button id="addMetadataBtn" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-globe"></i> Add Shared
+                                    <i class="fas fa-globe"></i> Add to Mesh
                                 </button>
                                 <button id="addStateMetadataBtn" class="btn btn-warning btn-sm">
-                                    <i class="fas fa-layer-group"></i> Add to State
+                                    <i class="fas fa-layer-group"></i> Add to Annotation
                                 </button>
                             </div>
                         </div>
@@ -886,6 +902,70 @@
             </div>
         </div>
         
+        <!-- ===== CLOUD STORAGE PANEL ===== -->
+        <div id="cloudStoragePanel" class="panel hidden">
+            <div class="panel-header">
+                <div class="panel-header-icon cloud-icon"><i class="fas fa-cloud"></i></div>
+                <div class="panel-header-text">
+                    <h2>Cloud Storage</h2>
+                    <span class="panel-subtitle">Meshes & annotation states</span>
+                </div>
+            </div>
+            <div class="panel-content">
+                <!-- Status & Actions -->
+                <div class="panel-section">
+                    <div class="cloud-storage-header">
+                        <div id="cloudStorageStatus" class="cloud-storage-status info">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Connect to server to view storage</span>
+                        </div>
+                        <div class="cloud-storage-actions">
+                            <button id="refreshCloudStorageBtn" class="icon-btn" title="Refresh">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upload & Save Actions -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-upload"></i>
+                        <span>Actions</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="btn-group-vertical">
+                            <button id="uploadMeshToCloudBtn" class="btn btn-primary btn-sm">
+                                <i class="fas fa-cloud-upload-alt"></i> Upload Meshes from local files
+                            </button>
+                            <input type="file" id="cloudMeshUploadInput" accept=".ply" class="hidden-file-input" multiple>
+                            <button id="saveStateToCloudBtn" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-save"></i> Save Current Annotation
+                            </button>
+                        </div>
+                        <p class="help-text">Upload PLY meshes to cloud storage (supports multiple files - use Shift+Click). Annotations in uploaded files are saved separately. Use "Save Current Annotation" for the currently viewed mesh.</p>
+                    </div>
+                </div>
+
+                <!-- Mesh List -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-cube"></i>
+                        <span>Meshes</span>
+                    </div>
+                    <div class="section-content cloud-mesh-list-container">
+                        <div id="cloudMeshList" class="cloud-mesh-list">
+                            <div class="empty-state">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>No meshes stored yet</p>
+                                <p class="text-xs text-gray-500">Upload a mesh to get started</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ===== SETTINGS PANEL ===== -->
         <div id="settingsPanel" class="panel hidden">
             <div class="panel-header">
@@ -994,6 +1074,78 @@
         </div>
     </div>
     
+
+    <!-- Save Annotation Modal -->
+    <div id="saveAnnotationModal" class="modal">
+        <div class="settings-modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-cloud-upload-alt"></i> Save Annotation to Cloud</h2>
+                <button class="modal-close" id="saveAnnotationModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Cloud Status Indicator -->
+                <div id="saveAnnotationStatus" class="save-annotation-status">
+                    <div class="status-icon">
+                        <i class="fas fa-cloud"></i>
+                    </div>
+                    <div class="status-text">
+                        <span class="status-title">Mesh not in cloud</span>
+                        <span class="status-subtitle">Will upload mesh first</span>
+                    </div>
+                </div>
+
+                <!-- Mesh Name Section -->
+                <div class="form-group">
+                    <label for="saveAnnotationMeshName">
+                        <i class="fas fa-cube"></i> Mesh Name
+                    </label>
+                    <input type="text" id="saveAnnotationMeshName" class="form-input" placeholder="Enter mesh name...">
+                    <p class="form-help" id="saveAnnotationMeshHelp">This name will be used when uploading the mesh to cloud storage.</p>
+                </div>
+
+                <!-- Annotation Name Section -->
+                <div class="form-group">
+                    <label for="saveAnnotationName">
+                        <i class="fas fa-layer-group"></i> Annotation Name
+                    </label>
+                    <input type="text" id="saveAnnotationName" class="form-input" placeholder="Enter annotation name...">
+                    <p class="form-help">A descriptive name to identify this annotation later.</p>
+                </div>
+
+                <!-- Mesh Metadata Preview Section (only shown when uploading mesh) -->
+                <div class="form-group" id="saveMeshMetadataSection" style="display: none;">
+                    <label>
+                        <i class="fas fa-cube"></i> Mesh Metadata
+                        <span class="label-badge" id="saveMeshMetadataCount">0 entries</span>
+                    </label>
+                    <div id="saveMeshMetadataPreview" class="metadata-preview">
+                        <div class="metadata-empty">No mesh metadata</div>
+                    </div>
+                    <p class="form-help">Metadata saved with the mesh file.</p>
+                </div>
+
+                <!-- Annotation Metadata Preview Section -->
+                <div class="form-group">
+                    <label>
+                        <i class="fas fa-layer-group"></i> Annotation Metadata
+                        <span class="label-badge" id="saveAnnotationMetadataCount">0 entries</span>
+                    </label>
+                    <div id="saveAnnotationMetadataPreview" class="metadata-preview">
+                        <div class="metadata-empty">No annotation metadata</div>
+                    </div>
+                    <p class="form-help">Metadata saved with this annotation (e.g., evaluation metrics).</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="saveAnnotationCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveAnnotationConfirmBtn">
+                    <i class="fas fa-cloud-upload-alt"></i> <span id="saveAnnotationConfirmText">Upload & Save</span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- The Modal -->
     <div id="docModal" class="modal">
@@ -1399,6 +1551,40 @@ Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.staros
         .file-btn-export:hover {
             background: var(--primary-500);
             border-color: var(--primary-400);
+        }
+        
+        /* Connect button styles */
+        .connect-btn {
+            position: relative;
+        }
+        
+        .connect-btn.connected {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: var(--success);
+            color: var(--success);
+        }
+        
+        .connect-btn.connected:hover {
+            background: rgba(16, 185, 129, 0.25);
+            border-color: var(--success);
+        }
+        
+        .navbar-connection-status {
+            display: flex;
+            align-items: center;
+            margin-right: 2px;
+        }
+        
+        .navbar-connection-status .status-dot {
+            font-size: 8px;
+        }
+        
+        .navbar-connection-status .status-dot.connected {
+            color: var(--success);
+        }
+        
+        .navbar-connection-status .status-dot.disconnected {
+            color: var(--danger);
         }
         
         .file-name-display {
@@ -2717,6 +2903,8 @@ Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.staros
     max-width: 480px;
     border-radius: 12px;
     overflow: hidden;
+    background: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 .modal-header {
@@ -2873,6 +3061,208 @@ Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.staros
 .settings-result.hidden {
     display: none;
 }
+
+/* Modal footer */
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 20px;
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-200);
+}
+
+/* Save Annotation Modal styles */
+.save-annotation-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+}
+
+.save-annotation-status .status-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--gray-200);
+    color: var(--gray-500);
+    font-size: 18px;
+}
+
+.save-annotation-status .status-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.save-annotation-status .status-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.save-annotation-status .status-subtitle {
+    font-size: 11px;
+    color: var(--gray-500);
+}
+
+/* Cloud connected state */
+.save-annotation-status.cloud-connected {
+    background: #dcfce7;
+    border-color: #bbf7d0;
+}
+
+.save-annotation-status.cloud-connected .status-icon {
+    background: #22c55e;
+    color: white;
+}
+
+.save-annotation-status.cloud-connected .status-title {
+    color: #166534;
+}
+
+.save-annotation-status.cloud-connected .status-subtitle {
+    color: #15803d;
+}
+
+/* Not connected state */
+.save-annotation-status.not-connected {
+    background: #fef3c7;
+    border-color: #fde68a;
+}
+
+.save-annotation-status.not-connected .status-icon {
+    background: #f59e0b;
+    color: white;
+}
+
+.save-annotation-status.not-connected .status-title {
+    color: #92400e;
+}
+
+.save-annotation-status.not-connected .status-subtitle {
+    color: #b45309;
+}
+
+/* Form label with icon */
+.form-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 6px;
+}
+
+.form-group label i {
+    color: var(--gray-400);
+    font-size: 11px;
+}
+
+.label-badge {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 6px;
+    background: var(--gray-200);
+    color: var(--gray-600);
+    border-radius: 10px;
+    margin-left: auto;
+}
+
+.form-help {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-top: 4px;
+    margin-bottom: 0;
+}
+
+/* Read-only input */
+.form-input.readonly {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+}
+
+/* Metadata preview */
+.metadata-preview {
+    max-height: 150px;
+    overflow-y: auto;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    font-size: 11px;
+}
+
+.metadata-preview .metadata-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--gray-400);
+    font-style: italic;
+}
+
+.metadata-preview-item {
+    display: flex;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.metadata-preview-item:last-child {
+    border-bottom: none;
+}
+
+.metadata-preview-key {
+    font-weight: 600;
+    color: var(--gray-600);
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+.metadata-preview-value {
+    color: var(--gray-700);
+    word-break: break-word;
+}
+
+/* Connection modal info section */
+.connection-info-section {
+    margin-top: 24px;
+}
+
+.section-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: var(--gray-400);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.section-divider::before,
+.section-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.section-divider span {
+    padding: 0 12px;
+}
+
+.connection-info-text {
+    font-size: 12px;
+    color: var(--gray-500);
+    line-height: 1.5;
+}
+
 .modal-content {
     background-color: #fefefe;
     margin: auto;
@@ -4469,6 +4859,319 @@ Vladimir Starostin: [vladimir.starostin@uni-tuebingen.de](mailto:vladimir.staros
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid #e5e7eb;
+}
+
+/* ===== CLOUD STORAGE PANEL ===== */
+.cloud-icon {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.cloud-storage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.cloud-storage-status {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.cloud-storage-status.info {
+    background: var(--gray-50);
+    color: var(--gray-600);
+    border: 1px solid var(--gray-200);
+}
+
+.cloud-storage-status.success {
+    background: rgba(34, 197, 94, 0.1);
+    color: #15803d;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.cloud-storage-status.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.cloud-storage-status.warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: #b45309;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.cloud-storage-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.cloud-mesh-list-container {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.cloud-mesh-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cloud-mesh-item {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.cloud-mesh-item:hover {
+    border-color: var(--primary-light);
+}
+
+.cloud-mesh-item.current {
+    border-color: var(--primary);
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.cloud-mesh-item.current .mesh-item-name {
+    color: var(--primary);
+}
+
+.mesh-item-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    cursor: pointer;
+}
+
+.mesh-item-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--gray-200) 0%, var(--gray-300) 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-600);
+}
+
+.cloud-mesh-item.current .mesh-item-icon {
+    background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%);
+    color: white;
+}
+
+.mesh-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.mesh-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-800);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mesh-item-meta {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-top: 2px;
+}
+
+.mesh-item-meta .state-count {
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.mesh-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mesh-item-actions .icon-btn {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.cloud-mesh-item:hover .mesh-item-actions .icon-btn {
+    opacity: 1;
+}
+
+.expand-icon {
+    color: var(--gray-400);
+    font-size: 10px;
+    margin-left: 4px;
+    transition: transform 0.2s;
+}
+
+.cloud-mesh-item.expanded .expand-icon {
+    transform: rotate(180deg);
+}
+
+.mesh-item-states {
+    display: none;
+    border-top: 1px solid var(--gray-200);
+    background: white;
+    padding: 12px;
+}
+
+.cloud-mesh-item.expanded .mesh-item-states {
+    display: block;
+}
+
+.states-loading,
+.states-error,
+.states-empty {
+    text-align: center;
+    padding: 20px;
+    font-size: 12px;
+    color: var(--gray-500);
+}
+
+.states-error {
+    color: var(--danger);
+}
+
+.states-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cloud-state-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.cloud-state-item:hover {
+    background: white;
+    border-color: var(--primary-light);
+}
+
+.state-item-icon {
+    width: 28px;
+    height: 28px;
+    background: var(--gray-200);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-500);
+    font-size: 12px;
+}
+
+.state-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.state-item-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gray-700);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.state-item-meta {
+    font-size: 10px;
+    color: var(--gray-500);
+    margin-top: 2px;
+}
+
+.state-item-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.state-item-actions .icon-btn {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.cloud-state-item:hover .state-item-actions .icon-btn {
+    opacity: 1;
+}
+
+.icon-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--gray-500);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.icon-btn:hover {
+    background: var(--gray-200);
+    color: var(--gray-700);
+}
+
+.icon-btn:hover .fa-trash {
+    color: var(--danger);
+}
+
+.icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--gray-500);
+}
+
+.empty-state i {
+    font-size: 32px;
+    color: var(--gray-300);
+    margin-bottom: 12px;
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 13px;
+}
+
+/* Cloud connection indicator on save button */
+#saveStateToCloudBtn.cloud-connected {
+    border-color: var(--success);
+    position: relative;
+}
+
+#saveStateToCloudBtn.cloud-connected::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 8px;
+    height: 8px;
+    background: var(--success);
+    border-radius: 50%;
+    border: 2px solid white;
 }
     </style>
 </body>

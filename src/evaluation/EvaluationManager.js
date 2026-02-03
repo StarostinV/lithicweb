@@ -63,6 +63,34 @@ export class EvaluationManager {
 
         // Segmenter for computing segments on arbitrary edge states
         this.segmenter = new MeshSegmenter(meshObject);
+        
+        // Listen to history changes to clear stale evaluation labels
+        this._setupHistoryListener();
+    }
+    
+    /**
+     * Setup listener for history changes.
+     * Clears evaluation labels when history is cleared (e.g., new mesh loaded).
+     * @private
+     */
+    _setupHistoryListener() {
+        let previousTotalStates = this.meshObject.history.getTotalStates();
+        
+        this.meshObject.history.addListener((history) => {
+            const currentTotal = history.getTotalStates();
+            
+            // If history was cleared (total states reset to 1 = initial state only)
+            // and we had previous states, clear evaluation labels
+            if (currentTotal === 1 && previousTotalStates > 1) {
+                console.log('[EvaluationManager] History cleared, resetting evaluation labels');
+                this.groundTruth = null;
+                this.prediction = null;
+                this.metricsResult = null;
+                this._notifyListeners();
+            }
+            
+            previousTotalStates = currentTotal;
+        });
     }
 
     /**

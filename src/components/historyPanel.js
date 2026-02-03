@@ -224,6 +224,8 @@ export class HistoryPanel {
             icon = '<i class="fas fa-eraser"></i>';
         } else if (action.type === 'model') {
             icon = '<i class="fas fa-brain text-purple-600"></i>';
+        } else if (action.type === 'cloud') {
+            icon = '<i class="fas fa-cloud-download-alt text-blue-500"></i>';
         }
         
         // Use custom description if available

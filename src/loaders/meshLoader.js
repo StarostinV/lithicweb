@@ -164,54 +164,77 @@ export default class MeshLoader {
     load(event) {
         const file = event.target.files[0];
         if (!file) return;
-        this.currentFileName = file.name.substring(0, file.name.lastIndexOf('.'));
+        this.loadFile(file);
+    }
     
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const data = event.target.result;
-            let positions, labels, indices, arrows, metadata, comments; 
-
-            if (file.name.endsWith('.ply')) {
-                ({ positions, labels, indices, arrows, metadata, comments } = this.readPLY(data));
-                debugGlobalVar['ply'] = {
-                    positions: positions,
-                    labels: labels,
-                    indices: indices,
-                    arrows: arrows,
-                    metadata: metadata,
-                    comments: comments
-                }
-            } else if (file.name.endsWith('.mat')) {
-                ({ positions, labels, indices, arrows, metadata, comments } = this.readMAT(data));
-            } else {
-                console.error('Unsupported file format');
-                return;
-            }
-
-            if (positions.length === 0) {
-                console.error('No data found in the file');
+    /**
+     * Load a mesh from a File object directly.
+     * Supports PLY and MAT file formats.
+     * 
+     * @param {File} file - The File object to load
+     * @returns {Promise<void>} Resolves when the file is loaded
+     */
+    loadFile(file) {
+        return new Promise((resolve, reject) => {
+            if (!file) {
+                reject(new Error('No file provided'));
                 return;
             }
             
-            // Store metadata and comments
-            this.metadata = metadata || {};
-            this.comments = comments || [];
+            this.currentFileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
         
-            this.meshObject.setMesh(positions, labels, indices, this.metadata);
-            this.arrowDrawer.clear();
-            this.arrowDrawer.load(arrows);
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const data = event.target.result;
+                let positions, labels, indices, arrows, metadata, comments; 
+
+                if (file.name.endsWith('.ply')) {
+                    ({ positions, labels, indices, arrows, metadata, comments } = this.readPLY(data));
+                    debugGlobalVar['ply'] = {
+                        positions: positions,
+                        labels: labels,
+                        indices: indices,
+                        arrows: arrows,
+                        metadata: metadata,
+                        comments: comments
+                    }
+                } else if (file.name.endsWith('.mat')) {
+                    ({ positions, labels, indices, arrows, metadata, comments } = this.readMAT(data));
+                } else {
+                    reject(new Error('Unsupported file format'));
+                    return;
+                }
+
+                if (positions.length === 0) {
+                    reject(new Error('No data found in the file'));
+                    return;
+                }
+                
+                // Store metadata and comments
+                this.metadata = metadata || {};
+                this.comments = comments || [];
             
-            // Apply state-metadata to initial state if present in loaded metadata
-            if (this.metadata['state-metadata']) {
-                this.meshObject.history.updateStateMetadata(0, this.metadata['state-metadata']);
-                delete this.metadata['state-metadata'];
-            }
+                this.meshObject.setMesh(positions, labels, indices, this.metadata);
+                this.arrowDrawer.clear();
+                this.arrowDrawer.load(arrows);
+                
+                // Apply state-metadata to initial state if present in loaded metadata
+                if (this.metadata['state-metadata']) {
+                    this.meshObject.history.updateStateMetadata(0, this.metadata['state-metadata']);
+                    delete this.metadata['state-metadata'];
+                }
+                
+                // Notify listeners that a file was loaded
+                this.notifyLoadListeners();
+                resolve();
+            };
             
-            // Notify listeners that a file was loaded
-            this.notifyLoadListeners();
-        };
-    
-        reader.readAsArrayBuffer(file);
+            reader.onerror = () => {
+                reject(new Error('Failed to read file'));
+            };
+        
+            reader.readAsArrayBuffer(file);
+        });
     }
     
     /**

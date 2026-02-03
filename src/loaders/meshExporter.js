@@ -13,7 +13,7 @@ const METADATA_JSON_PREFIX = 'metadata:json ';
  * @param {Object} metadata - Key-value pairs to serialize
  * @returns {string} PLY comment lines for the metadata
  */
-function serializeMetadata(metadata) {
+export function serializeMetadata(metadata) {
     if (!metadata || typeof metadata !== 'object') {
         return '';
     }
@@ -170,4 +170,52 @@ end_header
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+/**
+ * Export mesh geometry with metadata to a PLY Blob (without downloading).
+ * This is used for cloud upload where we need just the geometry and metadata,
+ * not the annotations (which are saved separately).
+ * 
+ * @param {Float32Array} positions - Vertex positions array
+ * @param {Uint32Array|Array} indices - Face indices array
+ * @param {Object} metadata - Metadata to include in the PLY file
+ * @returns {Blob} PLY file as a Blob
+ */
+export function exportMeshToBlob(positions, indices, metadata = {}) {
+    const numVertices = positions.length / 3;
+    const numFaces = indices.length / 3;
+    
+    // Serialize metadata to PLY comment lines
+    const metadataComments = serializeMetadata(metadata);
+    
+    // Build PLY header with metadata comments (ASCII format for simplicity)
+    let ply = 'ply\n';
+    ply += 'format ascii 1.0\n';
+    ply += metadataComments;
+    ply += `element vertex ${numVertices}\n`;
+    ply += 'property float x\n';
+    ply += 'property float y\n';
+    ply += 'property float z\n';
+    ply += `element face ${numFaces}\n`;
+    ply += 'property list uchar int vertex_indices\n';
+    ply += 'end_header\n';
+    
+    // Add vertices
+    for (let i = 0; i < numVertices; i++) {
+        const x = positions[i * 3];
+        const y = positions[i * 3 + 1];
+        const z = positions[i * 3 + 2];
+        ply += `${x} ${y} ${z}\n`;
+    }
+    
+    // Add faces
+    for (let i = 0; i < numFaces; i++) {
+        const a = indices[i * 3];
+        const b = indices[i * 3 + 1];
+        const c = indices[i * 3 + 2];
+        ply += `3 ${a} ${b} ${c}\n`;
+    }
+    
+    return new Blob([ply], { type: 'text/plain' });
 }

@@ -1,9 +1,26 @@
 /**
  * MetadataPanel - UI component for viewing and editing mesh metadata.
  * 
+ * ## Metadata Types
+ * 
+ * There are two types of metadata in this application:
+ * 
+ * 1. **Mesh Metadata** (shared metadata):
+ *    - Belongs to the mesh itself
+ *    - Persisted across all annotation states
+ *    - Examples: author, description, mesh source, creation date
+ *    - Stored in meshObject.metadata and meshLoader.metadata
+ * 
+ * 2. **Annotation Metadata** (state metadata):
+ *    - Belongs to a specific annotation state
+ *    - Unique per history state, NOT shared across states
+ *    - Examples: evaluation metrics (precision, recall, F1), model parameters
+ *    - Stored per-action in the history system
+ *    - Note: Called "state metadata" in code for historical reasons
+ * 
  * Provides a visual interface to:
- * - View shared metadata (persisted across all states)
- * - View state-specific metadata (unique per history state, e.g., evaluation metrics)
+ * - View mesh metadata (persisted across all states)
+ * - View annotation metadata (unique per history state, e.g., evaluation metrics)
  * - Add new metadata entries
  * - Edit existing values
  * - Delete metadata entries
@@ -22,7 +39,7 @@ export class MetadataPanel {
         this.meshObject = meshObject;
         this.meshLoader = meshLoader;
         
-        // UI Elements - Shared Metadata
+        // UI Elements - Mesh Metadata (shared across all states)
         this.metadataList = document.getElementById('metadataList');
         this.addMetadataBtn = document.getElementById('addMetadataBtn');
         this.addStateMetadataBtn = document.getElementById('addStateMetadataBtn');
@@ -32,7 +49,7 @@ export class MetadataPanel {
         this.commentsSection = document.getElementById('commentsSection');
         this.commentsList = document.getElementById('commentsList');
         
-        // UI Elements - State Metadata
+        // UI Elements - Annotation Metadata (state-specific, unique per annotation)
         this.stateMetadataSection = document.getElementById('stateMetadataSection');
         this.stateMetadataList = document.getElementById('stateMetadataList');
         this.stateMetadataBadge = document.getElementById('stateMetadataBadge');
@@ -45,7 +62,7 @@ export class MetadataPanel {
             this.updateUI();
         });
         
-        // Subscribe to history changes to update state-metadata display
+        // Subscribe to history changes to update annotation metadata display
         this.meshObject.history.addListener(() => {
             this.updateStateMetadataUI();
         });
@@ -418,7 +435,7 @@ export class MetadataPanel {
             this.stateMetadataList.innerHTML = `
                 <div class="metadata-empty state-metadata-empty">
                     <i class="fas fa-layer-group"></i>
-                    <p>No state-specific metadata</p>
+                    <p>No annotation-specific metadata</p>
                     <p class="text-xs text-gray-400">Evaluation metrics will appear here when computed</p>
                 </div>
             `;

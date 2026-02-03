@@ -10,10 +10,12 @@ import DrawBrush from './components/drawBrush.js';
 import { HistoryPanel } from './components/historyPanel.js';
 import { ModelPanel } from './components/modelPanel.js';
 import { MetadataPanel } from './components/metadataPanel.js';
+import { ConnectionManager } from './components/connectionManager.js';
 import { EvaluationManager } from './evaluation/EvaluationManager.js';
 import { EvaluationPanel } from './components/evaluationPanel.js';
 import { RenderingPanel } from './components/renderingPanel.js';
 import { UserConfig } from './utils/UserConfig.js';
+import { CloudStoragePanel } from './components/cloudStoragePanel.js';
 
 //colors
 const drawColor = new THREE.Color(1, 0.6, 0.2); // Orange
@@ -47,8 +49,11 @@ const evaluationManager = new EvaluationManager(meshObject);
 const historyPanel = new HistoryPanel(meshObject);
 historyPanel.setEvaluationManager(evaluationManager);
 
+// Connection manager (shared across app for server connection)
+const connectionManager = new ConnectionManager();
+
 // Model panel (AI inference) - with evaluation manager to auto-assign predictions
-const modelPanel = new ModelPanel(meshObject);
+const modelPanel = new ModelPanel(meshObject, connectionManager);
 modelPanel.setEvaluationManager(evaluationManager);
 
 // Evaluation panel
@@ -56,6 +61,12 @@ const evaluationPanel = new EvaluationPanel(meshObject, evaluationManager);
 
 // Metadata panel
 const metadataPanel = new MetadataPanel(meshObject, meshLoader);
+
+// Cloud storage panel
+const cloudStoragePanel = new CloudStoragePanel(meshObject, meshLoader, connectionManager);
+
+// Wire up cloud storage panel to model panel for optimized mesh loading
+modelPanel.setCloudStoragePanel(cloudStoragePanel);
 
 // Rendering panel (view mode controls) - with userConfig for persistence
 const renderingPanel = new RenderingPanel(scene, meshObject, userConfig);
@@ -189,6 +200,14 @@ document.getElementById('metadataPanelBtn').addEventListener('click', () => {
 document.getElementById('evaluationPanelBtn').addEventListener('click', () => {
     showHidePanel('evaluationPanel');
     setActiveNavBtn('evaluationPanelBtn');
+    mode.setMode(MODES.VIEW, true);
+});
+
+document.getElementById('cloudStoragePanelBtn').addEventListener('click', () => {
+    showHidePanel('cloudStoragePanel', {
+        onShow: () => cloudStoragePanel.onShow()
+    });
+    setActiveNavBtn('cloudStoragePanelBtn');
     mode.setMode(MODES.VIEW, true);
 });
 
@@ -381,10 +400,12 @@ window.addEventListener('resize', updateRendererSize);
 updateRendererSize();
 
 // Export for debugging
+window.debugGlobalVar.connectionManager = connectionManager;
 window.debugGlobalVar.evaluationManager = evaluationManager;
 window.debugGlobalVar.meshObject = meshObject;
 window.debugGlobalVar.meshLoader = meshLoader;
 window.debugGlobalVar.metadataPanel = metadataPanel;
+window.debugGlobalVar.cloudStoragePanel = cloudStoragePanel;
 window.debugGlobalVar.renderingPanel = renderingPanel;
 window.debugGlobalVar.scene = scene;
 window.debugGlobalVar.userConfig = userConfig;
