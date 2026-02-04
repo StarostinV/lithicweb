@@ -1,0 +1,228 @@
+/**
+ * History Panel Styles
+ * ====================
+ * Undo/redo history and timeline display.
+ */
+
+.section-content.history-timeline {
+    flex: 1;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Undo/Redo Buttons Container */
+.undo-redo-buttons {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.history-controls {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.history-stats {
+    text-align: center;
+    font-size: 12px;
+    color: var(--gray-500);
+    padding: 8px;
+    background: var(--gray-50);
+    border-radius: 6px;
+}
+
+.history-stats i {
+    margin-right: 4px;
+}
+
+.history-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+#historyList {
+    min-height: 100px;
+}
+
+#historyList::-webkit-scrollbar {
+    width: 6px;
+}
+
+#historyList::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+#historyList::-webkit-scrollbar-thumb {
+    background: #c4c4c4;
+    border-radius: 3px;
+}
+
+#historyList::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.history-empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--gray-400);
+}
+
+.history-empty i {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.history-empty p {
+    margin: 4px 0;
+}
+
+/* History Item */
+.history-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.history-item:hover {
+    border-color: var(--primary-light);
+    background: var(--gray-50);
+}
+
+.history-item.current {
+    border-color: var(--primary);
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.history-item.future {
+    opacity: 0.5;
+}
+
+.history-item-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    background: var(--gray-100);
+    color: var(--gray-500);
+    flex-shrink: 0;
+}
+
+.history-item.current .history-item-icon {
+    background: var(--primary);
+    color: white;
+}
+
+.history-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-item-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gray-800);
+    margin-bottom: 2px;
+}
+
+.history-item-meta {
+    font-size: 10px;
+    color: var(--gray-500);
+}
+
+.history-item-time {
+    font-size: 10px;
+    color: var(--gray-400);
+    flex-shrink: 0;
+}
+
+/* Evaluation Labels on History Items */
+.eval-btn {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    opacity: 0.6;
+}
+
+.eval-btn:hover {
+    opacity: 1;
+}
+
+.eval-btn.gt-btn {
+    border-color: #10b981;
+    color: #10b981;
+    background: transparent;
+}
+
+.eval-btn.gt-btn.active {
+    background: #10b981;
+    color: white;
+    opacity: 1;
+}
+
+.eval-btn.pred-btn {
+    border-color: #8b5cf6;
+    color: #8b5cf6;
+    background: transparent;
+}
+
+.eval-btn.pred-btn.active {
+    background: #8b5cf6;
+    color: white;
+    opacity: 1;
+}
+
+.eval-labels {
+    display: flex;
+    gap: 4px;
+}
+
+.eval-label {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.eval-label.gt-label {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.eval-label.pred-label {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+/* Alternate eval label styles */
+.eval-label.gt-label {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.eval-label.pred-label {
+    background: #ede9fe;
+    color: #5b21b6;
+}

@@ -1,0 +1,272 @@
+/**
+ * Navbar Styles
+ * =============
+ * Main navigation bar at the top of the application.
+ */
+
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--navbar-height);
+    background: linear-gradient(135deg, var(--gray-900) 0%, var(--gray-800) 100%);
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+}
+
+.navbar-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+    padding: 0 16px;
+    max-width: 100%;
+}
+
+/* Navbar Left Section */
+.navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.brand-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--purple) 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 16px;
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: -0.5px;
+}
+
+.brand-subtitle {
+    font-size: 10px;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.navbar-divider {
+    width: 1px;
+    height: 32px;
+    background: var(--gray-700);
+}
+
+/* File Section */
+.file-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.file-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: var(--gray-700);
+    color: var(--gray-200);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid var(--gray-600);
+}
+
+.file-btn:hover {
+    background: var(--gray-600);
+    border-color: var(--gray-500);
+}
+
+.file-btn-export {
+    background: var(--primary);
+    border-color: var(--primary-dark);
+    color: white;
+}
+
+.file-btn-export:hover {
+    background: var(--primary-dark);
+    border-color: var(--primary);
+}
+
+.file-name-display {
+    font-size: 12px;
+    color: var(--gray-400);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hidden-file-input {
+    display: none;
+}
+
+/* Connect Button */
+.connect-btn {
+    position: relative;
+}
+
+.connect-btn.connected {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.connect-btn.connected:hover {
+    background: rgba(16, 185, 129, 0.25);
+    border-color: var(--success);
+}
+
+.navbar-connection-status {
+    display: flex;
+    align-items: center;
+    margin-right: 2px;
+}
+
+.navbar-connection-status .status-dot {
+    font-size: 8px;
+}
+
+.navbar-connection-status .status-dot.connected {
+    color: var(--success);
+}
+
+.navbar-connection-status .status-dot.disconnected {
+    color: var(--danger);
+}
+
+/* Navbar Center - Navigation */
+.navbar-center {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 8px;
+}
+
+.nav-group-label {
+    font-size: 9px;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.nav-group-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 12px;
+    background: transparent;
+    color: var(--gray-400);
+    border: none;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-width: 64px;
+}
+
+.nav-btn i {
+    font-size: 16px;
+}
+
+.nav-btn:hover {
+    background: var(--gray-700);
+    color: var(--gray-200);
+}
+
+.nav-btn.active {
+    background: var(--primary);
+    color: white;
+}
+
+.nav-btn-ai {
+    color: var(--purple);
+}
+
+.nav-btn-ai:hover {
+    background: rgba(139, 92, 246, 0.2);
+    color: var(--primary-light);
+}
+
+.nav-btn-ai.active {
+    background: var(--purple);
+    color: white;
+}
+
+/* Navbar Right */
+.navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.action-btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.action-btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+.action-btn-help {
+    background: transparent;
+    color: var(--gray-400);
+    padding: 8px 10px;
+}
+
+.action-btn-help:hover {
+    background: var(--gray-700);
+    color: white;
+}

@@ -1,0 +1,278 @@
+/**
+ * Cloud Storage Panel Styles
+ * ==========================
+ * Cloud connection, mesh list, and state management.
+ */
+
+/* Cloud Storage Header */
+.cloud-storage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.cloud-storage-status {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.cloud-storage-status.info {
+    background: var(--gray-50);
+    color: var(--gray-600);
+    border: 1px solid var(--gray-200);
+}
+
+.cloud-storage-status.success {
+    background: rgba(34, 197, 94, 0.1);
+    color: #15803d;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.cloud-storage-status.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.cloud-storage-status.warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: #b45309;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.cloud-storage-actions {
+    display: flex;
+    gap: 4px;
+}
+
+/* Cloud Mesh List */
+.cloud-mesh-list-container {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.cloud-mesh-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Cloud Mesh Item */
+.cloud-mesh-item {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.cloud-mesh-item:hover {
+    border-color: var(--primary-light);
+}
+
+.cloud-mesh-item.current {
+    border-color: var(--primary);
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.cloud-mesh-item.current .mesh-item-name {
+    color: var(--primary);
+}
+
+/* Mesh Item Header */
+.mesh-item-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    cursor: pointer;
+}
+
+.mesh-item-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--gray-200) 0%, var(--gray-300) 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-600);
+}
+
+.cloud-mesh-item.current .mesh-item-icon {
+    background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%);
+    color: white;
+}
+
+.mesh-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.mesh-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-800);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mesh-item-meta {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-top: 2px;
+}
+
+.mesh-item-meta .state-count {
+    color: var(--primary);
+    font-weight: 500;
+}
+
+/* Mesh Item Actions */
+.mesh-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mesh-item-actions .icon-btn {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.cloud-mesh-item:hover .mesh-item-actions .icon-btn {
+    opacity: 1;
+}
+
+/* Expand Icon */
+.expand-icon {
+    color: var(--gray-400);
+    font-size: 10px;
+    margin-left: 4px;
+    transition: transform 0.2s;
+}
+
+.cloud-mesh-item.expanded .expand-icon {
+    transform: rotate(180deg);
+}
+
+/* Mesh Item States */
+.mesh-item-states {
+    display: none;
+    border-top: 1px solid var(--gray-200);
+    background: white;
+    padding: 12px;
+}
+
+.cloud-mesh-item.expanded .mesh-item-states {
+    display: block;
+}
+
+.states-loading,
+.states-error,
+.states-empty {
+    text-align: center;
+    padding: 20px;
+    font-size: 12px;
+    color: var(--gray-500);
+}
+
+.states-error {
+    color: var(--danger);
+}
+
+/* States List */
+.states-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Cloud State Item */
+.cloud-state-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.cloud-state-item:hover {
+    background: white;
+    border-color: var(--primary-light);
+}
+
+.state-item-icon {
+    width: 28px;
+    height: 28px;
+    background: var(--gray-200);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-500);
+    font-size: 12px;
+}
+
+.state-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.state-item-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gray-700);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.state-item-meta {
+    font-size: 10px;
+    color: var(--gray-500);
+    margin-top: 2px;
+}
+
+/* State Item Actions */
+.state-item-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.state-item-actions .icon-btn {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.cloud-state-item:hover .state-item-actions .icon-btn {
+    opacity: 1;
+}
+
+/* Cloud Connection Indicator on Save Button */
+#saveStateToCloudBtn.cloud-connected {
+    border-color: var(--success);
+    position: relative;
+}
+
+#saveStateToCloudBtn.cloud-connected::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 8px;
+    height: 8px;
+    background: var(--success);
+    border-radius: 50%;
+    border: 2px solid white;
+}

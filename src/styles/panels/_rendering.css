@@ -1,0 +1,199 @@
+/**
+ * Rendering Panel Styles
+ * ======================
+ * Lighting, display, and material controls.
+ */
+
+/* Render Section */
+.render-section {
+    margin-bottom: 0.5rem;
+}
+
+.render-section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #4b5563;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.render-section-title i {
+    color: #6366f1;
+    font-size: 0.7rem;
+}
+
+/* Color Row */
+.color-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Background Presets */
+.bg-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Material Select */
+.material-select-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.material-select {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: white;
+    cursor: pointer;
+}
+
+.material-select:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Lighting Preset */
+.lighting-preset-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.lighting-preset-row label {
+    min-width: 45px;
+}
+
+.lighting-preset-select {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: white;
+    cursor: pointer;
+}
+
+.lighting-preset-select:focus {
+    outline: none;
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+/* Light Control Group */
+.light-control-group {
+    background: #fefce8;
+    border: 1px solid #fef08a;
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+
+.light-control-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.light-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #854d0e;
+}
+
+/* Annotation Mode Row */
+.annotation-mode-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.annotation-mode-row label {
+    min-width: 75px;
+}
+
+.annotation-mode-select {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: white;
+    cursor: pointer;
+}
+
+.annotation-mode-select:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* PBR Slider Row */
+.pbr-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.pbr-slider-row:last-child {
+    margin-bottom: 0;
+}
+
+.pbr-slider-row label {
+    min-width: 70px;
+    font-size: 0.7rem;
+}
+
+.pbr-slider {
+    flex: 1;
+    height: 6px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #e5e7eb;
+    border-radius: 3px;
+}
+
+.pbr-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: #6366f1;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.pbr-slider::-webkit-slider-thumb:hover {
+    background: #4f46e5;
+}
+
+.pbr-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: #6366f1;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+.pbr-value {
+    min-width: 32px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #374151;
+    text-align: right;
+}

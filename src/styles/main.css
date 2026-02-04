@@ -1,0 +1,51 @@
+/**
+ * NeuroLithic - Main Stylesheet
+ * =============================
+ * 
+ * This is the main entry point for all CSS.
+ * Styles are organized into logical modules for maintainability.
+ * 
+ * Structure:
+ * - base/      : Variables, reset, typography
+ * - layout/    : Navbar, sidebar, canvas
+ * - components/: Reusable UI components
+ * - panels/    : Panel-specific styles
+ * - utilities/ : Helper classes
+ */
+
+/* ==========================================================================
+   Base Styles
+   ========================================================================== */
+
+@import './base/_variables.css';
+@import './base/_reset.css';
+
+/* ==========================================================================
+   Layout
+   ========================================================================== */
+
+@import './layout/_navbar.css';
+@import './layout/_sidebar.css';
+@import './layout/_canvas.css';
+
+/* ==========================================================================
+   Components
+   ========================================================================== */
+
+@import './components/_panels.css';
+@import './components/_buttons.css';
+@import './components/_forms.css';
+@import './components/_sliders.css';
+@import './components/_modals.css';
+@import './components/_cards.css';
+
+/* ==========================================================================
+   Panel-Specific Styles
+   ========================================================================== */
+
+@import './panels/_rendering.css';
+@import './panels/_annotation.css';
+@import './panels/_history.css';
+@import './panels/_metadata.css';
+@import './panels/_evaluation.css';
+@import './panels/_cloud-storage.css';

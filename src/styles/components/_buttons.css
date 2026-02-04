@@ -1,0 +1,369 @@
+/**
+ * Button Styles
+ * =============
+ * All button variants used throughout the application.
+ */
+
+/* Base Button */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-sm {
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+/* Primary Button */
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--primary-dark);
+}
+
+/* Secondary Button */
+.btn-secondary {
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-300);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--gray-200);
+}
+
+/* Ghost Button */
+.btn-ghost {
+    background: transparent;
+    color: var(--gray-600);
+}
+
+.btn-ghost:hover {
+    background: var(--gray-100);
+}
+
+/* Button Group Vertical */
+.btn-group-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Danger Button */
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #dc2626;
+}
+
+/* Outline Danger */
+.btn-outline-danger {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+}
+
+.btn-outline-danger:hover {
+    background: var(--danger);
+    color: white;
+}
+
+/* Warning Button */
+.btn-warning {
+    background: var(--warning);
+    color: white;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+}
+
+/* AI Button */
+.btn-ai {
+    background: linear-gradient(135deg, var(--purple) 0%, #7c3aed 100%);
+    color: white;
+}
+
+.btn-ai:hover {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+}
+
+/* Evaluation Button */
+.btn-eval {
+    background: linear-gradient(135deg, var(--teal) 0%, #0d9488 100%);
+    color: white;
+}
+
+.btn-eval:hover:not(:disabled) {
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+}
+
+.btn-eval:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Large Button */
+.btn-lg {
+    padding: 14px 20px;
+    font-size: 14px;
+}
+
+/* Full Width Button */
+.btn-full {
+    width: 100%;
+}
+
+/* Icon Button */
+.btn-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--gray-500);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-icon:hover {
+    background: var(--gray-100);
+    color: var(--gray-600);
+}
+
+.btn-icon-danger:hover {
+    background: #fee2e2;
+    color: var(--danger);
+}
+
+.btn-icon-sm {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+}
+
+/* Icon Button Standalone */
+.icon-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--gray-500);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.icon-btn:hover {
+    background: var(--gray-200);
+    color: var(--gray-700);
+}
+
+.icon-btn:hover .fa-trash {
+    color: var(--danger);
+}
+
+.icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Undo/Redo Buttons */
+.btn-undo,
+.btn-redo {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    background: white;
+    color: var(--gray-600);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-undo:hover:not(:disabled),
+.btn-redo:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.btn-undo:disabled,
+.btn-redo:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Mode Toggle Buttons */
+.mode-btn-group {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--gray-100);
+    border-radius: 8px;
+}
+
+.mode-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 8px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--gray-500);
+    font-size: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.mode-btn i {
+    font-size: 18px;
+}
+
+.mode-btn:hover {
+    background: var(--gray-200);
+    color: var(--gray-700);
+}
+
+.mode-btn.active {
+    background: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.mode-btn.view-mode.active {
+    color: var(--primary);
+}
+
+.mode-btn.draw-mode.active {
+    color: var(--warning);
+}
+
+.mode-btn.erase-mode.active {
+    color: var(--danger);
+}
+
+.mode-btn.arrow-mode.active {
+    color: var(--teal);
+}
+
+/* Annotation Action Buttons */
+.annotation-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn-fill {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.fill-all-btn {
+    background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+    color: white;
+}
+
+.fill-all-btn:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.clear-btn {
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+.clear-btn:hover {
+    background: var(--gray-200);
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    width: 40px;
+    height: 22px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--gray-300);
+    transition: 0.2s;
+    border-radius: 22px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.2s;
+    border-radius: 50%;
+    box-shadow: var(--shadow-sm);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(18px);
+}
