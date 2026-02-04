@@ -1,5 +1,7 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const CopyPlugin = require('copy-webpack-plugin');
 
 module.exports = (env, argv) => {
     const isProduction = argv.mode === 'production' || !argv.mode;
@@ -12,7 +14,10 @@ module.exports = (env, argv) => {
             clean: true,
         },
         devServer: {
-            static: path.resolve(__dirname, 'dist'),
+            static: [
+                path.resolve(__dirname, 'dist'),
+                { directory: path.resolve(__dirname), publicPath: '/' }
+            ],
             port: 8000,
         },
         plugins: [
@@ -20,6 +25,14 @@ module.exports = (env, argv) => {
                 template: './index.html',
                 filename: 'index.html',
                 scriptLoading: 'defer',
+            }),
+            new MiniCssExtractPlugin({
+                filename: 'styles/[name].[contenthash].css',
+            }),
+            new CopyPlugin({
+                patterns: [
+                    { from: 'docs', to: 'docs' }
+                ]
             }),
         ],
         module: {
@@ -33,7 +46,14 @@ module.exports = (env, argv) => {
                             presets: ['@babel/preset-env']
                         }
                     }
-                }
+                },
+                {
+                    test: /\.css$/,
+                    use: [
+                        isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
+                        'css-loader',
+                    ],
+                },
             ]
         },
         optimization: isProduction ? {

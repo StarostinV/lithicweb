@@ -1,3 +1,6 @@
+// Styles
+import './styles/main.css';
+
 import * as THREE from 'three';
 import { exportAnnotations } from './loaders/meshExporter.js';
 import { MODES, Mode } from './utils/mode.js';
@@ -14,8 +17,10 @@ import { ConnectionManager } from './components/connectionManager.js';
 import { EvaluationManager } from './evaluation/EvaluationManager.js';
 import { EvaluationPanel } from './components/evaluationPanel.js';
 import { RenderingPanel } from './components/renderingPanel.js';
+import { SettingsPanel } from './components/settingsPanel.js';
 import { UserConfig } from './utils/UserConfig.js';
 import { CloudStoragePanel } from './components/cloudStoragePanel.js';
+import { initUI } from './components/uiSetup.js';
 
 //colors
 const drawColor = new THREE.Color(1, 0.6, 0.2); // Orange
@@ -70,6 +75,9 @@ modelPanel.setCloudStoragePanel(cloudStoragePanel);
 
 // Rendering panel (view mode controls) - with userConfig for persistence
 const renderingPanel = new RenderingPanel(scene, meshObject, userConfig);
+
+// Settings panel (settings management)
+const settingsPanel = new SettingsPanel(userConfig, renderingPanel);
 
 // Reset rendering button
 document.getElementById('resetRenderingBtn').addEventListener('click', () => {
@@ -141,13 +149,38 @@ function setActiveNavBtn(activeBtnId) {
     if (activeBtn) activeBtn.classList.add('active');
 }
 
+// Cached DOM elements for annotation tab synchronization (initialized lazily)
+const annotationElements = {
+    edgeTab: null,
+    arrowTab: null,
+    edgeSection: null,
+    arrowSection: null,
+    segmentSection: null,
+    modeTabs: null,
+    initialized: false
+};
+
+/**
+ * Initialize cached annotation elements.
+ * Called lazily on first use to ensure DOM is ready.
+ */
+function initAnnotationElements() {
+    if (annotationElements.initialized) return;
+    annotationElements.edgeTab = document.querySelector('.mode-tab[data-mode="edges"]');
+    annotationElements.arrowTab = document.querySelector('.mode-tab[data-mode="arrows"]');
+    annotationElements.edgeSection = document.getElementById('edgeAnnotationSection');
+    annotationElements.arrowSection = document.getElementById('arrowAnnotationSection');
+    annotationElements.segmentSection = document.getElementById('segmentationSection');
+    annotationElements.modeTabs = document.querySelectorAll('.mode-tab');
+    annotationElements.initialized = true;
+}
+
 // Sync annotation tabs when tool buttons are clicked directly
 function syncAnnotationTabWithMode(mode) {
-    const edgeTab = document.querySelector('.mode-tab[data-mode="edges"]');
-    const arrowTab = document.querySelector('.mode-tab[data-mode="arrows"]');
-    const edgeSection = document.getElementById('edgeAnnotationSection');
-    const arrowSection = document.getElementById('arrowAnnotationSection');
-    const segmentSection = document.getElementById('segmentationSection');
+    // Initialize cached elements on first call
+    initAnnotationElements();
+    
+    const { edgeTab, arrowTab, edgeSection, arrowSection, segmentSection, modeTabs } = annotationElements;
     
     if (!edgeTab || !arrowTab) return;
     
@@ -155,7 +188,7 @@ function syncAnnotationTabWithMode(mode) {
     const isArrowMode = [MODES.ARROW, MODES.DELETEARROWS].includes(mode);
     
     // Update tab active state
-    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    modeTabs.forEach(t => t.classList.remove('active'));
     
     if (isEdgeMode) {
         edgeTab.classList.add('active');
@@ -170,12 +203,10 @@ function syncAnnotationTabWithMode(mode) {
     }
 }
 
-// Hook into mode changes to sync tabs
-const originalSetMode = mode.setMode.bind(mode);
-mode.setMode = function(newMode, rewritePrevious = false) {
-    originalSetMode(newMode, rewritePrevious);
+// Hook into mode changes to sync tabs using the listener pattern
+mode.addModeChangeListener((newMode) => {
     syncAnnotationTabWithMode(newMode);
-};
+});
 
 document.getElementById('modelPanelBtn').addEventListener('click', () => {
     showHidePanel('modelPanel');
@@ -212,10 +243,11 @@ document.getElementById('cloudStoragePanelBtn').addEventListener('click', () => 
 });
 
 document.getElementById('settingsPanelBtn').addEventListener('click', () => {
-    showHidePanel('settingsPanel');
+    showHidePanel('settingsPanel', {
+        onShow: () => settingsPanel.onShow()
+    });
     setActiveNavBtn('settingsPanelBtn');
     mode.setMode(MODES.VIEW, true);
-    updateSettingsSummary();
 });
 
 // Keyboard shortcuts for undo/redo
@@ -232,155 +264,18 @@ window.addEventListener('keydown', (event) => {
     }
 });
 
-// ===== SETTINGS PANEL FUNCTIONALITY =====
-
-/**
- * Update the settings summary display in the Settings panel.
- */
-function updateSettingsSummary() {
-    const renderingConfig = userConfig.getSection('rendering');
-    const lightingConfig = userConfig.getSection('lighting');
-    
-    const renderingSummaryEl = document.getElementById('renderingSettingsSummary');
-    const lightingSummaryEl = document.getElementById('lightingSettingsSummary');
-    
-    if (renderingSummaryEl) {
-        renderingSummaryEl.innerHTML = `
-            <div class="settings-item">
-                <span class="settings-item-key">Annotation Mode</span>
-                <span class="settings-item-value">${renderingConfig.annotationMode}</span>
-            </div>
-            <div class="settings-item">
-                <span class="settings-item-key">Material</span>
-                <span class="settings-item-value">${renderingConfig.materialType}</span>
-            </div>
-            <div class="settings-item">
-                <span class="settings-item-key">Wireframe</span>
-                <span class="settings-item-value">${renderingConfig.wireframeMode ? 'On' : 'Off'}</span>
-            </div>
-            <div class="settings-item">
-                <span class="settings-item-key">Flat Shading</span>
-                <span class="settings-item-value">${renderingConfig.flatShading ? 'On' : 'Off'}</span>
-            </div>
-            <div class="settings-item">
-                <span class="settings-item-key">Background</span>
-                <span class="settings-item-value">
-                    <span class="settings-item-color" style="background-color: ${renderingConfig.backgroundColor}"></span>
-                    ${renderingConfig.backgroundColor}
-                </span>
-            </div>
-            <div class="settings-item">
-                <span class="settings-item-key">Edge Color</span>
-                <span class="settings-item-value">
-                    <span class="settings-item-color" style="background-color: ${renderingConfig.edgeColor}"></span>
-                    ${renderingConfig.edgeColor}
-                </span>
-            </div>
-            <div class="settings-item">
-                <span class="settings-item-key">Object Color</span>
-                <span class="settings-item-value">
-                    <span class="settings-item-color" style="background-color: ${renderingConfig.objectColor}"></span>
-                    ${renderingConfig.objectColor}
-                </span>
-            </div>
-        `;
-    }
-    
-    if (lightingSummaryEl) {
-        lightingSummaryEl.innerHTML = `
-            <div class="settings-item">
-                <span class="settings-item-key">Preset</span>
-                <span class="settings-item-value">${lightingConfig.currentLightingPreset}</span>
-            </div>
-            <div class="settings-item">
-                <span class="settings-item-key">Key Light</span>
-                <span class="settings-item-value">${lightingConfig.keyLightIntensity?.toFixed(1) || '2.0'}</span>
-            </div>
-            <div class="settings-item">
-                <span class="settings-item-key">Fill Light</span>
-                <span class="settings-item-value">${lightingConfig.fillLightIntensity?.toFixed(1) || '1.0'}</span>
-            </div>
-            <div class="settings-item">
-                <span class="settings-item-key">Ambient</span>
-                <span class="settings-item-value">${lightingConfig.ambientLightIntensity?.toFixed(1) || '0.3'}</span>
-            </div>
-            <div class="settings-item">
-                <span class="settings-item-key">Light Color</span>
-                <span class="settings-item-value">
-                    <span class="settings-item-color" style="background-color: ${lightingConfig.keyLightColor}"></span>
-                    ${lightingConfig.keyLightColor}
-                </span>
-            </div>
-            <div class="settings-item">
-                <span class="settings-item-key">Follow Camera</span>
-                <span class="settings-item-value">${lightingConfig.lightFollowsCamera ? 'On' : 'Off'}</span>
-            </div>
-        `;
-    }
-}
-
-// Export settings button
-document.getElementById('exportSettingsBtn').addEventListener('click', () => {
-    userConfig.exportToFile('lithicjs-settings.json');
-});
-
-// Import settings input
-document.getElementById('importSettingsInput').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    try {
-        await userConfig.importFromFile(file);
-        // Reload settings into rendering panel
-        renderingPanel.loadFromConfig();
-        // Update summary display
-        updateSettingsSummary();
-        // Show success message
-        alert('Settings imported successfully!');
-    } catch (error) {
-        console.error('Failed to import settings:', error);
-        alert('Failed to import settings: ' + error.message);
-    }
-    
-    // Reset file input
-    e.target.value = '';
-});
-
-// Reset all settings button
-document.getElementById('resetAllSettingsBtn').addEventListener('click', () => {
-    if (confirm('Are you sure you want to reset all settings to defaults?')) {
-        userConfig.reset();
-        renderingPanel.loadFromConfig();
-        updateSettingsSummary();
-    }
-});
-
-// Clear local storage button
-document.getElementById('clearStorageBtn').addEventListener('click', () => {
-    if (confirm('This will clear all saved settings from browser storage. Continue?')) {
-        localStorage.removeItem('lithicjs_user_config');
-        userConfig.reset();
-        renderingPanel.loadFromConfig();
-        updateSettingsSummary();
-        alert('Local storage cleared.');
-    }
-});
-
-// Listen for config changes to update summary
-userConfig.addListener('*', () => {
-    // Only update if settings panel is visible
-    const settingsPanel = document.getElementById('settingsPanel');
-    if (settingsPanel && !settingsPanel.classList.contains('hidden')) {
-        updateSettingsSummary();
-    }
-});
+// Initialize UI components (file input, modal, sidebar resize, annotation tabs)
+initUI();
 
 scene.animate();
 
 // Handle window resize - account for navbar height and sidebar width
 function updateRendererSize() {
-    const navbarHeight = 64; // Match CSS --navbar-height
-    const sidebarWidth = 380; // Match CSS --sidebar-width
+    // Read dimensions from actual DOM elements (with fallbacks)
+    const navbar = document.querySelector('.navbar');
+    const sidebar = document.getElementById('sideMenu');
+    const navbarHeight = navbar?.offsetHeight || 64;
+    const sidebarWidth = sidebar?.offsetWidth || 380;
     
     // Canvas is sized to visible area (excluding sidebar)
     const width = window.innerWidth - sidebarWidth;
@@ -407,5 +302,6 @@ window.debugGlobalVar.meshLoader = meshLoader;
 window.debugGlobalVar.metadataPanel = metadataPanel;
 window.debugGlobalVar.cloudStoragePanel = cloudStoragePanel;
 window.debugGlobalVar.renderingPanel = renderingPanel;
+window.debugGlobalVar.settingsPanel = settingsPanel;
 window.debugGlobalVar.scene = scene;
 window.debugGlobalVar.userConfig = userConfig;

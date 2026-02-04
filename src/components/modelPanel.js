@@ -176,10 +176,48 @@ export class ModelPanel {
 
     // ============== Session Management (Hidden from UI) ==============
 
-    async ensureSession() {
-        if (this.currentSession) {
-            console.log('[ModelPanel] Using existing session:', this.currentSession.session_id);
+    /**
+     * Clear local session state. Call this when session may be invalid.
+     */
+    clearSession() {
+        console.log('[ModelPanel] Clearing session state');
+        this.currentSession = null;
+    }
+
+    /**
+     * Verify that the current session is still valid on the server.
+     * Clears local session state if the session has expired or is invalid.
+     * @returns {Promise<boolean>} True if session is valid, false otherwise
+     */
+    async verifySession() {
+        if (!this.currentSession) {
+            return false;
+        }
+
+        try {
+            const serverSession = await lithicClient.getSession(this.currentSession.session_id);
+            // Update local state from server (in case it diverged)
+            this.currentSession.has_data = serverSession.has_data || false;
+            this.currentSession.current_filename = serverSession.current_filename || null;
+            console.log('[ModelPanel] Session verified:', this.currentSession.session_id);
             return true;
+        } catch (e) {
+            console.warn('[ModelPanel] Session verification failed:', e.message);
+            // Session is invalid or expired - clear local state
+            this.clearSession();
+            return false;
+        }
+    }
+
+    async ensureSession() {
+        // First verify any existing session is still valid
+        if (this.currentSession) {
+            const isValid = await this.verifySession();
+            if (isValid) {
+                console.log('[ModelPanel] Using existing session:', this.currentSession.session_id);
+                return true;
+            }
+            // Session was invalid, will create new one below
         }
 
         try {
@@ -267,6 +305,10 @@ export class ModelPanel {
             }
         } catch (e) {
             console.error('[ModelPanel] Upload failed:', e);
+            // Clear session state if error indicates session is invalid
+            if (e.message.includes('404') || e.message.includes('session') || e.message.includes('Session')) {
+                this.clearSession();
+            }
             this.setStatus('Failed: ' + e.message, 'error');
         } finally {
             this.setLoading(false);
@@ -306,46 +348,6 @@ export class ModelPanel {
         return { vertices, faces };
     }
 
-    /**
-     * Export current mesh as PLY format (kept for future use with disk storage).
-     */
-    exportMeshToPLY() {
-        // Export current mesh as PLY format
-        const positions = this.meshObject.positions;
-        const indices = this.meshObject.indices;
-        const numVertices = positions.length / 3;
-        const numFaces = indices.length / 3;
-        
-        // Build PLY header
-        let ply = 'ply\n';
-        ply += 'format ascii 1.0\n';
-        ply += `element vertex ${numVertices}\n`;
-        ply += 'property float x\n';
-        ply += 'property float y\n';
-        ply += 'property float z\n';
-        ply += `element face ${numFaces}\n`;
-        ply += 'property list uchar int vertex_indices\n';
-        ply += 'end_header\n';
-        
-        // Add vertices
-        for (let i = 0; i < numVertices; i++) {
-            const x = positions[i * 3];
-            const y = positions[i * 3 + 1];
-            const z = positions[i * 3 + 2];
-            ply += `${x} ${y} ${z}\n`;
-        }
-        
-        // Add faces
-        for (let i = 0; i < numFaces; i++) {
-            const a = indices[i * 3];
-            const b = indices[i * 3 + 1];
-            const c = indices[i * 3 + 2];
-            ply += `3 ${a} ${b} ${c}\n`;
-        }
-        
-        return new Blob([ply], { type: 'text/plain' });
-    }
-
     async runInference() {
         if (!lithicClient.isConfigured()) {
             this.setStatus('Please configure server settings first', 'error');
@@ -383,6 +385,10 @@ export class ModelPanel {
             this.setStatus(`Done! Applied ${appliedCount} edge annotations.`, 'success');
         } catch (e) {
             console.error('[ModelPanel] Inference failed:', e);
+            // Clear session state if error indicates session is invalid
+            if (e.message.includes('404') || e.message.includes('session') || e.message.includes('Session')) {
+                this.clearSession();
+            }
             this.setStatus('Inference failed: ' + e.message, 'error');
         } finally {
             this.setLoading(false);

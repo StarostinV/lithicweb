@@ -7,6 +7,8 @@
  * @module HistoryPanel
  */
 
+import { escapeHtml } from '../utils/sanitize.js';
+
 export class HistoryPanel {
     /**
      * Create a HistoryPanel.
@@ -228,15 +230,15 @@ export class HistoryPanel {
             icon = '<i class="fas fa-cloud-download-alt text-blue-500"></i>';
         }
         
-        // Use custom description if available
-        const displayName = action.customDescription || action.description || action.type;
+        // Use custom description if available (escape for XSS safety)
+        const displayName = escapeHtml(action.customDescription || action.description || action.type);
         const protectedIcon = isProtected ? `<i class="fas fa-lock text-amber-600 ml-1" title="Protected state"></i>` : '';
         
         item.innerHTML = `
             <div class="flex justify-between items-start">
                 <div class="flex-1 history-item-content">
                     <div class="font-semibold history-item-name">${icon} <span class="state-name">${displayName}</span>${protectedIcon}</div>
-                    <div class="${isCurrent ? 'text-blue-100' : 'text-gray-500'}">${timestamp} | ${edgeCount} edges</div>
+                    <div class="${isCurrent ? 'text-blue-100' : 'text-gray-500'}">${escapeHtml(timestamp)} | ${edgeCount} edges</div>
                     ${this._createEvalLabels(isGT, isPred)}
                 </div>
                 <div class="flex items-center gap-1">

@@ -818,8 +818,16 @@ export class CloudStoragePanel {
 
     /**
      * Apply a loaded state to the mesh.
+     * @param {Object} stateData - The state data to apply
+     * @param {Array<number>} stateData.edge_indices - Array of edge indices to apply
+     * @param {Object} [stateData.metadata] - Optional metadata for the state
      */
     applyState(stateData) {
+        if (!stateData || !Array.isArray(stateData.edge_indices)) {
+            console.error('[CloudStorage] Invalid state data received:', stateData);
+            this.setStatus('Failed to apply state: invalid data format', 'error');
+            return;
+        }
         const edgeIndices = new Set(stateData.edge_indices);
         
         // Start a draw operation for history tracking

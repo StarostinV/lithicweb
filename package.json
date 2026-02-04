@@ -14,15 +14,19 @@
         "@babel/core": "^7.15.0",
         "@babel/preset-env": "^7.15.0",
         "babel-loader": "^8.2.2",
+        "copy-webpack-plugin": "^13.0.1",
+        "css-loader": "^7.1.2",
         "html-webpack-plugin": "^5.6.0",
         "mat-for-js": "^1.1.0",
+        "mini-css-extract-plugin": "^2.9.2",
         "nouislider": "^15.8.1",
         "serve": "^14.2.3",
+        "style-loader": "^4.0.0",
         "three": "^0.166.0",
         "three-mesh-bvh": "^0.7.5",
         "webpack": "^5.51.1",
-        "webpack-cli": "^4.8.0",
-        "webpack-dev-server": "^4.0.0"
+        "webpack-cli": "^5.1.4",
+        "webpack-dev-server": "^5.2.3"
     },
     "engines": {
         "node": "20.x"

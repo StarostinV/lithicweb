@@ -64,6 +64,9 @@ export class EvaluationManager {
         // Segmenter for computing segments on arbitrary edge states
         this.segmenter = new MeshSegmenter(meshObject);
         
+        /** @type {Function|null} - Reference to history listener for cleanup */
+        this._historyListenerCallback = null;
+        
         // Listen to history changes to clear stale evaluation labels
         this._setupHistoryListener();
     }
@@ -76,7 +79,8 @@ export class EvaluationManager {
     _setupHistoryListener() {
         let previousTotalStates = this.meshObject.history.getTotalStates();
         
-        this.meshObject.history.addListener((history) => {
+        // Store reference for cleanup in dispose()
+        this._historyListenerCallback = (history) => {
             const currentTotal = history.getTotalStates();
             
             // If history was cleared (total states reset to 1 = initial state only)
@@ -90,7 +94,27 @@ export class EvaluationManager {
             }
             
             previousTotalStates = currentTotal;
-        });
+        };
+        
+        this.meshObject.history.addListener(this._historyListenerCallback);
+    }
+    
+    /**
+     * Clean up resources and listeners.
+     * Call this before discarding the EvaluationManager instance.
+     */
+    dispose() {
+        // Remove history listener to prevent memory leaks
+        if (this._historyListenerCallback) {
+            this.meshObject.history.removeListener(this._historyListenerCallback);
+            this._historyListenerCallback = null;
+        }
+        
+        // Clear all state
+        this.groundTruth = null;
+        this.prediction = null;
+        this.metricsResult = null;
+        this.listeners = [];
     }
 
     /**

@@ -36,6 +36,7 @@ export class Mode {
         this.previousMode = MODES.VIEW;
         this.ctrlHeld = false;
         this.showGizmo = true;  // User preference for gizmo visibility
+        this.modeChangeListeners = [];  // Listeners for mode changes
 
         this.handleModeSwitch = this.handleModeSwitch.bind(this);
         this.setMode = this.setMode.bind(this);
@@ -148,6 +149,31 @@ export class Mode {
         this.currentMode = mode;
 
         this.update();
+        this._notifyModeChangeListeners(mode, rewritePrevious);
+    }
+
+    /**
+     * Add a listener for mode changes.
+     * @param {Function} callback - Called with (newMode, rewritePrevious) when mode changes
+     */
+    addModeChangeListener(callback) {
+        this.modeChangeListeners.push(callback);
+    }
+
+    /**
+     * Remove a mode change listener.
+     * @param {Function} callback - The callback to remove
+     */
+    removeModeChangeListener(callback) {
+        this.modeChangeListeners = this.modeChangeListeners.filter(l => l !== callback);
+    }
+
+    /**
+     * Notify all mode change listeners.
+     * @private
+     */
+    _notifyModeChangeListeners(newMode, rewritePrevious) {
+        this.modeChangeListeners.forEach(cb => cb(newMode, rewritePrevious));
     }
 
     update() {
