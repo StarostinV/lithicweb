@@ -21,8 +21,8 @@ import { ActionHistory } from '../utils/ActionHistory.js';
  * 
  * ```javascript
  * // OLD (deprecated)
- * const meshObject = new MeshObject(scene, edgeColor, objectColor);
- * meshObject.setMesh(positions, labels, indices, metadata);
+ * const meshView = new MeshObject(scene, edgeColor, objectColor);
+ * meshView.setMesh(positions, labels, indices, metadata);
  * 
  * // NEW (recommended)
  * import { BasicMesh, Annotation } from './geometry/index.js';

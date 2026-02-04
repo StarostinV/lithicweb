@@ -67,28 +67,29 @@ export function combineMetadata(meshMetadata, annotationMetadata) {
 /**
  * MeshLoader handles loading mesh files (PLY, MAT) and managing their metadata.
  * 
+ * ## Metadata Management
+ * 
  * Metadata is stored separately from geometry and can be:
  * - Loaded from PLY file comments
  * - Modified programmatically via getMetadata/setMetadata/updateMetadata
  * - Exported back to PLY files via meshExporter
+ * - Cleared via clearMetadata() (called automatically when loading new mesh)
  * 
  * ## Event Bus Integration
  * 
- * MeshLoader emits the following events via the global EventBus:
+ * Emits:
  * - `Events.MESH_LOADED` - When a mesh is loaded from a local file
  *   Data: { source: 'file', filename: string, metadata: object }
  * 
- * Components can subscribe to these events instead of using addLoadListener():
- * ```javascript
+ * @example
+ * // Subscribe to mesh load events
  * import { eventBus, Events } from '../utils/EventBus.js';
  * eventBus.on(Events.MESH_LOADED, (data) => {
  *     if (data.source === 'file') {
  *         console.log('File loaded:', data.filename);
  *     }
  * });
- * ```
  * 
- * @example
  * // Access metadata after loading
  * const author = meshLoader.getMetadata('author');
  * 
@@ -97,8 +98,8 @@ export function combineMetadata(meshMetadata, annotationMetadata) {
  * meshLoader.updateMetadata({ version: '2.0', modified: true });
  */
 export default class MeshLoader {
-    constructor(meshObject, arrowDrawer) {
-        this.meshObject = meshObject;
+    constructor(meshView, arrowDrawer) {
+        this.meshView = meshView;
         this.arrowDrawer = arrowDrawer;
         this.loader = new CustomPLYLoader();
         this.currentFileName = null;
@@ -114,12 +115,6 @@ export default class MeshLoader {
          * @type {string[]}
          */
         this.comments = [];
-        
-        /**
-         * Listeners to be notified when a file is loaded.
-         * @type {Function[]}
-         */
-        this.loadListeners = [];
 
         this.load = this.load.bind(this);
 
@@ -130,52 +125,11 @@ export default class MeshLoader {
     }
     
     /**
-     * Add a listener to be notified when a file is loaded.
-     * The listener receives an object with { fileName, metadata, comments }.
-     * 
-     * @deprecated Prefer using EventBus for new code:
-     * ```javascript
-     * import { eventBus, Events } from '../utils/EventBus.js';
-     * eventBus.on(Events.MESH_LOADED, (data) => {
-     *     if (data.source === 'file') {
-     *         // data.filename, data.metadata
-     *     }
-     * });
-     * ```
-     * 
-     * @param {Function} listener - Callback function
-     */
-    addLoadListener(listener) {
-        this.loadListeners.push(listener);
-    }
-    
-    /**
-     * Remove a load listener.
-     * @param {Function} listener - The listener to remove
-     */
-    removeLoadListener(listener) {
-        const index = this.loadListeners.indexOf(listener);
-        if (index > -1) {
-            this.loadListeners.splice(index, 1);
-        }
-    }
-    
-    /**
-     * Notify all listeners that a file was loaded.
-     * Emits both to legacy listeners and the global EventBus.
+     * Emit MESH_LOADED event via EventBus.
+     * Called after successfully loading a mesh file.
      * @private
      */
-    notifyLoadListeners() {
-        const data = {
-            fileName: this.currentFileName,
-            metadata: this.metadata,
-            comments: this.comments
-        };
-        
-        // Legacy listener pattern (for backward compatibility)
-        this.loadListeners.forEach(listener => listener(data));
-        
-        // EventBus pattern (preferred for new code)
+    _emitMeshLoaded() {
         eventBus.emit(Events.MESH_LOADED, {
             source: 'file',
             filename: this.currentFileName,
@@ -199,9 +153,9 @@ export default class MeshLoader {
      */
     setMetadata(key, value) {
         this.metadata[key] = value;
-        // Also update meshObject's metadata if it exists
-        if (this.meshObject && this.meshObject.metadata) {
-            this.meshObject.metadata[key] = value;
+        // Also update meshView's metadata if it exists
+        if (this.meshView && this.meshView.metadata) {
+            this.meshView.metadata[key] = value;
         }
     }
     
@@ -219,9 +173,9 @@ export default class MeshLoader {
      */
     updateMetadata(updates) {
         this.metadata = { ...this.metadata, ...updates };
-        // Also update meshObject's metadata if it exists
-        if (this.meshObject && this.meshObject.metadata) {
-            this.meshObject.metadata = { ...this.meshObject.metadata, ...updates };
+        // Also update meshView's metadata if it exists
+        if (this.meshView && this.meshView.metadata) {
+            this.meshView.metadata = { ...this.meshView.metadata, ...updates };
         }
     }
     
@@ -230,8 +184,8 @@ export default class MeshLoader {
      */
     clearMetadata() {
         this.metadata = {};
-        if (this.meshObject && this.meshObject.metadata) {
-            this.meshObject.metadata = {};
+        if (this.meshView && this.meshView.metadata) {
+            this.meshView.metadata = {};
         }
     }
     
@@ -241,8 +195,8 @@ export default class MeshLoader {
      */
     deleteMetadata(key) {
         delete this.metadata[key];
-        if (this.meshObject && this.meshObject.metadata) {
-            delete this.meshObject.metadata[key];
+        if (this.meshView && this.meshView.metadata) {
+            delete this.meshView.metadata[key];
         }
     }
     
@@ -313,18 +267,18 @@ export default class MeshLoader {
                 this.metadata = metadata || {};
                 this.comments = comments || [];
             
-                this.meshObject.setMesh(positions, labels, indices, this.metadata);
+                this.meshView.setMesh(positions, labels, indices, this.metadata);
                 this.arrowDrawer.clear();
                 this.arrowDrawer.load(arrows);
                 
                 // Apply state-metadata to initial state if present in loaded metadata
                 if (this.metadata['state-metadata']) {
-                    this.meshObject.history.updateStateMetadata(0, this.metadata['state-metadata']);
+                    this.meshView.history.updateStateMetadata(0, this.metadata['state-metadata']);
                     delete this.metadata['state-metadata'];
                 }
                 
-                // Notify listeners that a file was loaded
-                this.notifyLoadListeners();
+                // Emit MESH_LOADED event for other components
+                this._emitMeshLoaded();
                 resolve();
             };
             

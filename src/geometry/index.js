@@ -8,11 +8,6 @@
  * - **Annotation**: Lightweight container for annotation data (edgeIndices + arrows + metadata)
  * - **BasicMesh**: Pure geometry container with mesh-level metadata
  * 
- * ## Legacy Classes (deprecated)
- * 
- * - **MeshObject**: Monolithic class combining geometry, annotations, and rendering
- * - **AnnotatedMesh**: Extends BasicMesh with annotations (use MeshView instead)
- * 
  * ## New Architecture
  * 
  * The new architecture separates concerns:
@@ -52,11 +47,15 @@
 export { Annotation } from './Annotation.js';
 export { BasicMesh } from './BasicMesh.js';
 
-// Legacy classes (still in use during migration)
-export { MeshObject } from './meshObject.js';
-export { AnnotatedMesh } from './AnnotatedMesh.js';
-
 // Supporting classes
 export { MeshSegmenter } from './segmentation.js';
 export { PathFinder } from './PathFinder.js';
 export { IntersectFinder } from './intersections.js';
+
+// Edge angle computation for segmentation
+export { 
+    computeEdgeAngles, 
+    computeVertexMaxAngles,
+    getSharpVertices,
+    radiansToDegrees 
+} from './edgeAngles.js';

@@ -188,7 +188,7 @@ export class MeshView {
     // ========================================
 
     /**
-     * Set mesh geometry and initialize view state (MeshObject-compatible).
+     * Set mesh geometry and initialize view state.
      * 
      * @param {Float32Array} positions - Vertex positions
      * @param {Uint8Array|Array} labels - Edge labels (1 = edge, 0 = not edge)
@@ -215,9 +215,11 @@ export class MeshView {
             }
         }
         this.initialState = new Set(this.currentEdgeIndices);
-        this.history.clear();
-
+        
+        // Create initial annotation and clear history
         this.workingAnnotation = Annotation.fromEdgeLabels(this.edgeLabels, [], {});
+        this.history.clear();
+        this.history.setInitialAnnotation(this.workingAnnotation);
 
         this._applyEdgesToMesh();
         this._computeSegments();
@@ -246,8 +248,9 @@ export class MeshView {
             this.edgeLabels[index] = 1;
         }
         
-        // Clear history for new annotation
+        // Clear history and set initial annotation
         this.history.clear();
+        this.history.setInitialAnnotation(annotation);
         
         // "Unzip" - compute derived state
         this._applyEdgesToMesh();
@@ -410,25 +413,19 @@ export class MeshView {
         
         // Only save if there were actual changes
         if (!this._setsEqual(this.pendingAction.previousState, currentState)) {
-            let description = this.pendingAction.description;
-            if (!description) {
-                switch (this.pendingAction.type) {
-                    case 'draw': description = 'Draw edges'; break;
-                    case 'erase': description = 'Erase edges'; break;
-                    case 'model': description = 'AI segmentation'; break;
-                    case 'cloud': description = 'Cloud state'; break;
-                    case 'library-load': description = 'Load from library'; break;
-                    default: description = this.pendingAction.type;
-                }
-            }
-            
-            this.history.push({
+            // Create Annotation-based action
+            const action = this.history.createAction({
+                edgeIndices: currentState,
+                arrows: this._getArrowData(),
                 type: this.pendingAction.type,
-                previousState: this.pendingAction.previousState,
-                newState: currentState,
-                timestamp: Date.now(),
-                description: description
+                description: this.pendingAction.description,
             });
+            
+            // Store previous state for undo compatibility
+            action.previousState = this.pendingAction.previousState;
+            action.newState = currentState;
+            
+            this.history.push(action);
         }
         
         this.pendingAction = null;
@@ -481,6 +478,49 @@ export class MeshView {
     getVerticesWithinRadius(event, radius) {
         if (!this._threeMesh) return [];
         return this.intersectFinder.getVerticesWithinRadius(this._threeMesh, event, radius);
+    }
+
+    /**
+     * Find the nearest annotated (edge) vertex to a given vertex position.
+     * 
+     * This is used for snapping new annotation lines to existing annotated vertices,
+     * ensuring seamless connections between annotation segments.
+     * 
+     * @param {number} vertexIndex - The reference vertex index to search from
+     * @param {number} maxDistance - Maximum distance threshold in local mesh units
+     * @returns {{index: number, distance: number}|null} The nearest annotated vertex info, or null if none within threshold
+     */
+    findNearestAnnotatedVertex(vertexIndex, maxDistance) {
+        if (this.currentEdgeIndices.size === 0) return null;
+        
+        const referencePosition = this.indexToVertex(vertexIndex);
+        if (!referencePosition) return null;
+        
+        let nearestIndex = null;
+        let nearestDistanceSq = maxDistance * maxDistance;
+        
+        for (const annotatedIndex of this.currentEdgeIndices) {
+            // Skip if it's the same vertex
+            if (annotatedIndex === vertexIndex) continue;
+            
+            const annotatedPosition = this.indexToVertex(annotatedIndex);
+            if (!annotatedPosition) continue;
+            
+            const distanceSq = referencePosition.distanceToSquared(annotatedPosition);
+            if (distanceSq < nearestDistanceSq) {
+                nearestDistanceSq = distanceSq;
+                nearestIndex = annotatedIndex;
+            }
+        }
+        
+        if (nearestIndex !== null) {
+            return {
+                index: nearestIndex,
+                distance: Math.sqrt(nearestDistanceSq)
+            };
+        }
+        
+        return null;
     }
 
     getAllIntersectionInfo(event) {
@@ -592,7 +632,19 @@ export class MeshView {
     undo() {
         const action = this.history.undo();
         if (action) {
-            this._restoreEdgeState(action.previousState);
+            // Get the state to restore (previous state or the annotation from previous action)
+            let stateToRestore;
+            if (action.previousState) {
+                stateToRestore = action.previousState;
+            } else {
+                // For new format without previousState, use the state at current index
+                const currentIndex = this.history.getCurrentIndex();
+                stateToRestore = currentIndex === 0 
+                    ? this.initialState 
+                    : this.history.getStateAtIndex(currentIndex);
+            }
+            
+            this._restoreEdgeState(stateToRestore);
             const autoSegments = document.getElementById('auto-segments');
             if (autoSegments?.checked) {
                 this.updateSegments();
@@ -610,12 +662,22 @@ export class MeshView {
     redo() {
         const action = this.history.redo();
         if (action) {
-            this._restoreEdgeState(action.newState);
-            const autoSegments = document.getElementById('auto-segments');
-            if (autoSegments?.checked) {
-                this.updateSegments();
+            // Get the state to restore from the action
+            let stateToRestore;
+            if (action.annotation) {
+                stateToRestore = new Set(action.annotation.edgeIndices);
+            } else if (action.newState) {
+                stateToRestore = action.newState;
             }
-            return true;
+            
+            if (stateToRestore) {
+                this._restoreEdgeState(stateToRestore);
+                const autoSegments = document.getElementById('auto-segments');
+                if (autoSegments?.checked) {
+                    this.updateSegments();
+                }
+                return true;
+            }
         }
         return false;
     }
@@ -632,16 +694,13 @@ export class MeshView {
             return;
         }
         
+        // Use history's getStateAtIndex which handles both old and new formats
         let targetState = null;
         
         if (targetIndex === 0) {
             targetState = this.initialState;
-        } else if (targetIndex <= this.history.undoStack.length) {
-            targetState = this.history.undoStack[targetIndex - 1].newState;
         } else {
-            const redoIndex = targetIndex - this.history.undoStack.length - 1;
-            const redoStack = this.history.getRedoStack();
-            targetState = redoStack[redoStack.length - 1 - redoIndex]?.newState;
+            targetState = this.history.getStateAtIndex(targetIndex);
         }
         
         if (targetState) {

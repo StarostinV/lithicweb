@@ -91,36 +91,3 @@ export function createMeshFromGeometry(geometry, colorBuffer) {
     
     return mesh;
 }
-
-// ========================================
-// Legacy function (for backward compatibility)
-// ========================================
-
-/**
- * Create a Three.js mesh with colors based on labels.
- * 
- * @deprecated Use createGeometry + createColorBufferFromLabels + createMeshFromGeometry instead.
- * This combined function is kept for backward compatibility with MeshObject.
- * 
- * @param {Float32Array} positions - Vertex positions
- * @param {Uint8Array|Array} labels - Edge labels (can be empty)
- * @param {Array} indices - Face indices
- * @param {THREE.Color} edgeColor - Color for edge vertices
- * @param {THREE.Color} objectColor - Color for non-edge vertices
- * @returns {{mesh: THREE.Mesh, meshColors: Float32Array}}
- */
-export function createThreeMesh(positions, labels, indices, edgeColor, objectColor) {
-    const geometry = createGeometry(positions, indices);
-    const vertexCount = positions.length / 3;
-    
-    let meshColors;
-    if (labels && labels.length > 0) {
-        meshColors = createColorBufferFromLabels(labels, edgeColor, objectColor);
-    } else {
-        meshColors = createColorBuffer(vertexCount, objectColor);
-    }
-    
-    const mesh = createMeshFromGeometry(geometry, meshColors);
-    
-    return { mesh, meshColors };
-}

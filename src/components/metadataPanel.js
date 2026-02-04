@@ -9,7 +9,8 @@
  *    - Belongs to the mesh itself
  *    - Persisted across all annotation states
  *    - Examples: author, description, mesh source, creation date
- *    - Stored in meshObject.metadata and meshLoader.metadata
+ *    - Stored in meshView.metadata and meshLoader.metadata
+ *    - Cleared automatically when loading a new mesh
  * 
  * 2. **Annotation Metadata** (state metadata):
  *    - Belongs to a specific annotation state
@@ -17,11 +18,12 @@
  *    - Examples: evaluation metrics (precision, recall, F1), model parameters
  *    - Stored per-action in the history system
  *    - Note: Called "state metadata" in code for historical reasons
+ *    - Built-in fields (name, source, createdAt, modifiedAt) are filtered from display
  * 
  * ## Event Bus Integration
  * 
  * Subscribes to:
- * - `Events.MESH_LOADED` - Updates UI when a mesh is loaded
+ * - `Events.MESH_LOADED` - Updates UI when a mesh is loaded (clears old metadata display)
  * - `Events.HISTORY_CHANGED` - Updates annotation metadata display when history changes
  * 
  * Provides a visual interface to:
@@ -36,15 +38,16 @@
  */
 
 import { eventBus, Events } from '../utils/EventBus.js';
+import { formatMetadataValue, isTimestampKey, isTimestamp, formatTimestamp } from '../utils/sanitize.js';
 
 export class MetadataPanel {
     /**
      * Create a MetadataPanel.
-     * @param {MeshObject} meshObject - The mesh object containing metadata
+     * @param {MeshView} meshView - The mesh view object containing metadata
      * @param {MeshLoader} meshLoader - The mesh loader for file-level metadata
      */
-    constructor(meshObject, meshLoader) {
-        this.meshObject = meshObject;
+    constructor(meshView, meshLoader) {
+        this.meshView = meshView;
         this.meshLoader = meshLoader;
         
         // UI Elements - Mesh Metadata (shared across all states)
@@ -146,7 +149,7 @@ export class MetadataPanel {
         
         if (type === 'state') {
             // Add to current state's metadata
-            this.meshObject.setCurrentStateMetadata(key, value);
+            this.meshView.setCurrentStateMetadata(key, value);
             this.showStatus(`Added "${key}" to state metadata`, 'success');
         } else {
             // Add to shared/persistent metadata
@@ -197,13 +200,12 @@ export class MetadataPanel {
     /**
      * Format a value for display.
      * @param {*} value - The value to format
+     * @param {string} [key] - Optional key name for context-aware formatting
      * @returns {string} Formatted string
      */
-    formatValue(value) {
-        if (typeof value === 'object') {
-            return JSON.stringify(value, null, 2);
-        }
-        return String(value);
+    formatValue(value, key = '') {
+        // Use the centralized metadata value formatter which handles timestamps
+        return formatMetadataValue(key, value);
     }
     
     /**
@@ -300,7 +302,7 @@ export class MetadataPanel {
         
         const typeClass = this.getValueTypeClass(value);
         const typeLabel = this.getTypeLabel(value);
-        const displayValue = this.formatValue(value);
+        const displayValue = this.formatValue(value, key);
         const isLongValue = displayValue.length > 50 || displayValue.includes('\n');
         
         item.innerHTML = `
@@ -341,7 +343,10 @@ export class MetadataPanel {
      */
     startEdit(item, key, currentValue) {
         const valueDiv = item.querySelector('.metadata-value');
-        const currentDisplay = this.formatValue(currentValue);
+        // For editing, show raw value (not formatted timestamp)
+        const currentDisplay = typeof currentValue === 'object' 
+            ? JSON.stringify(currentValue, null, 2) 
+            : String(currentValue);
         const isObject = typeof currentValue === 'object';
         
         // Create edit UI
@@ -434,6 +439,14 @@ export class MetadataPanel {
     }
     
     /**
+     * Built-in annotation metadata fields that are always present.
+     * These are filtered from display since they're internal/structural fields.
+     * @type {Set<string>}
+     * @private
+     */
+    static BUILTIN_ANNOTATION_FIELDS = new Set(['name', 'source', 'createdAt', 'modifiedAt']);
+    
+    /**
      * Update the state-specific metadata UI.
      */
     updateStateMetadataUI() {
@@ -442,16 +455,20 @@ export class MetadataPanel {
             return;
         }
         
-        const currentIndex = this.meshObject.getCurrentStateIndex();
-        const stateMetadata = this.meshObject.getCurrentStateMetadata();
-        const keys = Object.keys(stateMetadata);
+        const currentIndex = this.meshView.getCurrentStateIndex();
+        const stateMetadata = this.meshView.getCurrentStateMetadata();
+        
+        // Filter out built-in annotation fields - only show custom/user metadata
+        const keys = Object.keys(stateMetadata).filter(
+            key => !MetadataPanel.BUILTIN_ANNOTATION_FIELDS.has(key)
+        );
         
         // Always show the section
         this.stateMetadataSection.classList.remove('hidden');
         
         // Update the section badge with current state name
         if (this.stateMetadataBadge) {
-            const stateDesc = this.meshObject.history.getDisplayDescription(currentIndex);
+            const stateDesc = this.meshView.history.getDisplayDescription(currentIndex);
             this.stateMetadataBadge.textContent = `(${stateDesc})`;
         }
         
@@ -492,7 +509,7 @@ export class MetadataPanel {
         
         const typeClass = this.getValueTypeClass(value);
         const typeLabel = this.getTypeLabel(value);
-        const displayValue = this.formatValue(value);
+        const displayValue = this.formatValue(value, key);
         const isLongValue = displayValue.length > 50 || displayValue.includes('\n');
         
         item.innerHTML = `
@@ -735,7 +752,7 @@ export class MetadataPanel {
      * @param {string} key - The key to delete
      */
     deleteStateMetadata(key) {
-        this.meshObject.deleteCurrentStateMetadata(key);
+        this.meshView.deleteCurrentStateMetadata(key);
         this.showStatus(`Deleted state metadata "${key}"`, 'info');
         this.updateStateMetadataUI();
     }

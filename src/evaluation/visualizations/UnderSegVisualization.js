@@ -32,12 +32,12 @@ export class UnderSegVisualization extends BaseVisualization {
             return;
         }
 
-        const totalVertices = this.meshObject.positions.length / 3;
+        const totalVertices = this.meshView.positions.length / 3;
         
         // First, show matched areas subtly
         vertexErrors.forEach((errorType, idx) => {
             if (errorType === 'matched') {
-                this.meshObject.colorVertex(idx, EVALUATION_COLORS.matchedSubtle);
+                this.meshView.colorVertex(idx, EVALUATION_COLORS.matchedSubtle);
             }
         });
 
@@ -60,10 +60,10 @@ export class UnderSegVisualization extends BaseVisualization {
                 if (predSegmentLabels[i] === predId) {
                     const gtId = gtSegmentLabels[i];
                     if (gtColorMap.has(gtId)) {
-                        this.meshObject.colorVertex(i, gtColorMap.get(gtId));
+                        this.meshView.colorVertex(i, gtColorMap.get(gtId));
                     } else {
                         // Part of pred that doesn't correspond to significant GT
-                        this.meshObject.colorVertex(i, EVALUATION_COLORS.underseg);
+                        this.meshView.colorVertex(i, EVALUATION_COLORS.underseg);
                     }
                 }
             }
@@ -72,11 +72,11 @@ export class UnderSegVisualization extends BaseVisualization {
         // Show GT edges to highlight where splits should have occurred
         if (this.evaluationManager.groundTruth) {
             this.evaluationManager.groundTruth.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.gtEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.gtEdge);
             });
         }
 
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = true;
     }
 
@@ -87,10 +87,10 @@ export class UnderSegVisualization extends BaseVisualization {
     _showNoErrorsState() {
         if (this.evaluationManager.groundTruth) {
             this.evaluationManager.groundTruth.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.gtEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.gtEdge);
             });
         }
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = true;
     }
 

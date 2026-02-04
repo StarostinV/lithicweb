@@ -14,11 +14,20 @@ import { Annotation } from '../geometry/Annotation.js';
  * - Support for GT/Pred evaluation labels
  * - Cloud sync tracking via cloudStateId
  * 
- * ## Events
+ * ## Event Bus Integration
  * 
- * The library emits events via the global EventBus:
- * - `Events.LIBRARY_CHANGED` - When library changes (save, delete, rename, update)
+ * Emits:
+ * - `Events.LIBRARY_CHANGED` - When library changes (save, delete, rename, update, cloud_linked)
  * - `Events.LIBRARY_CLEARED` - When library is cleared
+ * 
+ * The LibraryPanel subscribes to `Events.ANNOTATION_LOADED` (from cloud/model sources)
+ * and automatically saves loaded annotations to this library.
+ * 
+ * ## Memory Optimization
+ * 
+ * - Annotations are lightweight (edgeIndices Set + arrows Array + metadata Object)
+ * - All public methods return clones to prevent external mutation
+ * - Cloud links tracked in a separate Map for O(1) lookup by cloudStateId
  * 
  * @example
  * const library = new AnnotationLibrary();
@@ -32,6 +41,10 @@ import { Annotation } from '../geometry/Annotation.js';
  * 
  * // List all annotations
  * const all = library.getAll();
+ * 
+ * // Track cloud sync
+ * library.setCloudLink(id, 'cloud-state-123');
+ * const synced = library.isCloudSynced(id);  // true
  */
 export class AnnotationLibrary {
     constructor() {

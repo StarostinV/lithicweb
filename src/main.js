@@ -12,6 +12,7 @@ import DrawLines from './components/drawLines.js';
 import MeshLoader from './loaders/meshLoader.js';
 import DrawBrush from './components/drawBrush.js';
 import { HistoryPanel } from './components/historyPanel.js';
+import { LibraryPanel } from './components/libraryPanel.js';
 import { ModelPanel } from './components/modelPanel.js';
 import { MetadataPanel } from './components/metadataPanel.js';
 import { ConnectionManager } from './components/connectionManager.js';
@@ -23,6 +24,7 @@ import { UserConfig } from './utils/UserConfig.js';
 import { CloudStoragePanel } from './components/cloudStoragePanel.js';
 import { initUI } from './components/uiSetup.js';
 import { MeshView } from './components/MeshView.js';
+import { AnnotationLibrary } from './utils/AnnotationLibrary.js';
 
 
 // User configuration (persisted to localStorage)
@@ -36,45 +38,64 @@ const mode = new Mode(scene);
 
 // Mesh (geometry) + View (rendering + editing)
 const basicMesh = new BasicMesh();
-const meshObject = new MeshView(scene, basicMesh);
+const meshView = new MeshView(scene, basicMesh);
 
 // Arrow drawer
-const arrowDrawer = new ArrowDrawer(scene.canvas, meshObject, mode);
+const arrowDrawer = new ArrowDrawer(scene.canvas, meshView, mode);
 
-const drawLines = new DrawLines(scene, meshObject, mode);
+const drawLines = new DrawLines(scene, meshView, mode);
 
-const drawBrush = new DrawBrush(scene, mode, meshObject);
+const drawBrush = new DrawBrush(scene, mode, meshView);
 
-const meshLoader = new MeshLoader(meshObject, arrowDrawer);
+const meshLoader = new MeshLoader(meshView, arrowDrawer);
+
+// Annotation library (stores saved annotations)
+const annotationLibrary = new AnnotationLibrary();
 
 // Evaluation manager (must be created before panels that depend on it)
-const evaluationManager = new EvaluationManager(meshObject);
+const evaluationManager = new EvaluationManager(meshView);
 
-// History panel (with evaluation manager for GT/Pred labels)
-const historyPanel = new HistoryPanel(meshObject);
-historyPanel.setEvaluationManager(evaluationManager);
+// Clear library, evaluation, and metadata when a new mesh is loaded
+eventBus.on(Events.MESH_LOADED, () => {
+    console.log('[main] Mesh loaded - clearing library, evaluation, and resetting metadata');
+    annotationLibrary.clear();
+    evaluationManager.clearGroundTruth();
+    evaluationManager.clearPrediction();
+    // Note: meshLoader.metadata is already set by the loader when loading from file/cloud
+    // This ensures any stale metadata is cleared if a mesh load fails or loads with no metadata
+}, 'main');
+
+// History panel (simple undo/redo timeline)
+const historyPanel = new HistoryPanel(meshView);
+
+// Library panel (saved annotations management, GT/Pred tags)
+const libraryPanel = new LibraryPanel(meshView, annotationLibrary);
+libraryPanel.setEvaluationManager(evaluationManager);
 
 // Connection manager (shared across app for server connection)
 const connectionManager = new ConnectionManager();
 
 // Model panel (AI inference) - with evaluation manager to auto-assign predictions
-const modelPanel = new ModelPanel(meshObject, connectionManager);
+const modelPanel = new ModelPanel(meshView, connectionManager);
 modelPanel.setEvaluationManager(evaluationManager);
 
 // Evaluation panel
-const evaluationPanel = new EvaluationPanel(meshObject, evaluationManager);
+const evaluationPanel = new EvaluationPanel(meshView, evaluationManager);
 
 // Metadata panel
-const metadataPanel = new MetadataPanel(meshObject, meshLoader);
+const metadataPanel = new MetadataPanel(meshView, meshLoader);
 
 // Cloud storage panel
-const cloudStoragePanel = new CloudStoragePanel(meshObject, meshLoader, connectionManager);
+const cloudStoragePanel = new CloudStoragePanel(meshView, meshLoader, connectionManager);
 
 // Wire up cloud storage panel to model panel for optimized mesh loading
 modelPanel.setCloudStoragePanel(cloudStoragePanel);
 
+// Wire up cloud storage panel to library panel for cloud upload functionality
+libraryPanel.setCloudStoragePanel(cloudStoragePanel);
+
 // Rendering panel (view mode controls) - with userConfig for persistence
-const renderingPanel = new RenderingPanel(scene, meshObject, userConfig);
+const renderingPanel = new RenderingPanel(scene, meshView, userConfig);
 
 // Settings panel (settings management)
 const settingsPanel = new SettingsPanel(userConfig, renderingPanel);
@@ -86,11 +107,11 @@ document.getElementById('resetRenderingBtn').addEventListener('click', () => {
 
 document.getElementById('exportAnnotations').addEventListener('click', () => {
     // Include current state's metadata under the 'state-metadata' key
-    const stateMetadata = meshObject.getCurrentStateMetadata();
+    const stateMetadata = meshView.getCurrentStateMetadata();
     const additionalMetadata = Object.keys(stateMetadata).length > 0 
         ? { 'state-metadata': stateMetadata } 
         : {};
-    exportAnnotations(meshObject.mesh, meshObject.meshColors, arrowDrawer, meshLoader, additionalMetadata);
+    exportAnnotations(meshView.mesh, meshView.meshColors, arrowDrawer, meshLoader, additionalMetadata);
 });
 
 // Track current panel for evaluation mode management
@@ -184,7 +205,7 @@ function syncAnnotationTabWithMode(mode) {
     
     if (!edgeTab || !arrowTab) return;
     
-    const isEdgeMode = [MODES.DRAW, MODES.ERASE, MODES.DRAWLINES].includes(mode);
+    const isEdgeMode = [MODES.DRAW, MODES.ERASE, MODES.DRAWLINES, MODES.RIDGE].includes(mode);
     const isArrowMode = [MODES.ARROW, MODES.DELETEARROWS].includes(mode);
     
     // Update tab active state
@@ -217,6 +238,12 @@ document.getElementById('modelPanelBtn').addEventListener('click', () => {
 document.getElementById('historyPanelBtn').addEventListener('click', () => {
     showHidePanel('historyPanel');
     setActiveNavBtn('historyPanelBtn');
+    mode.setMode(MODES.VIEW, true);
+});
+
+document.getElementById('libraryPanelBtn').addEventListener('click', () => {
+    showHidePanel('libraryPanel');
+    setActiveNavBtn('libraryPanelBtn');
     mode.setMode(MODES.VIEW, true);
 });
 
@@ -255,12 +282,12 @@ window.addEventListener('keydown', (event) => {
     // Ctrl+Z for undo
     if (event.ctrlKey && event.key === 'z' && !event.shiftKey) {
         event.preventDefault();
-        meshObject.undo();
+        meshView.undo();
     }
     // Ctrl+Shift+Z or Ctrl+Y for redo
     else if ((event.ctrlKey && event.shiftKey && event.key === 'Z') || (event.ctrlKey && event.key === 'y')) {
         event.preventDefault();
-        meshObject.redo();
+        meshView.redo();
     }
 });
 
@@ -275,9 +302,12 @@ function updateRendererSize() {
     const navbar = document.querySelector('.navbar');
     const sidebar = document.getElementById('sideMenu');
     const navbarHeight = navbar?.offsetHeight || 64;
-    const sidebarWidth = sidebar?.offsetWidth || 380;
     
-    // Canvas is sized to visible area (excluding sidebar)
+    // Check if sidebar is collapsed - if so, use full width
+    const isSidebarCollapsed = sidebar?.classList.contains('sidebar-collapsed');
+    const sidebarWidth = isSidebarCollapsed ? 0 : (sidebar?.offsetWidth || 380);
+    
+    // Canvas is sized to visible area (excluding sidebar if visible)
     const width = window.innerWidth - sidebarWidth;
     const height = window.innerHeight - navbarHeight;
     
@@ -297,12 +327,14 @@ updateRendererSize();
 // Export for debugging
 window.debugGlobalVar.connectionManager = connectionManager;
 window.debugGlobalVar.evaluationManager = evaluationManager;
-window.debugGlobalVar.meshObject = meshObject;
+window.debugGlobalVar.meshView = meshView;
 window.debugGlobalVar.basicMesh = basicMesh;
 window.debugGlobalVar.meshLoader = meshLoader;
 window.debugGlobalVar.metadataPanel = metadataPanel;
 window.debugGlobalVar.cloudStoragePanel = cloudStoragePanel;
 window.debugGlobalVar.renderingPanel = renderingPanel;
 window.debugGlobalVar.settingsPanel = settingsPanel;
+window.debugGlobalVar.annotationLibrary = annotationLibrary;
+window.debugGlobalVar.libraryPanel = libraryPanel;
 window.debugGlobalVar.scene = scene;
 window.debugGlobalVar.userConfig = userConfig;

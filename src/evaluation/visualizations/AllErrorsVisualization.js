@@ -55,17 +55,17 @@ export class AllErrorsVisualization extends BaseVisualization {
                 default:
                     color = EVALUATION_COLORS.neutral;
             }
-            this.meshObject.colorVertex(vertexIdx, color);
+            this.meshView.colorVertex(vertexIdx, color);
         });
 
         // Show GT edges as overlay
         if (this.evaluationManager.groundTruth) {
             this.evaluationManager.groundTruth.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.gtEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.gtEdge);
             });
         }
 
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = true;
     }
 
@@ -76,10 +76,10 @@ export class AllErrorsVisualization extends BaseVisualization {
     _showNoErrorsState() {
         if (this.evaluationManager.groundTruth) {
             this.evaluationManager.groundTruth.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.gtEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.gtEdge);
             });
         }
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = true;
     }
 

@@ -39,6 +39,12 @@
     --sidebar-width: 380px;
     --border-radius: 8px;
     
+    /* Responsive Breakpoints (for reference in media queries) */
+    /* --breakpoint-sm: 640px;   Small tablets */
+    /* --breakpoint-md: 768px;   Medium tablets */
+    /* --breakpoint-lg: 1024px;  Large tablets / small laptops */
+    /* --breakpoint-xl: 1280px;  Desktops */
+    
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);

@@ -272,3 +272,69 @@
     font-family: monospace;
     margin: 0 2px;
 }
+
+/* ==========================================================================
+   Edge Detection Controls
+   ========================================================================== */
+
+.edge-detection-controls {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--gray-200);
+}
+
+.edge-detection-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.edge-detection-stats {
+    margin-top: 12px;
+    padding: 10px;
+    background: var(--gray-50);
+    border-radius: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.edge-detection-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 80px;
+}
+
+.edge-detection-stat .stat-label {
+    font-size: 10px;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+.edge-detection-stat .stat-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.edge-detection-stat.highlight {
+    flex: 1 0 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--primary-light);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
+.edge-detection-stat.highlight .stat-label {
+    color: var(--primary-dark);
+}
+
+.edge-detection-stat.highlight .stat-value {
+    color: var(--primary);
+    font-size: 14px;
+}

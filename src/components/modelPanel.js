@@ -7,15 +7,24 @@
  * Subscribes to:
  * - `Events.CONNECTION_CHANGED` - Updates UI when connection status changes
  * 
+ * Emits:
+ * - `Events.ANNOTATION_LOADED` - When model inference results are applied (for library auto-save)
+ * 
+ * ## Memory Optimization
+ * 
+ * All event subscriptions use namespaces ('modelPanel') for efficient cleanup.
+ * The dispose() method removes all subscriptions via offNamespace() to prevent leaks.
+ * 
  * @module ModelPanel
  */
 
 import { lithicClient, DEFAULT_INFERENCE_CONFIG, CONFIG_PARAMS } from '../api/lithicClient.js';
 import { eventBus, Events } from '../utils/EventBus.js';
+import { Annotation } from '../geometry/Annotation.js';
 
 export class ModelPanel {
-    constructor(meshObject, connectionManager = null) {
-        this.meshObject = meshObject;
+    constructor(meshView, connectionManager = null) {
+        this.meshView = meshView;
         this.connectionManager = connectionManager; // Kept for backward compatibility
         this.evaluationManager = null;
         this.cloudStoragePanel = null;
@@ -263,7 +272,7 @@ export class ModelPanel {
     // ============== Upload & Inference ==============
 
     async uploadCurrentMesh() {
-        if (this.meshObject.isNull()) {
+        if (this.meshView.isNull()) {
             this.setStatus('No mesh loaded in viewer', 'error');
             return;
         }
@@ -347,8 +356,8 @@ export class ModelPanel {
      * Returns vertices as [[x,y,z], ...] and faces as [[v0,v1,v2], ...]
      */
     extractMeshData() {
-        const positions = this.meshObject.positions;
-        const indices = this.meshObject.indices;
+        const positions = this.meshView.positions;
+        const indices = this.meshView.indices;
         const numVertices = positions.length / 3;
         const numFaces = indices.length / 3;
         
@@ -422,6 +431,14 @@ export class ModelPanel {
         }
     }
 
+    /**
+     * Apply inference results to the mesh view.
+     * Creates an Annotation and emits ANNOTATION_LOADED for library auto-save.
+     * 
+     * @param {Object} result - Inference result from server
+     * @param {Array<number>} result.labels - Edge labels (0 or 1)
+     * @returns {number} Number of edge vertices applied
+     */
     applyResults(result) {
         if (!result) {
             this.setStatus('No inference results to apply', 'error');
@@ -439,7 +456,7 @@ export class ModelPanel {
         }
         
         // Start a draw operation for history tracking
-        this.meshObject.startDrawOperation('model');
+        this.meshView.startDrawOperation('model');
         
         // Build set of edge indices from inference results
         const edgeIndices = new Set();
@@ -450,34 +467,50 @@ export class ModelPanel {
         }
         
         // Clear current edges and apply new ones
-        this.meshObject.currentEdgeIndices.forEach(index => {
-            this.meshObject.edgeLabels[index] = 0;
-            this.meshObject.colorVertex(index, this.meshObject.objectColor);
+        this.meshView.currentEdgeIndices.forEach(index => {
+            this.meshView.edgeLabels[index] = 0;
+            this.meshView.colorVertex(index, this.meshView.objectColor);
         });
-        this.meshObject.currentEdgeIndices.clear();
+        this.meshView.currentEdgeIndices.clear();
         
         // Apply inference edges
         edgeIndices.forEach(index => {
-            if (index < this.meshObject.edgeLabels.length) {
-                this.meshObject.edgeLabels[index] = 1;
-                this.meshObject.colorVertex(index, this.meshObject.edgeColor);
-                this.meshObject.currentEdgeIndices.add(index);
+            if (index < this.meshView.edgeLabels.length) {
+                this.meshView.edgeLabels[index] = 1;
+                this.meshView.colorVertex(index, this.meshView.edgeColor);
+                this.meshView.currentEdgeIndices.add(index);
             }
         });
         
         // Finish draw operation to record in history (type 'model' -> 'AI segmentation')
-        this.meshObject.finishDrawOperation();
+        this.meshView.finishDrawOperation();
+        
+        // Create Annotation object from inference results for library auto-save
+        const annotation = new Annotation({
+            edgeIndices: edgeIndices,
+            arrows: [],
+            metadata: {
+                name: `Model Prediction ${new Date().toLocaleString()}`,
+                source: 'model',
+                config: { ...this.config }  // Include model config for reproducibility
+            }
+        });
+        
+        // Emit ANNOTATION_LOADED for library auto-save
+        eventBus.emit(Events.ANNOTATION_LOADED, {
+            annotation: annotation,
+            source: 'model'
+        });
         
         // Automatically set this state as the prediction in evaluation manager
         if (this.evaluationManager) {
-            const currentIndex = this.meshObject.history.getCurrentIndex();
-            this.evaluationManager.setPrediction(currentIndex, 'AI Prediction');
-            console.log('[ModelPanel] Auto-assigned prediction label to state', currentIndex);
+            this.evaluationManager.setPrediction(annotation);
+            console.log('[ModelPanel] Auto-assigned prediction from AI inference');
         }
         
         // Update segments if auto-segmentation is enabled
         if (document.getElementById('auto-segments')?.checked) {
-            this.meshObject.updateSegments();
+            this.meshView.updateSegments();
         }
         
         return edgeIndices.size;

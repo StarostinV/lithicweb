@@ -30,12 +30,12 @@ export class MissingPredVisualization extends BaseVisualization {
             return;
         }
 
-        const totalVertices = this.meshObject.positions.length / 3;
+        const totalVertices = this.meshView.positions.length / 3;
         
         // First, show matched areas subtly
         vertexErrors.forEach((errorType, idx) => {
             if (errorType === 'matched') {
-                this.meshObject.colorVertex(idx, EVALUATION_COLORS.matchedSubtle);
+                this.meshView.colorVertex(idx, EVALUATION_COLORS.matchedSubtle);
             }
         });
 
@@ -50,10 +50,10 @@ export class MissingPredVisualization extends BaseVisualization {
                 const detail = missingPredDetails.find(d => d.predId === predId);
                 if (detail && detail.bestCoverage < 0.05) {
                     // Complete hallucination - bright yellow
-                    this.meshObject.colorVertex(i, EVALUATION_COLORS.missingPred);
+                    this.meshView.colorVertex(i, EVALUATION_COLORS.missingPred);
                 } else {
                     // Partial hallucination - darker yellow
-                    this.meshObject.colorVertex(i, EVALUATION_COLORS.missingPred.clone().multiplyScalar(0.7));
+                    this.meshView.colorVertex(i, EVALUATION_COLORS.missingPred.clone().multiplyScalar(0.7));
                 }
             }
         }
@@ -61,18 +61,18 @@ export class MissingPredVisualization extends BaseVisualization {
         // Show GT edges for reference
         if (this.evaluationManager.groundTruth) {
             this.evaluationManager.groundTruth.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.gtEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.gtEdge);
             });
         }
 
         // Show pred edges to see what was predicted
         if (this.evaluationManager.prediction) {
             this.evaluationManager.prediction.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.predEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.predEdge);
             });
         }
 
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = true;
     }
 
@@ -83,10 +83,10 @@ export class MissingPredVisualization extends BaseVisualization {
     _showNoErrorsState() {
         if (this.evaluationManager.groundTruth) {
             this.evaluationManager.groundTruth.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.gtEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.gtEdge);
             });
         }
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = true;
     }
 

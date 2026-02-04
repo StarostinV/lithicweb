@@ -2,6 +2,10 @@
  * Canvas Container Styles
  * =======================
  * Main 3D viewport area and cursor states.
+ * 
+ * By default, canvas reserves space for sidebar so the 3D object
+ * is centered in the available area. When sidebar is collapsed,
+ * canvas expands to fill the entire viewport.
  */
 
 .canvas-container {
@@ -11,6 +15,12 @@
     right: var(--sidebar-width);
     bottom: 0;
     z-index: 1;
+    transition: right 0.3s ease;
+}
+
+/* Full-screen canvas when sidebar is collapsed */
+.canvas-container.canvas-fullscreen {
+    right: 0;
 }
 
 .canvas-container canvas {
@@ -69,7 +79,61 @@
     font-size: 14px;
 }
 
-/* Floating Controls */
+/* Transform Mode Indicator (Rotate/Move) */
+.transform-mode-indicator {
+    --transform-color: #0ea5e9;
+    position: fixed;
+    bottom: 24px;
+    left: 140px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid var(--transform-color);
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--transform-color);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(8px);
+    z-index: 50;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    user-select: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-10px);
+}
+
+.transform-mode-indicator.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+}
+
+.transform-mode-indicator:hover {
+    transform: scale(1.05);
+    box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1));
+}
+
+.transform-mode-indicator.visible:hover {
+    transform: scale(1.05);
+}
+
+.transform-mode-indicator:active {
+    transform: scale(0.98);
+}
+
+.transform-mode-indicator i {
+    font-size: 14px;
+}
+
+.transform-mode-indicator.move-mode {
+    --transform-color: #f59e0b;
+}
+
+/* Floating Controls - centered in the canvas area */
 .floating-controls {
     position: fixed;
     bottom: 24px;
@@ -78,6 +142,12 @@
     display: flex;
     gap: 12px;
     z-index: 50;
+    transition: left 0.3s ease;
+}
+
+/* Center floating controls when sidebar is collapsed */
+body.sidebar-collapsed .floating-controls {
+    left: 50%;
 }
 
 .floating-btn {
@@ -119,4 +189,58 @@
 
 .floating-action-btn:not(:disabled):active {
     transform: scale(0.95);
+}
+
+/* ==========================================================================
+   Responsive Styles
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+    .canvas-container {
+        right: 340px;
+    }
+    
+    .canvas-container.canvas-fullscreen {
+        right: 0;
+    }
+    
+    .floating-controls {
+        left: calc((100vw - 340px) / 2);
+    }
+    
+    body.sidebar-collapsed .floating-controls {
+        left: 50%;
+    }
+}
+
+@media (max-width: 768px) {
+    /* On mobile, canvas is always full width (sidebar overlays it) */
+    .canvas-container {
+        right: 0;
+    }
+    
+    .floating-controls {
+        left: 50%;
+    }
+    
+    /* Adjust mode indicators for mobile */
+    .mode-indicator {
+        left: 16px;
+        bottom: 16px;
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+    
+    .transform-mode-indicator {
+        left: 120px;
+        bottom: 16px;
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+    
+    .floating-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 16px;
+    }
 }

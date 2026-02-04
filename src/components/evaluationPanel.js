@@ -38,11 +38,11 @@ import {
 export class EvaluationPanel {
     /**
      * Create an EvaluationPanel.
-     * @param {MeshObject} meshObject - The mesh object
+     * @param {MeshView} meshView - The mesh view object
      * @param {EvaluationManager} evaluationManager - The evaluation manager
      */
-    constructor(meshObject, evaluationManager) {
-        this.meshObject = meshObject;
+    constructor(meshView, evaluationManager) {
+        this.meshView = meshView;
         this.evaluationManager = evaluationManager;
 
         // Default threshold values
@@ -90,8 +90,8 @@ export class EvaluationPanel {
      */
     _onGtChanged(data) {
         if (this.gtStatusEl) {
-            if (data.stateIndex !== null) {
-                this.gtStatusEl.textContent = data.description || `State #${data.stateIndex}`;
+            if (data.isSet) {
+                this.gtStatusEl.textContent = data.description || 'Ground Truth';
                 this.gtStatusEl.classList.remove('text-gray-400');
                 this.gtStatusEl.classList.add('text-green-600');
             } else {
@@ -109,8 +109,8 @@ export class EvaluationPanel {
      */
     _onPredChanged(data) {
         if (this.predStatusEl) {
-            if (data.stateIndex !== null) {
-                this.predStatusEl.textContent = data.description || `State #${data.stateIndex}`;
+            if (data.isSet) {
+                this.predStatusEl.textContent = data.description || 'Prediction';
                 this.predStatusEl.classList.remove('text-gray-400');
                 this.predStatusEl.classList.add('text-purple-600');
             } else {
@@ -261,8 +261,8 @@ export class EvaluationPanel {
         if (result) {
             this._displayMetrics(result);
             
-            // Save metrics to state-metadata of the prediction state
-            this._saveMetricsToStateMetadata(result);
+            // Log metrics
+            this._logMetrics(result);
             
             // Apply default visualization
             const selectedMode = document.querySelector('input[name="evalVizMode"]:checked')?.value || 'all';
@@ -271,59 +271,31 @@ export class EvaluationPanel {
     }
     
     /**
-     * Save evaluation metrics to the state-metadata of the prediction state.
+     * Log evaluation metrics (could be saved to annotation metadata in future).
      * @private
      * @param {Object} result - The metrics result object
      */
-    _saveMetricsToStateMetadata(result) {
-        const predIndex = this.evaluationManager.getPredictionIndex();
-        const gtIndex = this.evaluationManager.getGroundTruthIndex();
+    _logMetrics(result) {
+        const summary = this.evaluationManager.getSummary();
         
-        if (predIndex === null) return;
-        
-        // Create a well-structured, serializable summary of the metrics
-        const metricsSummary = {
-            general: {
-                computedAt: new Date().toISOString(),
-                gtStateIndex: gtIndex,
-                nGtInstances: result.nGtInstances,
-                nPredInstances: result.nPredInstances
-            },
+        console.log('Evaluation metrics:', {
+            gt: summary.groundTruthDescription,
+            pred: summary.predictionDescription,
             thresholds: {
-                iouThresh: this.iouThreshold,
-                oversegThresh: this.oversegThreshold,
-                undersegThresh: this.undersegThreshold
+                iou: this.iouThreshold,
+                overseg: this.oversegThreshold,
+                underseg: this.undersegThreshold
             },
-            detection: {
+            results: {
                 TP: result.TP,
                 FP: result.FP,
                 FN: result.FN,
                 precision: result.precision,
                 recall: result.recall,
-                f1: result.f1
-            },
-            panoptic: {
-                PQ: result.PQ,
-                RQ: result.RQ,
-                SQ: result.SQ,
-                meanIou: result.meanIou
-            },
-            errors: {
-                nOversegGt: result.nOversegGt,
-                nUndersegPred: result.nUndersegPred,
-                nMissingGt: result.nMissingGt,
-                nMissingPred: result.nMissingPred,
-                oversegFrac: result.oversegFrac,
-                undersegFrac: result.undersegFrac,
-                missingGtFrac: result.missingGtFrac,
-                missingPredFrac: result.missingPredFrac
+                f1: result.f1,
+                PQ: result.PQ
             }
-        };
-        
-        // Save to state-metadata
-        this.meshObject.setStateMetadata(predIndex, 'evaluation', metricsSummary);
-        
-        console.log(`Saved evaluation metrics to state #${predIndex} metadata`);
+        });
     }
 
     /**
@@ -475,22 +447,22 @@ export class EvaluationPanel {
     _createVisualization(mode) {
         switch (mode) {
             case 'gt':
-                return new GTVisualization(this.meshObject, this.evaluationManager);
+                return new GTVisualization(this.meshView, this.evaluationManager);
             case 'pred':
-                return new PredVisualization(this.meshObject, this.evaluationManager);
+                return new PredVisualization(this.meshView, this.evaluationManager);
             case 'matched':
-                return new MatchedVisualization(this.meshObject, this.evaluationManager);
+                return new MatchedVisualization(this.meshView, this.evaluationManager);
             case 'overseg':
-                return new OverSegVisualization(this.meshObject, this.evaluationManager);
+                return new OverSegVisualization(this.meshView, this.evaluationManager);
             case 'underseg':
-                return new UnderSegVisualization(this.meshObject, this.evaluationManager);
+                return new UnderSegVisualization(this.meshView, this.evaluationManager);
             case 'missingGt':
-                return new MissingGTVisualization(this.meshObject, this.evaluationManager);
+                return new MissingGTVisualization(this.meshView, this.evaluationManager);
             case 'missingPred':
-                return new MissingPredVisualization(this.meshObject, this.evaluationManager);
+                return new MissingPredVisualization(this.meshView, this.evaluationManager);
             case 'all':
             default:
-                return new AllErrorsVisualization(this.meshObject, this.evaluationManager);
+                return new AllErrorsVisualization(this.meshView, this.evaluationManager);
         }
     }
 
@@ -531,14 +503,14 @@ export class EvaluationPanel {
         
         // Update GT status
         this._onGtChanged({
-            stateIndex: state.hasGroundTruth ? state.groundTruthIndex : null,
-            description: state.hasGroundTruth ? `State #${state.groundTruthIndex}` : null
+            isSet: state.hasGroundTruth,
+            description: state.groundTruthDescription
         });
         
         // Update Pred status
         this._onPredChanged({
-            stateIndex: state.hasPrediction ? state.predictionIndex : null,
-            description: state.hasPrediction ? `State #${state.predictionIndex}` : null
+            isSet: state.hasPrediction,
+            description: state.predictionDescription
         });
         
         // Update metrics display if available

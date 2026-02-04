@@ -104,8 +104,8 @@ function createArrowComponents(startPoint, endPoint, color, shaftRadius, headRad
 
 
 export class ArrowDrawer {
-    constructor(canvas, meshObject, mode) {
-        this.meshObject = meshObject;
+    constructor(canvas, meshView, mode) {
+        this.meshView = meshView;
         this.canvas = canvas;
         this.mode = mode;
         this.isDrawing = false;
@@ -149,10 +149,10 @@ export class ArrowDrawer {
     loadArrowFromArray(data) {
         const startIndex = data.startIndex;
         const endIndex = data.endIndex;
-        const startPoint = this.meshObject.indexToVertex(startIndex);
-        const startNormal = this.meshObject.getVertexNormal(startIndex);
-        const endPoint = this.meshObject.indexToVertex(endIndex);
-        const endNormal = this.meshObject.getVertexNormal(endIndex);
+        const startPoint = this.meshView.indexToVertex(startIndex);
+        const startNormal = this.meshView.getVertexNormal(startIndex);
+        const endPoint = this.meshView.indexToVertex(endIndex);
+        const endNormal = this.meshView.getVertexNormal(endIndex);
         const arrow = new Arrow(
             startPoint, startNormal, startIndex, this.offset, 0xff0000, 0.02, 0.05, 0.2
         )
@@ -163,7 +163,7 @@ export class ArrowDrawer {
 
 
     mesh() {
-        return this.meshObject.mesh;
+        return this.meshView.mesh;
     }
 
     leftClick(event) {
@@ -187,7 +187,7 @@ export class ArrowDrawer {
     }
 
     startDrawing(event) {
-        const [intersectPoint, faceIndex, vertexNormal, closestVertexIndex, firstVertex] = this.meshObject.getAllIntersectionInfo(event);
+        const [intersectPoint, faceIndex, vertexNormal, closestVertexIndex, firstVertex] = this.meshView.getAllIntersectionInfo(event);
         if (faceIndex === -1) return;
         this.isDrawing = true;
 
@@ -207,7 +207,7 @@ export class ArrowDrawer {
 
     updateArrow(event) {
         if (!this.isDrawing) return;
-        const [intersectPoint, faceIndex, vertexNormal, closestVertexIndex, endVertex] = this.meshObject.getAllIntersectionInfo(event);
+        const [intersectPoint, faceIndex, vertexNormal, closestVertexIndex, endVertex] = this.meshView.getAllIntersectionInfo(event);
         if (closestVertexIndex === -1) return;
         this.arrow.updateArrow(endVertex, vertexNormal, closestVertexIndex);
     }
@@ -227,7 +227,7 @@ export class ArrowDrawer {
     }
 
     getIntersectedArrow(event) {
-        const intersectFinder = this.meshObject.intersectFinder;
+        const intersectFinder = this.meshView.intersectFinder;
 
         intersectFinder.getMousePosition(event);
 

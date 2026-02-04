@@ -1,12 +1,12 @@
 /**
  * EvaluationManager - Central coordinator for evaluation mode.
  * 
- * Manages the comparison between ground truth and prediction states,
+ * Manages the comparison between ground truth and prediction annotations,
  * coordinates metrics computation, and controls visualization modes.
  * 
  * Key responsibilities:
- * - Store GT and Prediction state references
- * - Compute segments for comparison states
+ * - Store GT and Prediction annotations
+ * - Compute segments for comparison
  * - Trigger metrics computation
  * - Manage visualization modes
  * - Restore original state when exiting evaluation
@@ -15,21 +15,13 @@
  * 
  * EvaluationManager emits the following events via the global EventBus:
  * - `Events.EVALUATION_GT_CHANGED` - When ground truth is set/cleared
- *   Data: { stateIndex: number|null, description: string|null }
+ *   Data: { isSet: boolean, annotation: Annotation|null, description: string|null }
  * - `Events.EVALUATION_PRED_CHANGED` - When prediction is set/cleared
- *   Data: { stateIndex: number|null, description: string|null }
+ *   Data: { isSet: boolean, annotation: Annotation|null, description: string|null }
  * - `Events.EVALUATION_METRICS_COMPUTED` - When metrics are computed
  *   Data: { metrics: object }
  * - `Events.EVALUATION_MODE_CHANGED` - When evaluation mode is entered/exited
  *   Data: { isActive: boolean }
- * 
- * Components can subscribe to these events instead of using addListener():
- * ```javascript
- * import { eventBus, Events } from '../utils/EventBus.js';
- * eventBus.on(Events.EVALUATION_GT_CHANGED, (data) => {
- *     console.log('GT changed:', data.stateIndex);
- * });
- * ```
  * 
  * @module EvaluationManager
  */
@@ -38,11 +30,12 @@ import * as THREE from 'three';
 import { eventBus, Events } from '../utils/EventBus.js';
 import { computeInstanceSegmentationMetrics, classifyVertexErrors } from './MetricsComputer.js';
 import { MeshSegmenter } from '../geometry/segmentation.js';
+import { Annotation } from '../geometry/Annotation.js';
 
 /**
  * @typedef {Object} EvaluationState
- * @property {Set<number>} edgeIndices - Set of vertex indices marked as edges
- * @property {number} stateIndex - Index in history timeline
+ * @property {Annotation} annotation - The annotation object
+ * @property {Set<number>} edgeIndices - Set of vertex indices marked as edges (derived from annotation)
  * @property {string} description - Human-readable description
  */
 
@@ -52,11 +45,11 @@ import { MeshSegmenter } from '../geometry/segmentation.js';
 export class EvaluationManager {
     /**
      * Create an EvaluationManager.
-     * @param {MeshObject} meshObject - The mesh object to evaluate
+     * @param {MeshView} meshView - The mesh object to evaluate
      */
-    constructor(meshObject) {
-        /** @type {MeshObject} */
-        this.meshObject = meshObject;
+    constructor(meshView) {
+        /** @type {MeshView} */
+        this.meshView = meshView;
 
         /** @type {EvaluationState|null} */
         this.groundTruth = null;
@@ -79,120 +72,37 @@ export class EvaluationManager {
         /** @type {Set<number>|null} - Saved state before entering evaluation */
         this.savedState = null;
 
-        /** @type {Function[]} */
-        this.listeners = [];
-
         // Segmenter for computing segments on arbitrary edge states
-        this.segmenter = new MeshSegmenter(meshObject);
-        
-        /** @type {Function|null} - Reference to history listener for cleanup */
-        this._historyListenerCallback = null;
-        
-        // Listen to history changes to clear stale evaluation labels
-        this._setupHistoryListener();
+        this.segmenter = new MeshSegmenter(meshView);
     }
     
     /**
-     * Setup listener for history changes.
-     * Clears evaluation labels when history is cleared (e.g., new mesh loaded).
-     * @private
-     */
-    _setupHistoryListener() {
-        let previousTotalStates = this.meshObject.history.getTotalStates();
-        
-        // Store reference for cleanup in dispose()
-        this._historyListenerCallback = (history) => {
-            const currentTotal = history.getTotalStates();
-            
-            // If history was cleared (total states reset to 1 = initial state only)
-            // and we had previous states, clear evaluation labels
-            if (currentTotal === 1 && previousTotalStates > 1) {
-                console.log('[EvaluationManager] History cleared, resetting evaluation labels');
-                this.groundTruth = null;
-                this.prediction = null;
-                this.metricsResult = null;
-                this._notifyListeners('state');
-            }
-            
-            previousTotalStates = currentTotal;
-        };
-        
-        this.meshObject.history.addListener(this._historyListenerCallback);
-    }
-    
-    /**
-     * Clean up resources and listeners.
-     * Call this before discarding the EvaluationManager instance.
+     * Clean up resources.
      */
     dispose() {
-        // Remove history listener to prevent memory leaks
-        if (this._historyListenerCallback) {
-            this.meshObject.history.removeListener(this._historyListenerCallback);
-            this._historyListenerCallback = null;
-        }
-        
-        // Clear all state
         this.groundTruth = null;
         this.prediction = null;
         this.metricsResult = null;
-        this.listeners = [];
     }
 
     /**
-     * Add a listener for state changes.
-     * 
-     * @deprecated Prefer using EventBus for new code:
-     * ```javascript
-     * import { eventBus, Events } from '../utils/EventBus.js';
-     * eventBus.on(Events.EVALUATION_GT_CHANGED, (data) => { ... });
-     * eventBus.on(Events.EVALUATION_PRED_CHANGED, (data) => { ... });
-     * eventBus.on(Events.EVALUATION_METRICS_COMPUTED, (data) => { ... });
-     * eventBus.on(Events.EVALUATION_MODE_CHANGED, (data) => { ... });
-     * ```
-     * 
-     * @param {Function} callback - Called when evaluation state changes
-     */
-    addListener(callback) {
-        this.listeners.push(callback);
-    }
-
-    /**
-     * Remove a listener.
-     * @param {Function} callback - The callback to remove
-     */
-    removeListener(callback) {
-        this.listeners = this.listeners.filter(l => l !== callback);
-    }
-
-    /**
-     * Notify all listeners of state change.
-     * Emits both to legacy listeners and the global EventBus.
+     * Emit state change via EventBus.
      * @private
-     * @param {string} [eventType='state'] - Type of change for targeted EventBus emission
+     * @param {string} [eventType='state'] - Type of change
      */
     _notifyListeners(eventType = 'state') {
-        const state = {
-            groundTruth: this.groundTruth,
-            prediction: this.prediction,
-            metricsResult: this.metricsResult,
-            visualizationMode: this.visualizationMode,
-            isInEvaluationMode: this.isInEvaluationMode
-        };
-        
-        // Legacy listener pattern (for backward compatibility)
-        this.listeners.forEach(cb => cb(state));
-        
-        // EventBus pattern (preferred for new code) - emit specific events
         if (eventType === 'gt' || eventType === 'state') {
             eventBus.emit(Events.EVALUATION_GT_CHANGED, {
-                stateIndex: this.groundTruth?.stateIndex ?? null,
+                isSet: this.groundTruth !== null,
+                annotation: this.groundTruth?.annotation ?? null,
                 description: this.groundTruth?.description ?? null
             });
         }
         
         if (eventType === 'pred' || eventType === 'state') {
             eventBus.emit(Events.EVALUATION_PRED_CHANGED, {
-                stateIndex: this.prediction?.stateIndex ?? null,
+                isSet: this.prediction !== null,
+                annotation: this.prediction?.annotation ?? null,
                 description: this.prediction?.description ?? null
             });
         }
@@ -211,96 +121,41 @@ export class EvaluationManager {
     }
 
     /**
-     * Set the ground truth state from a history state index.
-     * @param {number} stateIndex - Index in history timeline (0 = initial state)
-     * @param {string} [description] - Optional description
+     * Set the ground truth annotation.
+     * @param {Annotation} annotation - The annotation to use as GT
      */
-    setGroundTruth(stateIndex, description = null) {
-        const edgeIndices = this._getEdgeIndicesForState(stateIndex);
-        if (edgeIndices) {
-            // Unprotect previous GT state if it was only protected for being GT
-            if (this.groundTruth && this.groundTruth.stateIndex !== stateIndex) {
-                this._updateProtectionForState(this.groundTruth.stateIndex);
-            }
-            
-            this.groundTruth = {
-                edgeIndices: new Set(edgeIndices),
-                stateIndex,
-                description: description || `State #${stateIndex}`
-            };
-            
-            // Protect the new GT state
-            this.meshObject.history.setProtected(stateIndex, true);
-            
-            this.metricsResult = null; // Invalidate cached metrics
-            this._notifyListeners('gt');
-        }
+    setGroundTruth(annotation) {
+        this.groundTruth = {
+            annotation: annotation.clone(),
+            edgeIndices: new Set(annotation.edgeIndices),
+            description: annotation.name || 'Ground Truth'
+        };
+        
+        this.metricsResult = null;
+        this._notifyListeners('gt');
     }
-
+    
     /**
-     * Set the prediction state from a history state index.
-     * @param {number} stateIndex - Index in history timeline (0 = initial state)
-     * @param {string} [description] - Optional description
+     * Set the prediction annotation.
+     * @param {Annotation} annotation - The annotation to use as Prediction
      */
-    setPrediction(stateIndex, description = null) {
-        const edgeIndices = this._getEdgeIndicesForState(stateIndex);
-        if (edgeIndices) {
-            // Unprotect previous Pred state if it was only protected for being Pred
-            if (this.prediction && this.prediction.stateIndex !== stateIndex) {
-                this._updateProtectionForState(this.prediction.stateIndex);
-            }
-            
-            this.prediction = {
-                edgeIndices: new Set(edgeIndices),
-                stateIndex,
-                description: description || `State #${stateIndex}`
-            };
-            
-            // Protect the new Pred state
-            this.meshObject.history.setProtected(stateIndex, true);
-            
-            this.metricsResult = null; // Invalidate cached metrics
-            this._notifyListeners('pred');
-        }
-    }
-
-    /**
-     * Update protection status for a state when a label is removed.
-     * Only unprotects if the state has no other reason to be protected.
-     * @private
-     * @param {number} stateIndex - State index to check
-     */
-    _updateProtectionForState(stateIndex) {
-        if (stateIndex === 0) return; // Initial state can't be protected
+    setPrediction(annotation) {
+        this.prediction = {
+            annotation: annotation.clone(),
+            edgeIndices: new Set(annotation.edgeIndices),
+            description: annotation.name || 'Prediction'
+        };
         
-        const action = this.meshObject.history.getActionAtIndex(stateIndex);
-        if (!action) return;
-        
-        // Check if state still needs protection for other reasons
-        const isStillGT = this.groundTruth?.stateIndex === stateIndex;
-        const isStillPred = this.prediction?.stateIndex === stateIndex;
-        const isModel = action.type === 'model';
-        const isRenamed = !!action.customDescription;
-        
-        // Only unprotect if no other reason exists
-        if (!isStillGT && !isStillPred && !isModel && !isRenamed) {
-            this.meshObject.history.setProtected(stateIndex, false);
-        }
+        this.metricsResult = null;
+        this._notifyListeners('pred');
     }
 
     /**
      * Clear the ground truth state.
      */
     clearGroundTruth() {
-        const prevIndex = this.groundTruth?.stateIndex;
         this.groundTruth = null;
         this.metricsResult = null;
-        
-        // Update protection for the previously labeled state
-        if (prevIndex !== undefined && prevIndex !== null) {
-            this._updateProtectionForState(prevIndex);
-        }
-        
         this._notifyListeners('gt');
     }
 
@@ -308,15 +163,8 @@ export class EvaluationManager {
      * Clear the prediction state.
      */
     clearPrediction() {
-        const prevIndex = this.prediction?.stateIndex;
         this.prediction = null;
         this.metricsResult = null;
-        
-        // Update protection for the previously labeled state
-        if (prevIndex !== undefined && prevIndex !== null) {
-            this._updateProtectionForState(prevIndex);
-        }
-        
         this._notifyListeners('pred');
     }
 
@@ -329,19 +177,19 @@ export class EvaluationManager {
     }
 
     /**
-     * Get the ground truth state index.
-     * @returns {number|null}
+     * Get the ground truth annotation.
+     * @returns {Annotation|null}
      */
-    getGroundTruthIndex() {
-        return this.groundTruth ? this.groundTruth.stateIndex : null;
+    getGroundTruthAnnotation() {
+        return this.groundTruth?.annotation ?? null;
     }
 
     /**
-     * Get the prediction state index.
-     * @returns {number|null}
+     * Get the prediction annotation.
+     * @returns {Annotation|null}
      */
-    getPredictionIndex() {
-        return this.prediction ? this.prediction.stateIndex : null;
+    getPredictionAnnotation() {
+        return this.prediction?.annotation ?? null;
     }
 
     /**
@@ -405,7 +253,7 @@ export class EvaluationManager {
         if (this.isInEvaluationMode) return;
 
         // Save current mesh state
-        this.savedState = new Set(this.meshObject.currentEdgeIndices);
+        this.savedState = new Set(this.meshView.currentEdgeIndices);
         this.isInEvaluationMode = true;
 
         this._notifyListeners('mode');
@@ -419,9 +267,9 @@ export class EvaluationManager {
 
         // Restore original state
         if (this.savedState) {
-            this.meshObject.restoreEdgeState(this.savedState);
+            this.meshView.restoreEdgeState(this.savedState);
             if (document.getElementById('auto-segments')?.checked) {
-                this.meshObject.updateSegments();
+                this.meshView.updateSegments();
             }
         }
 
@@ -465,25 +313,25 @@ export class EvaluationManager {
 
         const colors = this._getVisualizationColors();
         const vertexErrors = this.metricsResult.vertexErrors;
-        const totalVertices = this.meshObject.positions.length / 3;
+        const totalVertices = this.meshView.positions.length / 3;
 
         // Reset all vertices to base color first
         for (let i = 0; i < totalVertices; i++) {
-            this.meshObject.colorVertex(i, this.meshObject.objectColor);
+            this.meshView.colorVertex(i, this.meshView.objectColor);
         }
 
         // Apply visualization based on mode
         if (this.visualizationMode === 'none') {
             // Just show current state edges
             this.groundTruth?.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, this.meshObject.edgeColor);
+                this.meshView.colorVertex(i, this.meshView.edgeColor);
             });
         } else if (this.visualizationMode === 'all') {
             // Show all error types with different colors
             vertexErrors.forEach((errorType, vertexIdx) => {
                 const color = colors[errorType];
                 if (color) {
-                    this.meshObject.colorVertex(vertexIdx, color);
+                    this.meshView.colorVertex(vertexIdx, color);
                 }
             });
         } else {
@@ -492,11 +340,11 @@ export class EvaluationManager {
                 if (errorType === this.visualizationMode) {
                     const color = colors[errorType];
                     if (color) {
-                        this.meshObject.colorVertex(vertexIdx, color);
+                        this.meshView.colorVertex(vertexIdx, color);
                     }
                 } else if (errorType === 'matched') {
                     // Always show matched in a subtle way
-                    this.meshObject.colorVertex(vertexIdx, colors.matchedSubtle);
+                    this.meshView.colorVertex(vertexIdx, colors.matchedSubtle);
                 }
             });
         }
@@ -504,11 +352,11 @@ export class EvaluationManager {
         // Optionally show GT edges overlay
         if (this.showGtEdgeOverlay && this.groundTruth) {
             this.groundTruth.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, colors.gtEdge);
+                this.meshView.colorVertex(i, colors.gtEdge);
             });
         }
 
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
     }
 
     /**
@@ -530,33 +378,54 @@ export class EvaluationManager {
     }
 
     /**
+     * Get an Annotation for a specific history state.
+     * @private
+     * @param {number} stateIndex - Index in history timeline
+     * @returns {Annotation|null} Annotation or null if invalid
+     */
+    _getAnnotationForState(stateIndex) {
+        const history = this.meshView.history;
+        
+        if (stateIndex === 0) {
+            // Initial state - use history's initial annotation or create from initialState
+            if (history.initialAnnotation) {
+                return history.initialAnnotation.clone();
+            }
+            return new Annotation({
+                edgeIndices: new Set(this.meshView.initialState),
+                name: 'Initial State',
+                source: 'manual'
+            });
+        }
+        
+        // Use history's getAnnotationAtIndex which handles both formats
+        const annotation = history.getAnnotationAtIndex(stateIndex);
+        if (annotation) {
+            return annotation;
+        }
+        
+        // Fallback: create from edge indices
+        const edgeIndices = this._getEdgeIndicesForState(stateIndex);
+        if (edgeIndices) {
+            return new Annotation({
+                edgeIndices,
+                name: `State #${stateIndex}`,
+                source: 'manual'
+            });
+        }
+        
+        return null;
+    }
+
+    /**
      * Get edge indices for a specific history state.
      * @private
      * @param {number} stateIndex - Index in history timeline
      * @returns {Set<number>|null} Edge indices set or null if invalid
      */
     _getEdgeIndicesForState(stateIndex) {
-        const history = this.meshObject.history;
-
-        if (stateIndex === 0) {
-            // Initial state
-            return new Set(this.meshObject.initialState);
-        }
-
-        if (stateIndex <= history.undoStack.length) {
-            // State in undo stack
-            return new Set(history.undoStack[stateIndex - 1].newState);
-        }
-
-        // State in redo stack
-        const redoIndex = stateIndex - history.undoStack.length - 1;
-        if (redoIndex < history.redoStack.length) {
-            const redoStack = history.getRedoStack();
-            return new Set(redoStack[redoStack.length - 1 - redoIndex].newState);
-        }
-
-        console.warn('Invalid state index:', stateIndex);
-        return null;
+        // Use history's unified method
+        return this.meshView.history.getStateAtIndex(stateIndex);
     }
 
     /**
@@ -566,7 +435,7 @@ export class EvaluationManager {
      * @returns {number[]} Array of segment labels per vertex
      */
     _computeSegmentLabels(edgeIndices) {
-        const totalVertices = this.meshObject.positions.length / 3;
+        const totalVertices = this.meshView.positions.length / 3;
         
         // Create temporary edge labels array
         const tempEdgeLabels = new Uint8Array(totalVertices).fill(0);
@@ -575,16 +444,16 @@ export class EvaluationManager {
         });
 
         // Save original edge labels
-        const originalEdgeLabels = this.meshObject.edgeLabels;
+        const originalEdgeLabels = this.meshView.edgeLabels;
 
         // Temporarily set edge labels for segmentation
-        this.meshObject.edgeLabels = tempEdgeLabels;
+        this.meshView.edgeLabels = tempEdgeLabels;
 
         // Compute segments using flood fill
         const segments = this._floodFillSegments(tempEdgeLabels);
 
         // Restore original edge labels
-        this.meshObject.edgeLabels = originalEdgeLabels;
+        this.meshView.edgeLabels = originalEdgeLabels;
 
         // Convert segments to per-vertex labels
         const segmentLabels = new Array(totalVertices).fill(0);
@@ -605,7 +474,7 @@ export class EvaluationManager {
      * @returns {number[][]} Array of segments (each segment is array of vertex indices)
      */
     _floodFillSegments(edgeLabels) {
-        const adjacencyGraph = this.meshObject.adjacencyGraph;
+        const adjacencyGraph = this.meshView.adjacencyGraph;
         if (!adjacencyGraph) return [];
 
         const totalVertices = edgeLabels.length;
@@ -657,8 +526,8 @@ export class EvaluationManager {
         return {
             hasGroundTruth: this.groundTruth !== null,
             hasPrediction: this.prediction !== null,
-            groundTruthIndex: this.groundTruth?.stateIndex ?? null,
-            predictionIndex: this.prediction?.stateIndex ?? null,
+            groundTruthDescription: this.groundTruth?.description ?? null,
+            predictionDescription: this.prediction?.description ?? null,
             hasMetrics: this.metricsResult !== null,
             visualizationMode: this.visualizationMode,
             isInEvaluationMode: this.isInEvaluationMode

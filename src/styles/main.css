@@ -46,6 +46,7 @@
 @import './panels/_rendering.css';
 @import './panels/_annotation.css';
 @import './panels/_history.css';
+@import './panels/_library.css';
 @import './panels/_metadata.css';
 @import './panels/_evaluation.css';
 @import './panels/_cloud-storage.css';

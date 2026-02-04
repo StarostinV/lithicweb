@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createGeometry } from '../utils/meshUtils.js';
 import { buildAdjacencyGraph } from '../utils/graphUtils.js';
+import { computeVertexMaxAngles as computeAngles } from './edgeAngles.js';
 
 /**
  * BasicMesh - Pure geometry container with mesh-level metadata.
@@ -9,6 +10,7 @@ import { buildAdjacencyGraph } from '../utils/graphUtils.js';
  * - Geometry: positions, indices, adjacencyGraph, geometry
  * - Mesh metadata: author, scan_date, source info (shared by all annotations)
  * - Geometric query methods
+ * - Cached computed properties (e.g., vertex max angles)
  * 
  * This class does NOT hold annotation data (edgeLabels, arrows, etc.) - 
  * that lives in the Annotation class and is managed by MeshView.
@@ -32,6 +34,13 @@ export class BasicMesh {
          * @type {Object}
          */
         this.metadata = {};
+        
+        /**
+         * Cached vertex max angles (computed on demand).
+         * @type {Float32Array|null}
+         * @private
+         */
+        this._vertexMaxAngles = null;
     }
 
     isNull() {
@@ -48,6 +57,7 @@ export class BasicMesh {
         }
         this.adjacencyGraph = null;
         this.metadata = {};
+        this._vertexMaxAngles = null;
     }
 
     /**
@@ -196,5 +206,49 @@ export class BasicMesh {
 
         console.log('Mesh is fully connected - all vertices are used in triangles');
         return true;
+    }
+    
+    // ========================================
+    // Computed Geometry Properties (Cached)
+    // ========================================
+    
+    /**
+     * Get the maximum dihedral angle at each vertex.
+     * Computed on first call and cached for subsequent calls.
+     * 
+     * The dihedral angle is the angle between adjacent faces sharing an edge.
+     * Vertices on sharp features will have high maximum angles.
+     * 
+     * @returns {Float32Array|null} Maximum angle (in radians) at each vertex, or null if no mesh
+     */
+    getVertexMaxAngles() {
+        if (this.isNull()) return null;
+        
+        // Return cached result if available
+        if (this._vertexMaxAngles !== null) {
+            return this._vertexMaxAngles;
+        }
+        
+        // Compute and cache
+        console.time('BasicMesh: computeVertexMaxAngles');
+        this._vertexMaxAngles = computeAngles(this.positions, this.indices);
+        console.timeEnd('BasicMesh: computeVertexMaxAngles');
+        
+        return this._vertexMaxAngles;
+    }
+    
+    /**
+     * Check if vertex max angles have been computed and cached.
+     * @returns {boolean} True if angles are cached
+     */
+    hasVertexMaxAngles() {
+        return this._vertexMaxAngles !== null;
+    }
+    
+    /**
+     * Clear the cached vertex max angles (forces recomputation on next call).
+     */
+    clearVertexMaxAnglesCache() {
+        this._vertexMaxAngles = null;
     }
 } 

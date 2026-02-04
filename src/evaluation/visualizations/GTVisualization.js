@@ -29,7 +29,7 @@ export class GTVisualization extends BaseVisualization {
             return;
         }
 
-        const totalVertices = this.meshObject.positions.length / 3;
+        const totalVertices = this.meshView.positions.length / 3;
         
         // Generate colors for each GT segment
         const segmentColors = this.generateDistinctColors(gtIds.length);
@@ -42,18 +42,18 @@ export class GTVisualization extends BaseVisualization {
         for (let i = 0; i < totalVertices; i++) {
             const segmentId = gtSegmentLabels[i];
             if (segmentId !== 0 && colorMap.has(segmentId)) {
-                this.meshObject.colorVertex(i, colorMap.get(segmentId));
+                this.meshView.colorVertex(i, colorMap.get(segmentId));
             }
         }
 
         // Show GT edges prominently
         if (this.evaluationManager.groundTruth) {
             this.evaluationManager.groundTruth.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.gtEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.gtEdge);
             });
         }
 
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = true;
     }
 

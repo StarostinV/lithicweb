@@ -72,8 +72,14 @@ export const Events = Object.freeze({
     STATE_CHANGED: 'state:changed',
     /** Fired when state is saved to cloud. Data: { meshId: string, stateId: string } */
     STATE_SAVED: 'state:saved',
-    /** Fired when state is loaded from cloud. Data: { meshId: string, stateId: string } */
+    /** Fired when state is loaded from cloud. Data: { meshId: string, stateId: string, metadata: object } */
     STATE_LOADED: 'state:loaded',
+    /** 
+     * Fired when an annotation is loaded from an external source (cloud, model inference, file import).
+     * Components like the library can subscribe to automatically save loaded annotations.
+     * Data: { annotation: Annotation, source: 'cloud'|'model'|'import', cloudInfo?: { meshId, stateId } }
+     */
+    ANNOTATION_LOADED: 'annotation:loaded',
     
     // History events
     /** Fired when history changes (undo, redo, clear). Data: { action: 'undo'|'redo'|'clear', history: object } */
@@ -102,6 +108,14 @@ export const Events = Object.freeze({
     // Config events
     /** Fired when user configuration changes. Data: { path: string, newValue: any, oldValue: any } */
     CONFIG_CHANGED: 'config:changed',
+    
+    // Rendering events
+    /** 
+     * Fired when rendering settings change. Data: { property: string, value: any, source: 'user'|'config' }
+     * property can be: 'annotationMode', 'wireframeMode', 'flatShading', 'materialType', 
+     * 'backgroundColor', 'edgeColor', 'objectColor', 'all' (for full refresh)
+     */
+    RENDERING_CHANGED: 'rendering:changed',
     
     // Library events
     /** Fired when library changes. Data: { action: 'save'|'delete'|'rename'|'update'|etc, id: string, annotation?: object } */

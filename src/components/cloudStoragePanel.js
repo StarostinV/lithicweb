@@ -28,12 +28,19 @@
  * 
  * Subscribes to:
  * - `Events.CONNECTION_CHANGED` - Refreshes mesh list when connection is established
+ * - `Events.MESH_LOADED` - Resets cloud connection when local file is loaded
  * 
  * Emits:
  * - `Events.MESH_LOADED` - When a mesh is loaded from cloud storage
  * - `Events.MESH_UPLOADED` - When a mesh is uploaded to cloud storage
  * - `Events.STATE_SAVED` - When an annotation state is saved to cloud
- * - `Events.STATE_LOADED` - When an annotation state is loaded from cloud
+ * - `Events.STATE_LOADED` - When an annotation state is loaded from cloud (cloud-specific)
+ * - `Events.ANNOTATION_LOADED` - When an annotation is loaded (with Annotation object for library)
+ * 
+ * ## Memory Optimization
+ * 
+ * All event subscriptions use namespaces ('cloudStoragePanel') for efficient cleanup.
+ * The dispose() method removes all subscriptions via offNamespace() to prevent leaks.
  * 
  * @module CloudStoragePanel
  */
@@ -41,16 +48,18 @@
 import { lithicClient } from '../api/lithicClient.js';
 import { exportMeshToBlob } from '../loaders/meshExporter.js';
 import { eventBus, Events } from '../utils/EventBus.js';
+import { Annotation } from '../geometry/Annotation.js';
+import { formatMetadataValue } from '../utils/sanitize.js';
 
 export class CloudStoragePanel {
     /**
      * Create a CloudStoragePanel.
-     * @param {MeshObject} meshObject - The mesh object with annotations
+     * @param {MeshView} meshView - The mesh object with annotations
      * @param {MeshLoader} meshLoader - The mesh loader for loading PLY files
      * @param {ConnectionManager} [connectionManager] - Connection manager (legacy, now optional)
      */
-    constructor(meshObject, meshLoader, connectionManager = null) {
-        this.meshObject = meshObject;
+    constructor(meshView, meshLoader, connectionManager = null) {
+        this.meshView = meshView;
         this.meshLoader = meshLoader;
         this.connectionManager = connectionManager; // Kept for backward compatibility
         
@@ -178,8 +187,8 @@ export class CloudStoragePanel {
         }
         
         // Verify vertex and face counts match
-        const currentVertices = this.meshObject.positions.length / 3;
-        const currentFaces = this.meshObject.indices.length / 3;
+        const currentVertices = this.meshView.positions.length / 3;
+        const currentFaces = this.meshView.indices.length / 3;
         
         const matches = (
             currentVertices === this.cloudMeshInfo.numVertices &&
@@ -807,6 +816,10 @@ export class CloudStoragePanel {
 
     /**
      * Load a state from cloud storage.
+     * 
+     * After loading, emits:
+     * - `Events.STATE_LOADED` - for cloud-specific tracking
+     * - `Events.ANNOTATION_LOADED` - for library auto-save and other components
      */
     async loadState(meshId, stateId) {
         // Check if the correct mesh is loaded
@@ -835,16 +848,31 @@ export class CloudStoragePanel {
             console.log('[CloudStorage] State data received:', stateData);
             console.log('[CloudStorage] State metadata from server:', stateData.metadata);
             
-            // Apply the state to the mesh
+            // Create Annotation object from cloud data
+            // This is the canonical representation that will be saved to library
+            const annotation = this._createAnnotationFromCloudState(stateData, stateId);
+            
+            // Apply the state to the mesh view
             this.applyState(stateData);
             
             this.setStatus('State loaded successfully!', 'success');
             
-            // Emit event for other components
+            // Emit STATE_LOADED for cloud-specific tracking
             eventBus.emit(Events.STATE_LOADED, {
                 meshId: meshId,
                 stateId: stateId,
                 metadata: stateData.metadata
+            });
+            
+            // Emit ANNOTATION_LOADED for library auto-save and other components
+            // The annotation object is passed so subscribers don't need to re-fetch or reconstruct
+            eventBus.emit(Events.ANNOTATION_LOADED, {
+                annotation: annotation,
+                source: 'cloud',
+                cloudInfo: {
+                    meshId: meshId,
+                    stateId: stateId
+                }
             });
         } catch (e) {
             console.error('[CloudStorage] Load state failed:', e);
@@ -852,6 +880,36 @@ export class CloudStoragePanel {
         } finally {
             this.setLoading(false);
         }
+    }
+    
+    /**
+     * Create an Annotation object from cloud state data.
+     * This creates a lightweight, serializable annotation for use by the library and other components.
+     * 
+     * @param {Object} stateData - State data from cloud
+     * @param {Array<number>} stateData.edge_indices - Edge vertex indices
+     * @param {Object} [stateData.metadata] - Cloud state metadata
+     * @param {string} stateId - Cloud state ID
+     * @returns {Annotation} Annotation object
+     * @private
+     */
+    _createAnnotationFromCloudState(stateData, stateId) {
+        const edgeIndices = new Set(stateData.edge_indices || []);
+        const name = stateData.metadata?.name || stateData.name || 'Cloud annotation';
+        
+        // Build annotation metadata from cloud state metadata
+        const metadata = {
+            name: name,
+            source: 'cloud',
+            cloudStateId: stateId,
+            ...(stateData.metadata || {})
+        };
+        
+        return new Annotation({
+            edgeIndices: edgeIndices,
+            arrows: [], // Cloud states don't currently store arrows
+            metadata: metadata
+        });
     }
 
     /**
@@ -870,37 +928,37 @@ export class CloudStoragePanel {
         
         // Start a draw operation for history tracking
         const description = stateData.metadata?.name || stateData.name || 'Cloud state';
-        this.meshObject.startDrawOperation('cloud');
-        this.meshObject.pendingAction.description = `Loaded: ${description}`;
+        this.meshView.startDrawOperation('cloud');
+        this.meshView.pendingAction.description = `Loaded: ${description}`;
         
         // Clear current edges
-        this.meshObject.currentEdgeIndices.forEach(index => {
-            this.meshObject.edgeLabels[index] = 0;
-            this.meshObject.colorVertex(index, this.meshObject.objectColor);
+        this.meshView.currentEdgeIndices.forEach(index => {
+            this.meshView.edgeLabels[index] = 0;
+            this.meshView.colorVertex(index, this.meshView.objectColor);
         });
-        this.meshObject.currentEdgeIndices.clear();
+        this.meshView.currentEdgeIndices.clear();
         
         // Apply loaded edges
         edgeIndices.forEach(index => {
-            if (index < this.meshObject.edgeLabels.length) {
-                this.meshObject.edgeLabels[index] = 1;
-                this.meshObject.colorVertex(index, this.meshObject.edgeColor);
-                this.meshObject.currentEdgeIndices.add(index);
+            if (index < this.meshView.edgeLabels.length) {
+                this.meshView.edgeLabels[index] = 1;
+                this.meshView.colorVertex(index, this.meshView.edgeColor);
+                this.meshView.currentEdgeIndices.add(index);
             }
         });
         
         // Finish draw operation
-        this.meshObject.finishDrawOperation();
+        this.meshView.finishDrawOperation();
         
         // Apply loaded annotation metadata to the current state
         if (stateData.metadata && typeof stateData.metadata === 'object') {
             console.log('[CloudStorage] Applying annotation metadata:', stateData.metadata);
-            this.meshObject.updateCurrentStateMetadata(stateData.metadata);
+            this.meshView.updateCurrentStateMetadata(stateData.metadata);
         }
         
         // Update segments if auto-segmentation is enabled
         if (document.getElementById('auto-segments')?.checked) {
-            this.meshObject.updateSegments();
+            this.meshView.updateSegments();
         }
     }
 
@@ -935,7 +993,7 @@ export class CloudStoragePanel {
      */
     showSaveAnnotationModal() {
         // Check if we have a mesh loaded
-        if (this.meshObject.isNull()) {
+        if (this.meshView.isNull()) {
             this.setStatus('No mesh loaded', 'error');
             return;
         }
@@ -1085,7 +1143,7 @@ export class CloudStoragePanel {
         if (!this.saveAnnotationMetadataPreview) return;
         
         // Get current annotation metadata (state-specific metadata)
-        const annotationMetadata = this.meshObject.getCurrentStateMetadata();
+        const annotationMetadata = this.meshView.getCurrentStateMetadata();
         const entries = Object.entries(annotationMetadata);
         
         // Update count badge
@@ -1110,16 +1168,12 @@ export class CloudStoragePanel {
      */
     buildMetadataPreviewHTML(entries) {
         return entries.map(([key, value]) => {
-            let displayValue = value;
-            if (typeof value === 'object') {
-                displayValue = JSON.stringify(value);
-            } else if (typeof value === 'number') {
-                displayValue = Number.isInteger(value) ? value : value.toFixed(4);
-            }
+            // Use centralized formatter which handles timestamps
+            const displayValue = formatMetadataValue(key, value);
             return `
                 <div class="metadata-preview-item">
                     <span class="metadata-preview-key">${this.escapeHtml(key)}</span>
-                    <span class="metadata-preview-value">${this.escapeHtml(String(displayValue))}</span>
+                    <span class="metadata-preview-value">${this.escapeHtml(displayValue)}</span>
                 </div>
             `;
         }).join('');
@@ -1173,7 +1227,7 @@ export class CloudStoragePanel {
      * @returns {Promise<string|null>} The mesh ID if successful, null otherwise
      */
     async uploadCurrentMesh(customName) {
-        if (this.meshObject.isNull()) {
+        if (this.meshView.isNull()) {
             this.setStatus('No mesh loaded', 'error');
             return null;
         }
@@ -1209,8 +1263,8 @@ export class CloudStoragePanel {
             }
             
             // Set cloud connection with current mesh info
-            const numVertices = this.meshObject.positions.length / 3;
-            const numFaces = this.meshObject.indices.length / 3;
+            const numVertices = this.meshView.positions.length / 3;
+            const numFaces = this.meshView.indices.length / 3;
             this.setCloudConnection(meshId, numVertices, numFaces, currentMeshMetadata);
             
             this.setStatus('Mesh uploaded!', 'success');
@@ -1268,8 +1322,8 @@ export class CloudStoragePanel {
      * @returns {Blob} PLY file as a Blob
      */
     exportMeshToPLY() {
-        const positions = this.meshObject.positions;
-        const indices = this.meshObject.indices;
+        const positions = this.meshView.positions;
+        const indices = this.meshView.indices;
         
         // Get mesh metadata to include in the PLY file
         const meshMetadata = this.meshLoader.getAllMetadata();
@@ -1296,10 +1350,10 @@ export class CloudStoragePanel {
         
         try {
             // Get current edge indices
-            const edgeIndices = Array.from(this.meshObject.currentEdgeIndices);
+            const edgeIndices = Array.from(this.meshView.currentEdgeIndices);
             
             // Get current annotation metadata (state-specific metadata)
-            const annotationMetadata = this.meshObject.getCurrentStateMetadata();
+            const annotationMetadata = this.meshView.getCurrentStateMetadata();
             
             const meshId = this.cloudMeshInfo.meshId;
             console.log('[CloudStorage] Saving annotation to mesh:', meshId);

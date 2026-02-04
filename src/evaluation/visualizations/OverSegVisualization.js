@@ -33,12 +33,12 @@ export class OverSegVisualization extends BaseVisualization {
             return;
         }
 
-        const totalVertices = this.meshObject.positions.length / 3;
+        const totalVertices = this.meshView.positions.length / 3;
         
         // First, show matched areas subtly
         vertexErrors.forEach((errorType, idx) => {
             if (errorType === 'matched') {
-                this.meshObject.colorVertex(idx, EVALUATION_COLORS.matchedSubtle);
+                this.meshView.colorVertex(idx, EVALUATION_COLORS.matchedSubtle);
             }
         });
 
@@ -61,10 +61,10 @@ export class OverSegVisualization extends BaseVisualization {
                 if (gtSegmentLabels[i] === gtId) {
                     const predId = predSegmentLabels[i];
                     if (predColorMap.has(predId)) {
-                        this.meshObject.colorVertex(i, predColorMap.get(predId));
+                        this.meshView.colorVertex(i, predColorMap.get(predId));
                     } else {
                         // Part of GT not covered by any significant pred
-                        this.meshObject.colorVertex(i, EVALUATION_COLORS.overseg);
+                        this.meshView.colorVertex(i, EVALUATION_COLORS.overseg);
                     }
                 }
             }
@@ -73,11 +73,11 @@ export class OverSegVisualization extends BaseVisualization {
         // Show GT edges to highlight boundaries
         if (this.evaluationManager.groundTruth) {
             this.evaluationManager.groundTruth.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.gtEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.gtEdge);
             });
         }
 
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = true;
     }
 
@@ -89,10 +89,10 @@ export class OverSegVisualization extends BaseVisualization {
         // Show GT edges only
         if (this.evaluationManager.groundTruth) {
             this.evaluationManager.groundTruth.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.gtEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.gtEdge);
             });
         }
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = true;
     }
 

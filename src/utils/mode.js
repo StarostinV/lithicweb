@@ -6,7 +6,8 @@ export const MODES = Object.freeze({
     ERASE: 'erase',
     ARROW: 'arrow',
     DELETEARROWS: 'deleteArrows',
-    DRAWLINES: 'drawLines'
+    DRAWLINES: 'drawLines',
+    RIDGE: 'ridge'
 });
 
 // Mode display names for the UI indicator
@@ -16,7 +17,8 @@ const MODE_LABELS = {
     [MODES.ERASE]: { label: 'Erase', icon: 'fa-eraser', color: '#ef4444' },
     [MODES.ARROW]: { label: 'Arrows', icon: 'fa-arrow-right', color: '#10b981' },
     [MODES.DELETEARROWS]: { label: 'Delete Arrows', icon: 'fa-trash-alt', color: '#ef4444' },
-    [MODES.DRAWLINES]: { label: 'Lines', icon: 'fa-project-diagram', color: '#8b5cf6' }
+    [MODES.DRAWLINES]: { label: 'Lines', icon: 'fa-project-diagram', color: '#8b5cf6' },
+    [MODES.RIDGE]: { label: 'Ridge', icon: 'fa-mountain', color: '#14b8a6' }
 };
 
 /**
@@ -53,6 +55,7 @@ export class Mode {
         this.ctrlHeld = false;
         this.showGizmo = true;  // User preference for gizmo visibility
         this.modeChangeListeners = [];  // Listeners for mode changes
+        this.transformMode = 'rotate';  // 'rotate' or 'translate'
 
         this.handleModeSwitch = this.handleModeSwitch.bind(this);
         this.setMode = this.setMode.bind(this);
@@ -107,8 +110,37 @@ export class Mode {
             });
         }
         
+        // Make transform mode indicator clickable - toggle between rotate and move
+        const transformModeIndicator = document.getElementById('transformModeIndicator');
+        if (transformModeIndicator) {
+            transformModeIndicator.addEventListener('click', () => {
+                this.toggleTransformMode();
+            });
+        }
+        
         // Initialize UI state to match default mode (VIEW)
         this.update();
+    }
+    
+    /**
+     * Toggles the transform mode between 'rotate' and 'translate'.
+     */
+    toggleTransformMode() {
+        this.transformMode = this.transformMode === 'rotate' ? 'translate' : 'rotate';
+        this._setGizmoMode(this.transformMode);
+        this.updateTransformModeIndicator();
+    }
+    
+    /**
+     * Sets the transform mode explicitly.
+     * @param {'rotate'|'translate'} mode - The transform mode
+     */
+    setTransformMode(mode) {
+        if (mode === 'rotate' || mode === 'translate') {
+            this.transformMode = mode;
+            this._setGizmoMode(mode);
+            this.updateTransformModeIndicator();
+        }
     }
     
     _onKeyDown(event) {
@@ -119,11 +151,13 @@ export class Mode {
             }
         }
         
-        // Ctrl key - switch gizmo to translate mode while held
+        // Ctrl key - temporarily switch to the opposite transform mode while held
         if (event.key === 'Control' && !this.ctrlHeld) {
             this.ctrlHeld = true;
             if (this.currentMode === MODES.VIEW) {
-                this._setGizmoMode('translate');
+                // Switch to opposite of the persistent transform mode
+                const tempMode = this.transformMode === 'rotate' ? 'translate' : 'rotate';
+                this._setGizmoMode(tempMode);
             }
         }
     }
@@ -134,11 +168,11 @@ export class Mode {
             this.toPreviousMode();
         }
         
-        // Ctrl key released - switch gizmo back to rotate mode
+        // Ctrl key released - switch gizmo back to the persistent transform mode
         if (event.key === 'Control') {
             this.ctrlHeld = false;
             if (this.currentMode === MODES.VIEW) {
-                this._setGizmoMode('rotate');
+                this._setGizmoMode(this.transformMode);
             }
         }
     }
@@ -216,6 +250,7 @@ export class Mode {
         this.updateGizmo();
         this.updateToolButtonStates();
         this.updateModeIndicator();
+        this.updateTransformModeIndicator();
         // Note: Nav button highlighting is now handled by setActiveNavBtn in main.js
         // Mode changes no longer affect which tab appears active
     }
@@ -235,6 +270,7 @@ export class Mode {
             [MODES.VIEW]: ['viewModeEdge', 'viewModeArrow'],
             [MODES.DRAW]: ['drawMode'],
             [MODES.DRAWLINES]: ['drawLinesMode'],
+            [MODES.RIDGE]: ['ridgeMode'],
             [MODES.ERASE]: ['eraseMode'],
             [MODES.ARROW]: ['arrowMode'],
             [MODES.DELETEARROWS]: ['deleteArrowsMode']
@@ -262,6 +298,31 @@ export class Mode {
             indicator.style.setProperty('--mode-color', modeInfo.color);
         }
     }
+    
+    /**
+     * Updates the transform mode indicator (Rotate/Move) visibility and content.
+     * Only visible in VIEW mode.
+     */
+    updateTransformModeIndicator() {
+        const indicator = document.getElementById('transformModeIndicator');
+        if (!indicator) return;
+        
+        // Only show in VIEW mode
+        if (this.currentMode === MODES.VIEW) {
+            indicator.classList.add('visible');
+        } else {
+            indicator.classList.remove('visible');
+        }
+        
+        // Update content based on transform mode
+        if (this.transformMode === 'rotate') {
+            indicator.innerHTML = `<i class="fas fa-sync-alt"></i> Rotate`;
+            indicator.classList.remove('move-mode');
+        } else {
+            indicator.innerHTML = `<i class="fas fa-arrows-alt"></i> Move`;
+            indicator.classList.add('move-mode');
+        }
+    }
 
     updateControls() {
         if (this.currentMode === MODES.VIEW) {
@@ -280,9 +341,15 @@ export class Mode {
         // Show gizmo only if in view mode AND user wants to see it
         this.scene.setGizmoVisible(isViewMode && this.showGizmo);
         
-        // Set appropriate transform mode based on Ctrl state
+        // Set appropriate transform mode based on Ctrl state (temporary override) or persistent setting
         if (isViewMode) {
-            this._setGizmoMode(this.ctrlHeld ? 'translate' : 'rotate');
+            if (this.ctrlHeld) {
+                // Ctrl temporarily switches to opposite mode
+                const tempMode = this.transformMode === 'rotate' ? 'translate' : 'rotate';
+                this._setGizmoMode(tempMode);
+            } else {
+                this._setGizmoMode(this.transformMode);
+            }
         }
     }
 

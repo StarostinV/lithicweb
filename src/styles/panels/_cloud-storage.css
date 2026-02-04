@@ -151,6 +151,13 @@
     opacity: 1;
 }
 
+/* Always show buttons on touch devices (tablets) */
+@media (pointer: coarse), (max-width: 1024px) {
+    .mesh-item-actions .icon-btn {
+        opacity: 1;
+    }
+}
+
 /* Expand Icon */
 .expand-icon {
     color: var(--gray-400);
@@ -257,6 +264,13 @@
 
 .cloud-state-item:hover .state-item-actions .icon-btn {
     opacity: 1;
+}
+
+/* Always show buttons on touch devices (tablets) */
+@media (pointer: coarse), (max-width: 1024px) {
+    .state-item-actions .icon-btn {
+        opacity: 1;
+    }
 }
 
 /* Cloud Connection Indicator on Save Button */

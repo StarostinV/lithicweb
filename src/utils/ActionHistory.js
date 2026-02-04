@@ -1,137 +1,175 @@
 import { eventBus, Events } from './EventBus.js';
+import { Annotation } from '../geometry/Annotation.js';
+
+/**
+ * Action - Wrapper around an Annotation representing a history action.
+ * 
+ * Each Action stores the annotation state AFTER the action was performed.
+ * The previous state can be obtained from the preceding action in the stack.
+ * 
+ * @typedef {Object} Action
+ * @property {Annotation} annotation - The annotation state after this action
+ * @property {string} type - Action type: 'draw', 'erase', 'model', 'cloud', 'library-load'
+ * @property {string} description - Auto-generated description
+ * @property {string} [customDescription] - User-provided name
+ * @property {number} timestamp - When the action was performed
+ * @property {string} [libraryId] - If saved to library, the library annotation ID
+ */
 
 /**
  * ActionHistory manages undo/redo history for mesh annotation operations.
  * 
- * ## Terminology Note: "State" vs "Annotation"
+ * ## Annotation-Based Architecture
  * 
- * In this codebase, "state" and "annotation" are used interchangeably in certain contexts:
- * - A "state" represents a snapshot of edge annotations at a point in time
- * - "State metadata" is metadata specific to an annotation (e.g., evaluation metrics)
- * - This is different from "mesh metadata" which belongs to the mesh itself
- * 
- * The term "state" is used internally (stateMetadata, stateIndex) for historical reasons,
- * but conceptually these represent **annotation states** with their **annotation metadata**.
- * 
- * When saving to cloud storage:
- * - "state" = "annotation" (the edge annotations being saved)
- * - "stateMetadata" = "annotation metadata" (metadata specific to that annotation)
+ * Each action in the history stores a complete Annotation object representing
+ * the state AFTER that action. This makes it easy to:
+ * - Jump to any state directly
+ * - Save states to the library
+ * - Compare states for evaluation
  * 
  * ## Event Bus Integration
  * 
  * ActionHistory emits the following events via the global EventBus:
- * - `Events.HISTORY_CHANGED` - When history changes (push, undo, redo, clear, etc.)
+ * - `Events.HISTORY_CHANGED` - When history changes
  *   Data: { action: 'push'|'undo'|'redo'|'clear'|'jump'|'update', currentIndex: number, totalStates: number }
- * 
- * Components can subscribe to these events instead of using addListener():
- * ```javascript
- * import { eventBus, Events } from '../utils/EventBus.js';
- * eventBus.on(Events.HISTORY_CHANGED, (data) => {
- *     console.log('History changed:', data.action);
- * });
- * ```
  */
 export class ActionHistory {
-    constructor(maxHistorySize = 100) {
+    /**
+     * Create an ActionHistory.
+     * 
+     * @param {Object} options - Configuration options
+     * @param {number} [options.maxHistorySize=100] - Maximum history size
+     */
+    constructor(options = {}) {
+        const { maxHistorySize = 100 } = options;
+        
         this.undoStack = [];
         this.redoStack = [];
         this.maxHistorySize = maxHistorySize;
-        this.listeners = [];
-        this.currentViewIndex = 0; // Track which state we're viewing (0 = initial)
+        this.currentViewIndex = 0;
         
         /**
-         * Annotation metadata for the initial state (index 0).
-         * Each action has its own stateMetadata property for its annotation metadata.
-         * 
-         * Note: "stateMetadata" = "annotation metadata" (metadata specific to an annotation,
-         * such as evaluation metrics). This is distinct from mesh metadata.
-         * @type {Object}
+         * The initial annotation state (before any actions).
+         * @type {Annotation}
          */
-        this.initialStateMetadata = {};
+        this.initialAnnotation = Annotation.empty('Initial State');
     }
 
     /**
-     * Check if an action is protected from deletion.
-     * Protected actions: model predictions, cloud-loaded states, labeled (GT/Pred), or renamed states.
-     * @param {Object} action - The action to check
-     * @returns {boolean} True if protected
+     * Create an action from the current state.
+     * 
+     * @param {Object} params - Action parameters
+     * @param {Set<number>} params.edgeIndices - Current edge indices
+     * @param {Array} [params.arrows=[]] - Current arrows
+     * @param {string} params.type - Action type
+     * @param {string} [params.description] - Action description
+     * @param {Object} [params.metadata={}] - Additional annotation metadata
+     * @returns {Action} The created action
      */
-    isActionProtected(action) {
-        if (!action) return false;
-        // Explicitly protected (GT/Pred labeled)
-        if (action.protected) return true;
-        // Model predictions are auto-protected
-        if (action.type === 'model') return true;
-        // Cloud-loaded states are auto-protected
-        if (action.type === 'cloud') return true;
-        // Renamed states are protected
-        if (action.customDescription) return true;
-        return false;
+    createAction({ edgeIndices, arrows = [], type, description, metadata = {} }) {
+        const annotation = new Annotation({
+            edgeIndices: new Set(edgeIndices),
+            arrows: arrows.map(a => ({ ...a })),
+            source: type === 'model' ? 'model' : type === 'cloud' ? 'cloud' : 'manual',
+            metadata: {
+                ...metadata,
+                name: description || this._getDefaultDescription(type),
+            }
+        });
+        
+        return {
+            annotation,
+            type,
+            description: description || this._getDefaultDescription(type),
+            timestamp: Date.now(),
+        };
     }
 
+    /**
+     * Get default description for an action type.
+     * @private
+     */
+    _getDefaultDescription(type) {
+        switch (type) {
+            case 'draw': return 'Draw edges';
+            case 'erase': return 'Erase edges';
+            case 'model': return 'AI segmentation';
+            case 'cloud': return 'Cloud state';
+            case 'library-load': return 'Load from library';
+            default: return type;
+        }
+    }
+
+    /**
+     * Push an action to the history.
+     * 
+     * @param {Action|Object} action - The action to push
+     */
     push(action) {
-        // Add timestamp if not present
+        // Ensure timestamp
         if (!action.timestamp) {
             action.timestamp = Date.now();
         }
         
-        // Initialize empty annotation metadata for new actions
-        // Annotation metadata (stateMetadata) is unique per state and NOT carried to new states
-        if (!action.stateMetadata) {
-            action.stateMetadata = {};
+        // Convert old-style action to new style if needed
+        if (!action.annotation && action.newState) {
+            action = this._convertLegacyAction(action);
+        }
+        
+        // Ensure annotation exists
+        if (!action.annotation) {
+            console.warn('ActionHistory.push: action missing annotation');
+            return;
         }
 
-        // If we're viewing an old state, handle truncation with protection
-        if (this.currentViewIndex < this.undoStack.length) {
-            // Collect protected states that would be truncated
-            const protectedStates = [];
-            for (let i = this.currentViewIndex; i < this.undoStack.length; i++) {
-                if (this.isActionProtected(this.undoStack[i])) {
-                    protectedStates.push(this.undoStack[i]);
-                }
-            }
-            // Also collect protected states from redo stack
-            for (const redoAction of this.redoStack) {
-                if (this.isActionProtected(redoAction)) {
-                    protectedStates.push(redoAction);
-                }
-            }
-            
-            // Truncate to current view position
-            this.undoStack = this.undoStack.slice(0, this.currentViewIndex);
-            this.redoStack = [];
-            
-            // Push the new action
-            this.undoStack.push(action);
-            
-            // Re-add protected states after the new action
-            for (const protectedAction of protectedStates) {
-                this.undoStack.push(protectedAction);
-            }
-        } else {
-            this.undoStack.push(action);
-            this.redoStack = []; // Clear redo stack when new action is performed
-        }
+        // Clear redo stack on new action (standard undo/redo behavior)
+        this.redoStack = [];
         
-        // Limit stack size for memory efficiency (but don't remove protected states)
+        // Push the new action
+        this.undoStack.push(action);
+        
+        // Limit stack size
         while (this.undoStack.length > this.maxHistorySize) {
-            // Find first non-protected state to remove
-            let removed = false;
-            for (let i = 0; i < this.undoStack.length - 1; i++) {
-                if (!this.isActionProtected(this.undoStack[i])) {
-                    this.undoStack.splice(i, 1);
-                    removed = true;
-                    break;
-                }
-            }
-            // If all states are protected, just break to avoid infinite loop
-            if (!removed) break;
+            this.undoStack.shift();
         }
         
-        this.currentViewIndex = this.undoStack.length; // Update view to latest
+        this.currentViewIndex = this.undoStack.length;
         this.notifyListeners('push');
     }
 
+    /**
+     * Convert a legacy action format to the new Annotation-based format.
+     * @private
+     */
+    _convertLegacyAction(legacyAction) {
+        const annotation = new Annotation({
+            edgeIndices: new Set(legacyAction.newState || []),
+            arrows: [],
+            source: legacyAction.type === 'model' ? 'model' : 
+                    legacyAction.type === 'cloud' ? 'cloud' : 'manual',
+            metadata: {
+                name: legacyAction.customDescription || legacyAction.description || legacyAction.type,
+                ...(legacyAction.stateMetadata || {})
+            }
+        });
+        
+        return {
+            annotation,
+            type: legacyAction.type,
+            description: legacyAction.description,
+            customDescription: legacyAction.customDescription,
+            timestamp: legacyAction.timestamp || Date.now(),
+            // Keep legacy fields for compatibility during transition
+            previousState: legacyAction.previousState,
+            newState: legacyAction.newState,
+        };
+    }
+
+    /**
+     * Undo the last action.
+     * 
+     * @returns {Action|null} The undone action, or null if nothing to undo
+     */
     undo() {
         if (this.undoStack.length === 0) return null;
         const action = this.undoStack.pop();
@@ -141,6 +179,11 @@ export class ActionHistory {
         return action;
     }
 
+    /**
+     * Redo the last undone action.
+     * 
+     * @returns {Action|null} The redone action, or null if nothing to redo
+     */
     redo() {
         if (this.redoStack.length === 0) return null;
         const action = this.redoStack.pop();
@@ -158,8 +201,12 @@ export class ActionHistory {
         return this.redoStack.length > 0;
     }
 
-    // Jump to view a specific state without modifying stacks
-    // Just updates the view index, doesn't move actions between stacks
+    /**
+     * Jump to view a specific state without modifying stacks.
+     * 
+     * @param {number} targetIndex - State index (0 = initial)
+     * @returns {boolean} True if jump was successful
+     */
     jumpToViewState(targetIndex) {
         const totalStates = this.undoStack.length + this.redoStack.length + 1;
         
@@ -168,7 +215,7 @@ export class ActionHistory {
         }
 
         if (targetIndex === this.currentViewIndex) {
-            return false; // Already viewing this state
+            return false;
         }
 
         this.currentViewIndex = targetIndex;
@@ -176,21 +223,30 @@ export class ActionHistory {
         return true;
     }
 
-    // Get the current view index (position in the timeline we're viewing)
+    /**
+     * Get the current view index.
+     * @returns {number}
+     */
     getCurrentIndex() {
         return this.currentViewIndex;
     }
 
-    // Get total number of states (including current)
+    /**
+     * Get total number of states (including initial).
+     * @returns {number}
+     */
     getTotalStates() {
         return this.undoStack.length + this.redoStack.length + 1;
     }
 
+    /**
+     * Clear all history.
+     */
     clear() {
         this.undoStack = [];
         this.redoStack = [];
         this.currentViewIndex = 0;
-        this.initialStateMetadata = {};
+        this.initialAnnotation = Annotation.empty('Initial State');
         this.notifyListeners('clear');
     }
 
@@ -204,8 +260,9 @@ export class ActionHistory {
 
     /**
      * Get action at a specific state index.
+     * 
      * @param {number} stateIndex - State index (1-based, 0 is initial state)
-     * @returns {Object|null} The action or null if invalid index
+     * @returns {Action|null} The action or null if invalid index
      */
     getActionAtIndex(stateIndex) {
         if (stateIndex === 0) return null; // Initial state has no action
@@ -223,98 +280,91 @@ export class ActionHistory {
     }
 
     /**
-     * Set protection status for a state.
-     * @param {number} stateIndex - State index (1-based)
-     * @param {boolean} isProtected - Whether to protect the state
+     * Get the annotation at a specific state index.
+     * 
+     * @param {number} stateIndex - State index (0 = initial)
+     * @returns {Annotation|null} Clone of the annotation, or null
      */
-    setProtected(stateIndex, isProtected) {
-        const action = this.getActionAtIndex(stateIndex);
-        if (action) {
-            action.protected = isProtected;
-            this.notifyListeners('update');
+    getAnnotationAtIndex(stateIndex) {
+        if (stateIndex === 0) {
+            return this.initialAnnotation.clone();
         }
+        
+        const action = this.getActionAtIndex(stateIndex);
+        return action?.annotation?.clone() || null;
     }
 
     /**
-     * Rename a state (also protects it).
-     * @param {number} stateIndex - State index (1-based)
-     * @param {string} newDescription - New description for the state
+     * Get the edge state at a specific index (for compatibility).
+     * 
+     * @param {number} stateIndex - State index (0 = initial)
+     * @returns {Set<number>|null} Edge indices set
      */
-    renameState(stateIndex, newDescription) {
+    getStateAtIndex(stateIndex) {
+        if (stateIndex === 0) {
+            return new Set(this.initialAnnotation.edgeIndices);
+        }
+        
         const action = this.getActionAtIndex(stateIndex);
         if (action) {
-            action.customDescription = newDescription;
-            this.notifyListeners('update');
+            // Support both new and legacy format
+            if (action.annotation) {
+                return new Set(action.annotation.edgeIndices);
+            }
+            if (action.newState) {
+                return new Set(action.newState);
+            }
         }
-    }
-
-    /**
-     * Clear custom description (but keep original description).
-     * @param {number} stateIndex - State index (1-based)
-     */
-    clearCustomDescription(stateIndex) {
-        const action = this.getActionAtIndex(stateIndex);
-        if (action) {
-            delete action.customDescription;
-            this.notifyListeners('update');
-        }
+        
+        return null;
     }
 
     /**
      * Get the display description for a state.
+     * 
      * @param {number} stateIndex - State index (1-based)
      * @returns {string} The description to display
      */
     getDisplayDescription(stateIndex) {
+        if (stateIndex === 0) return 'Initial State';
         const action = this.getActionAtIndex(stateIndex);
         if (!action) return 'Initial State';
         return action.customDescription || action.description || action.type;
     }
 
     /**
-     * Check if a state is protected.
-     * @param {number} stateIndex - State index (1-based, 0 is always unprotected)
-     * @returns {boolean}
+     * Link an action to a library annotation ID.
+     * 
+     * @param {number} stateIndex - State index (1-based)
+     * @param {string} libraryId - The library annotation ID
      */
-    isStateProtected(stateIndex) {
-        if (stateIndex === 0) return false;
+    setLibraryLink(stateIndex, libraryId) {
         const action = this.getActionAtIndex(stateIndex);
-        return this.isActionProtected(action);
+        if (action) {
+            action.libraryId = libraryId;
+            if (action.annotation) {
+                action.annotation.setMetadata('libraryId', libraryId);
+            }
+            this.notifyListeners('update');
+        }
     }
 
-    // Listener pattern for UI updates
-    
     /**
-     * Add a listener for history changes.
+     * Get the library ID for a state.
      * 
-     * @deprecated Prefer using EventBus for new code:
-     * ```javascript
-     * import { eventBus, Events } from '../utils/EventBus.js';
-     * eventBus.on(Events.HISTORY_CHANGED, (data) => {
-     *     // data.action, data.currentIndex, data.totalStates
-     * });
-     * ```
-     * 
-     * @param {Function} callback - Called with (history) when history changes
+     * @param {number} stateIndex - State index (1-based)
+     * @returns {string|null}
      */
-    addListener(callback) {
-        this.listeners.push(callback);
-    }
-
-    removeListener(callback) {
-        this.listeners = this.listeners.filter(l => l !== callback);
+    getLibraryLink(stateIndex) {
+        const action = this.getActionAtIndex(stateIndex);
+        return action?.libraryId || null;
     }
 
     /**
-     * Notify all listeners of history change.
-     * Emits both to legacy listeners and the global EventBus.
-     * @param {string} [actionType='update'] - Type of change: 'push', 'undo', 'redo', 'clear', 'jump', 'update'
+     * Notify of history change via EventBus.
+     * @param {string} [actionType='update'] - Type of change
      */
     notifyListeners(actionType = 'update') {
-        // Legacy listener pattern (for backward compatibility)
-        this.listeners.forEach(callback => callback(this));
-        
-        // EventBus pattern (preferred for new code)
         eventBus.emit(Events.HISTORY_CHANGED, {
             action: actionType,
             currentIndex: this.currentViewIndex,
@@ -323,27 +373,28 @@ export class ActionHistory {
     }
 
     // ========================================
-    // State Metadata Methods
+    // State Metadata Methods (Annotation-based)
     // ========================================
     
     /**
-     * Get annotation metadata for a specific state/annotation.
-     * 
-     * Note: "stateMetadata" = "annotation metadata" - metadata specific to an annotation,
-     * such as evaluation metrics. This is distinct from mesh metadata which is shared.
-     * Annotation metadata is unique per state and NOT shared across states.
+     * Get annotation metadata for a specific state.
      * 
      * @param {number} stateIndex - State index (0 for initial state)
-     * @returns {Object} The annotation metadata object (empty {} if none)
+     * @returns {Object} The annotation metadata object
      */
     getStateMetadata(stateIndex) {
         if (stateIndex === 0) {
-            return this.initialStateMetadata;
+            return this.initialAnnotation.metadata;
         }
         
         const action = this.getActionAtIndex(stateIndex);
-        if (action) {
-            return action.stateMetadata || {};
+        if (action?.annotation) {
+            return action.annotation.metadata;
+        }
+        
+        // Legacy support
+        if (action?.stateMetadata) {
+            return action.stateMetadata;
         }
         
         return {};
@@ -352,21 +403,23 @@ export class ActionHistory {
     /**
      * Set a specific key in annotation metadata for a state.
      * 
-     * Note: "stateMetadata" = "annotation metadata" (see class documentation).
-     * 
      * @param {number} stateIndex - State index (0 for initial state)
      * @param {string} key - The metadata key
      * @param {*} value - The value to set
      */
     setStateMetadataKey(stateIndex, key, value) {
         if (stateIndex === 0) {
-            this.initialStateMetadata[key] = value;
+            this.initialAnnotation.setMetadata(key, value);
             this.notifyListeners('update');
             return;
         }
         
         const action = this.getActionAtIndex(stateIndex);
-        if (action) {
+        if (action?.annotation) {
+            action.annotation.setMetadata(key, value);
+            this.notifyListeners('update');
+        } else if (action) {
+            // Legacy support
             if (!action.stateMetadata) {
                 action.stateMetadata = {};
             }
@@ -378,47 +431,51 @@ export class ActionHistory {
     /**
      * Delete a key from annotation metadata for a state.
      * 
-     * Note: "stateMetadata" = "annotation metadata" (see class documentation).
-     * 
      * @param {number} stateIndex - State index (0 for initial state)
      * @param {string} key - The metadata key to delete
      * @returns {boolean} True if the key existed and was deleted
      */
     deleteStateMetadataKey(stateIndex, key) {
-        let metadata;
         if (stateIndex === 0) {
-            metadata = this.initialStateMetadata;
-        } else {
-            const action = this.getActionAtIndex(stateIndex);
-            if (!action || !action.stateMetadata) return false;
-            metadata = action.stateMetadata;
+            return this.initialAnnotation.deleteMetadata(key);
         }
         
-        if (key in metadata) {
-            delete metadata[key];
+        const action = this.getActionAtIndex(stateIndex);
+        if (action?.annotation) {
+            const result = action.annotation.deleteMetadata(key);
+            if (result) this.notifyListeners('update');
+            return result;
+        }
+        
+        // Legacy support
+        if (action?.stateMetadata && key in action.stateMetadata) {
+            delete action.stateMetadata[key];
             this.notifyListeners('update');
             return true;
         }
+        
         return false;
     }
     
     /**
      * Update multiple keys in annotation metadata for a state.
      * 
-     * Note: "stateMetadata" = "annotation metadata" (see class documentation).
-     * 
      * @param {number} stateIndex - State index (0 for initial state)
      * @param {Object} updates - Object containing key-value pairs to update
      */
     updateStateMetadata(stateIndex, updates) {
         if (stateIndex === 0) {
-            this.initialStateMetadata = { ...this.initialStateMetadata, ...updates };
+            this.initialAnnotation.updateMetadata(updates);
             this.notifyListeners('update');
             return;
         }
         
         const action = this.getActionAtIndex(stateIndex);
-        if (action) {
+        if (action?.annotation) {
+            action.annotation.updateMetadata(updates);
+            this.notifyListeners('update');
+        } else if (action) {
+            // Legacy support
             if (!action.stateMetadata) {
                 action.stateMetadata = {};
             }
@@ -430,33 +487,65 @@ export class ActionHistory {
     /**
      * Clear all annotation metadata for a state.
      * 
-     * Note: "stateMetadata" = "annotation metadata" (see class documentation).
-     * 
      * @param {number} stateIndex - State index (0 for initial state)
      */
     clearStateMetadata(stateIndex) {
         if (stateIndex === 0) {
-            this.initialStateMetadata = {};
+            // Reset to defaults only
+            this.initialAnnotation.metadata = {
+                name: 'Initial State',
+                source: 'manual',
+                createdAt: this.initialAnnotation.metadata.createdAt,
+                modifiedAt: Date.now()
+            };
             this.notifyListeners('update');
             return;
         }
         
         const action = this.getActionAtIndex(stateIndex);
-        if (action) {
+        if (action?.annotation) {
+            const name = action.annotation.name;
+            const source = action.annotation.source;
+            const createdAt = action.annotation.metadata.createdAt;
+            action.annotation.metadata = {
+                name,
+                source,
+                createdAt,
+                modifiedAt: Date.now()
+            };
+            this.notifyListeners('update');
+        } else if (action) {
+            // Legacy support
             action.stateMetadata = {};
             this.notifyListeners('update');
         }
     }
 
-    // Get memory usage estimate in bytes
+    /**
+     * Set the initial annotation state.
+     * 
+     * @param {Annotation} annotation - The initial annotation
+     */
+    setInitialAnnotation(annotation) {
+        this.initialAnnotation = annotation.clone();
+        this.initialAnnotation.name = 'Initial State';
+    }
+
+    /**
+     * Get memory usage estimate in bytes.
+     * @returns {number}
+     */
     getMemoryUsage() {
         let totalIndices = 0;
         [...this.undoStack, ...this.redoStack].forEach(action => {
-            if (action.edgeIndices) {
-                totalIndices += action.edgeIndices.size || action.edgeIndices.length || 0;
+            if (action.annotation) {
+                totalIndices += action.annotation.edgeCount;
+            } else if (action.newState) {
+                // Legacy format
+                totalIndices += action.newState.size || 0;
             }
         });
         // Each index is approximately 4 bytes (Uint32)
         return totalIndices * 4;
     }
-} 
+}

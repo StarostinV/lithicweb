@@ -29,7 +29,7 @@ export class PredVisualization extends BaseVisualization {
             return;
         }
 
-        const totalVertices = this.meshObject.positions.length / 3;
+        const totalVertices = this.meshView.positions.length / 3;
         
         // Generate colors for each Pred segment
         const segmentColors = this.generateDistinctColors(predIds.length);
@@ -42,18 +42,18 @@ export class PredVisualization extends BaseVisualization {
         for (let i = 0; i < totalVertices; i++) {
             const segmentId = predSegmentLabels[i];
             if (segmentId !== 0 && colorMap.has(segmentId)) {
-                this.meshObject.colorVertex(i, colorMap.get(segmentId));
+                this.meshView.colorVertex(i, colorMap.get(segmentId));
             }
         }
 
         // Show Pred edges prominently
         if (this.evaluationManager.prediction) {
             this.evaluationManager.prediction.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.predEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.predEdge);
             });
         }
 
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = true;
     }
 

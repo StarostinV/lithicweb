@@ -1,9 +1,10 @@
 import * as THREE from 'three';
+import { eventBus, Events } from '../utils/EventBus.js';
 
 /**
  * RenderingPanel - Manages rendering controls for publication-ready visualization.
  * 
- * Features:
+ * ## Features
  * - Annotation display modes (edges + segments, edges only, segments only, none)
  * - Wireframe mode
  * - Background color selection
@@ -12,6 +13,33 @@ import * as THREE from 'three';
  * - Environment map for reflections
  * - Flat shading toggle
  * - Edge and object color controls
+ * 
+ * ## EventBus Integration
+ * 
+ * ### Subscribes to:
+ * - `Events.MESH_LOADED` - Applies rendering config to newly loaded meshes
+ * - `Events.CONFIG_CHANGED` - Handles external config updates (e.g., import settings)
+ * 
+ * ### Emits:
+ * - `Events.RENDERING_CHANGED` - When any rendering setting changes
+ *   Data: { property: string, value: any, source: 'user'|'config' }
+ * 
+ * ## UserConfig Integration
+ * 
+ * Rendering settings are persisted to localStorage via UserConfig.
+ * Settings are automatically loaded on construction and saved on change.
+ * 
+ * @example
+ * // Create panel with scene, meshView, and userConfig
+ * const renderingPanel = new RenderingPanel(scene, meshView, userConfig);
+ * 
+ * // Listen for rendering changes
+ * eventBus.on(Events.RENDERING_CHANGED, (data) => {
+ *     console.log(`Rendering ${data.property} changed to ${data.value}`);
+ * });
+ * 
+ * // Clean up when done
+ * renderingPanel.dispose();
  */
 
 /**
@@ -21,17 +49,31 @@ import * as THREE from 'three';
  * - 'segments': Show only colored segments (no edge highlighting)
  * - 'none': Plain mesh with object color only
  */
-const ANNOTATION_MODES = Object.freeze({
+export const ANNOTATION_MODES = Object.freeze({
     FULL: 'full',
     EDGES: 'edges',
     SEGMENTS: 'segments',
     NONE: 'none'
 });
 
+/**
+ * EventBus namespace for this panel's subscriptions.
+ * Used for cleanup in dispose().
+ * @private
+ */
+const EVENTBUS_NAMESPACE = 'renderingPanel';
+
 export class RenderingPanel {
-    constructor(scene, meshObject, userConfig = null) {
+    /**
+     * Create a RenderingPanel.
+     * 
+     * @param {Object} scene - Scene object with renderer, lights, camera, etc.
+     * @param {MeshView} meshView - The MeshView instance for mesh operations
+     * @param {UserConfig} [userConfig=null] - Optional UserConfig for persistence
+     */
+    constructor(scene, meshView, userConfig = null) {
         this.scene = scene;
-        this.meshObject = meshObject;
+        this.meshView = meshView;
         this.userConfig = userConfig;
         
         // Load from userConfig or use defaults
@@ -62,16 +104,145 @@ export class RenderingPanel {
         this.envMap = null;
         this.pmremGenerator = null;
         
+        // Initialize UI controls
         this.initControls();
         this.initLightingControls();
         this.createEnvironmentMap();
         
-        // Apply loaded settings to scene
+        // Apply loaded settings to scene (background, lighting)
         this.applyInitialSettings();
+        
+        // Subscribe to EventBus events
+        this._setupEventBusSubscriptions();
+    }
+    
+    // ========================================
+    // EventBus Integration
+    // ========================================
+    
+    /**
+     * Set up EventBus subscriptions for mesh loading and config changes.
+     * @private
+     */
+    _setupEventBusSubscriptions() {
+        // When a mesh is loaded, apply the current rendering config
+        eventBus.on(Events.MESH_LOADED, (data) => {
+            this._onMeshLoaded(data);
+        }, EVENTBUS_NAMESPACE);
+        
+        // When config changes externally (e.g., import settings), update panel
+        eventBus.on(Events.CONFIG_CHANGED, (data) => {
+            this._onConfigChanged(data);
+        }, EVENTBUS_NAMESPACE);
     }
     
     /**
-     * Apply initially loaded settings to the scene.
+     * Handle mesh loaded event - apply rendering config to the new mesh.
+     * 
+     * This ensures that when a mesh is loaded, it immediately displays with
+     * the user's preferred rendering settings (material, colors, wireframe, etc.).
+     * 
+     * @private
+     * @param {Object} data - Event data from MESH_LOADED
+     * @param {string} data.source - 'file' or 'cloud'
+     * @param {string} data.filename - Name of the loaded file
+     */
+    _onMeshLoaded(data) {
+        console.log(`[RenderingPanel] Applying rendering config to loaded mesh: ${data.filename}`);
+        
+        // Small delay to ensure mesh is fully initialized
+        // This is needed because MeshView may still be setting up geometry
+        requestAnimationFrame(() => {
+            this.applyAllRenderingSettings();
+        });
+    }
+    
+    /**
+     * Handle config changed event - update panel if rendering/lighting config changed.
+     * 
+     * This allows external config changes (like importing settings) to update
+     * the rendering panel and apply the new settings to the current mesh.
+     * 
+     * @private
+     * @param {Object} data - Event data from CONFIG_CHANGED
+     * @param {string} data.path - Config path that changed
+     * @param {*} data.newValue - New value
+     * @param {*} data.oldValue - Previous value
+     */
+    _onConfigChanged(data) {
+        // Only respond to rendering or lighting config changes
+        if (data.path === 'rendering' || data.path === 'lighting' || data.path === '*') {
+            console.log(`[RenderingPanel] Config changed: ${data.path}, reloading settings`);
+            this.loadFromConfig();
+        }
+    }
+    
+    /**
+     * Emit a rendering changed event.
+     * 
+     * @private
+     * @param {string} property - The property that changed
+     * @param {*} value - The new value
+     * @param {string} [source='user'] - Source of change: 'user' (UI interaction) or 'config' (programmatic)
+     */
+    _emitRenderingChanged(property, value, source = 'user') {
+        eventBus.emit(Events.RENDERING_CHANGED, {
+            property,
+            value,
+            source
+        });
+    }
+    
+    // ========================================
+    // Settings Application
+    // ========================================
+    
+    /**
+     * Apply all current rendering settings to the mesh and scene.
+     * 
+     * This method applies the complete rendering configuration:
+     * - Background color
+     * - Material type with wireframe and flat shading
+     * - Edge and object colors
+     * - Annotation display mode
+     * - Material properties (metalness, roughness, envMap)
+     * 
+     * Called when:
+     * - A mesh is loaded
+     * - Settings are imported
+     * - Reset to defaults is triggered
+     */
+    applyAllRenderingSettings() {
+        if (this.meshView.isNull()) {
+            console.log('[RenderingPanel] No mesh loaded, skipping rendering application');
+            return;
+        }
+        
+        console.log('[RenderingPanel] Applying all rendering settings');
+        
+        // Apply colors to meshView first (they're used by other methods)
+        this.meshView.edgeColor.set(this.edgeColor);
+        this.meshView.objectColor.set(this.objectColor);
+        
+        // Apply scene settings
+        this.updateBackgroundColor();
+        
+        // Apply material (includes wireframe and flat shading)
+        this.updateMaterial();
+        
+        // Apply material properties (metalness, roughness, envMap)
+        this.updateMaterialProperties();
+        
+        // Apply annotation display mode (uses edge/object colors)
+        this.updateAnnotationDisplay();
+        
+        // Emit event to notify other components
+        this._emitRenderingChanged('all', null, 'config');
+    }
+    
+    /**
+     * Apply initially loaded settings to the scene (called once at construction).
+     * Only applies settings that don't require a mesh (background, lighting).
      */
     applyInitialSettings() {
         // Apply background color
@@ -89,6 +260,10 @@ export class RenderingPanel {
         this.scene.setKeyLightColor(this.keyLightColor);
         this.scene.setLightFollowsCamera(this.lightFollowsCamera);
     }
+    
+    // ========================================
+    // Config Persistence
+    // ========================================
     
     /**
      * Save rendering settings to userConfig.
@@ -126,6 +301,14 @@ export class RenderingPanel {
         });
     }
     
+    // ========================================
+    // UI Control Initialization
+    // ========================================
+    
+    /**
+     * Initialize all rendering control event listeners.
+     * @private
+     */
     initControls() {
         // Annotation Display Mode
         const annotationModeSelect = document.getElementById('annotationMode');
@@ -135,6 +318,7 @@ export class RenderingPanel {
                 this.annotationMode = e.target.value;
                 this.updateAnnotationDisplay();
                 this.saveRenderingConfig();
+                this._emitRenderingChanged('annotationMode', this.annotationMode);
             });
         }
         
@@ -146,6 +330,7 @@ export class RenderingPanel {
                 this.wireframeMode = e.target.checked;
                 this.updateWireframe();
                 this.saveRenderingConfig();
+                this._emitRenderingChanged('wireframeMode', this.wireframeMode);
             });
         }
         
@@ -157,6 +342,7 @@ export class RenderingPanel {
                 this.flatShading = e.target.checked;
                 this.updateMaterial();
                 this.saveRenderingConfig();
+                this._emitRenderingChanged('flatShading', this.flatShading);
             });
         }
         
@@ -168,6 +354,7 @@ export class RenderingPanel {
                 this.backgroundColor = e.target.value;
                 this.updateBackgroundColor();
                 this.saveRenderingConfig();
+                this._emitRenderingChanged('backgroundColor', this.backgroundColor);
             });
         }
         
@@ -182,6 +369,7 @@ export class RenderingPanel {
                     bgColorPicker.value = color;
                 }
                 this.saveRenderingConfig();
+                this._emitRenderingChanged('backgroundColor', this.backgroundColor);
             });
         });
         
@@ -194,6 +382,7 @@ export class RenderingPanel {
                 this.updateMaterial();
                 this.updateMaterialControlsVisibility();
                 this.saveRenderingConfig();
+                this._emitRenderingChanged('materialType', this.materialType);
             });
         }
         
@@ -208,6 +397,7 @@ export class RenderingPanel {
                 if (metalnessValue) metalnessValue.textContent = this.metalness.toFixed(2);
                 this.updateMaterialProperties();
                 this.saveRenderingConfig();
+                this._emitRenderingChanged('metalness', this.metalness);
             });
         }
         
@@ -222,6 +412,7 @@ export class RenderingPanel {
                 if (roughnessValue) roughnessValue.textContent = this.roughness.toFixed(2);
                 this.updateMaterialProperties();
                 this.saveRenderingConfig();
+                this._emitRenderingChanged('roughness', this.roughness);
             });
         }
         
@@ -236,6 +427,7 @@ export class RenderingPanel {
                 if (envMapValue) envMapValue.textContent = this.envMapIntensity.toFixed(2);
                 this.updateMaterialProperties();
                 this.saveRenderingConfig();
+                this._emitRenderingChanged('envMapIntensity', this.envMapIntensity);
             });
         }
         
@@ -247,6 +439,7 @@ export class RenderingPanel {
                 this.edgeColor = e.target.value;
                 this.updateColors();
                 this.saveRenderingConfig();
+                this._emitRenderingChanged('edgeColor', this.edgeColor);
             });
         }
         
@@ -258,6 +451,7 @@ export class RenderingPanel {
                 this.objectColor = e.target.value;
                 this.updateColors();
                 this.saveRenderingConfig();
+                this._emitRenderingChanged('objectColor', this.objectColor);
             });
         }
         
@@ -267,6 +461,7 @@ export class RenderingPanel {
     
     /**
      * Initialize lighting controls.
+     * @private
      */
     initLightingControls() {
         // Key Light Intensity
@@ -391,9 +586,14 @@ export class RenderingPanel {
         }
     }
     
+    // ========================================
+    // Environment Map
+    // ========================================
+    
     /**
      * Create a simple environment map for reflections.
      * Uses a gradient cubemap for subtle reflections.
+     * @private
      */
     createEnvironmentMap() {
         // Create PMREM generator for environment map processing
@@ -425,18 +625,30 @@ export class RenderingPanel {
         texture.dispose();
     }
     
+    // ========================================
+    // Rendering Update Methods
+    // ========================================
+    
     /**
      * Update annotation display based on current mode.
      * Handles edges, segments, and their combinations.
+     * 
+     * Annotation modes:
+     * - 'full': Show both edge annotations and colored segments
+     * - 'edges': Show only edge annotations (segments use object color)
+     * - 'segments': Show only colored segments (no edge highlighting)
+     * - 'none': Plain mesh with object color only
      */
     updateAnnotationDisplay() {
-        if (this.meshObject.isNull()) return;
+        if (this.meshView.isNull()) return;
         
-        const mesh = this.meshObject.mesh;
+        const mesh = this.meshView.mesh;
+        if (!mesh?.geometry?.attributes?.color) return;
+        
         const colors = mesh.geometry.attributes.color.array;
-        const edgeLabels = this.meshObject.edgeLabels;
-        const faceLabels = this.meshObject.faceLabels;
-        const faceColors = this.meshObject.faceColors;
+        const edgeLabels = this.meshView.edgeLabels;
+        const faceLabels = this.meshView.faceLabels;
+        const faceColors = this.meshView.faceColors;
         
         const edgeColor = new THREE.Color(this.edgeColor);
         const objectColor = new THREE.Color(this.objectColor);
@@ -446,8 +658,8 @@ export class RenderingPanel {
         const showSegments = this.annotationMode === ANNOTATION_MODES.FULL || 
                              this.annotationMode === ANNOTATION_MODES.SEGMENTS;
         
-        // Update meshObject's internal showSegments state to stay in sync
-        this.meshObject.showSegments = showSegments;
+        // Update meshView's internal showSegments state to stay in sync
+        this.meshView.showSegments = showSegments;
         
         // First pass: set base colors for all vertices
         for (let i = 0; i < edgeLabels.length; i++) {
@@ -479,9 +691,11 @@ export class RenderingPanel {
      * Toggle wireframe mode on the mesh material.
      */
     updateWireframe() {
-        if (this.meshObject.isNull()) return;
+        if (this.meshView.isNull()) return;
         
-        const mesh = this.meshObject.mesh;
+        const mesh = this.meshView.mesh;
+        if (!mesh?.material) return;
+        
         mesh.material.wireframe = this.wireframeMode;
         mesh.material.needsUpdate = true;
     }
@@ -495,11 +709,14 @@ export class RenderingPanel {
     
     /**
      * Update the mesh material type.
+     * Creates a new material with the selected type and current settings.
      */
     updateMaterial() {
-        if (this.meshObject.isNull()) return;
+        if (this.meshView.isNull()) return;
         
-        const mesh = this.meshObject.mesh;
+        const mesh = this.meshView.mesh;
+        if (!mesh) return;
+        
         const oldMaterial = mesh.material;
         
         // Create new material based on type
@@ -536,10 +753,12 @@ export class RenderingPanel {
         }
         
         mesh.material = newMaterial;
-        oldMaterial.dispose();
+        if (oldMaterial) {
+            oldMaterial.dispose();
+        }
         
         // Recompute normals if flat shading changed
-        if (this.flatShading) {
+        if (this.flatShading && mesh.geometry) {
             mesh.geometry.computeVertexNormals();
         }
     }
@@ -549,10 +768,12 @@ export class RenderingPanel {
      * Only applies to Standard material.
      */
     updateMaterialProperties() {
-        if (this.meshObject.isNull()) return;
+        if (this.meshView.isNull()) return;
         if (this.materialType !== 'standard') return;
         
-        const material = this.meshObject.mesh.material;
+        const material = this.meshView.mesh?.material;
+        if (!material) return;
+        
         material.metalness = this.metalness;
         material.roughness = this.roughness;
         material.envMapIntensity = this.envMapIntensity;
@@ -561,13 +782,14 @@ export class RenderingPanel {
     
     /**
      * Update edge and object colors on the mesh.
+     * Updates meshView's color references and re-applies annotation display.
      */
     updateColors() {
-        if (this.meshObject.isNull()) return;
+        if (this.meshView.isNull()) return;
         
         // Update colors in place so all references (including faceColors) stay in sync
-        this.meshObject.edgeColor.set(this.edgeColor);
-        this.meshObject.objectColor.set(this.objectColor);
+        this.meshView.edgeColor.set(this.edgeColor);
+        this.meshView.objectColor.set(this.objectColor);
         
         // Re-apply annotation display with new colors
         this.updateAnnotationDisplay();
@@ -583,8 +805,13 @@ export class RenderingPanel {
         }
     }
     
+    // ========================================
+    // Reset and Load Methods
+    // ========================================
+    
     /**
      * Reset all rendering settings to defaults.
+     * Updates UI, applies settings, and saves to config.
      */
     resetToDefaults() {
         // Rendering defaults
@@ -607,73 +834,12 @@ export class RenderingPanel {
         this.lightFollowsCamera = false;
         this.currentLightingPreset = 'default';
         
-        // Update UI elements - checkboxes
-        const checkboxes = {
-            wireframeMode: this.wireframeMode,
-            flatShading: this.flatShading,
-            lightFollowsCamera: this.lightFollowsCamera,
-        };
-        
-        Object.entries(checkboxes).forEach(([id, value]) => {
-            const el = document.getElementById(id);
-            if (el) el.checked = value;
-        });
-        
-        // Update dropdowns
-        const annotationModeSelect = document.getElementById('annotationMode');
-        if (annotationModeSelect) annotationModeSelect.value = this.annotationMode;
-        
-        const materialSelect = document.getElementById('materialType');
-        if (materialSelect) materialSelect.value = this.materialType;
-        
-        const lightingPresetSelect = document.getElementById('lightingPreset');
-        if (lightingPresetSelect) lightingPresetSelect.value = this.currentLightingPreset;
-        
-        // Update material sliders
-        const materialSliders = {
-            metalness: { value: this.metalness, decimals: 2 },
-            roughness: { value: this.roughness, decimals: 2 },
-            envMapIntensity: { value: this.envMapIntensity, decimals: 2 },
-        };
-        
-        Object.entries(materialSliders).forEach(([id, { value, decimals }]) => {
-            const slider = document.getElementById(id);
-            const valueEl = document.getElementById(id + 'Value');
-            if (slider) slider.value = value;
-            if (valueEl) valueEl.textContent = value.toFixed(decimals);
-        });
-        
-        // Update lighting sliders
-        const lightingSliders = {
-            keyLightIntensity: { value: this.keyLightIntensity, decimals: 1 },
-            fillLightIntensity: { value: this.fillLightIntensity, decimals: 1 },
-            ambientLightIntensity: { value: this.ambientLightIntensity, decimals: 1 },
-        };
-        
-        Object.entries(lightingSliders).forEach(([id, { value, decimals }]) => {
-            const slider = document.getElementById(id);
-            const valueEl = document.getElementById(id + 'Value');
-            if (slider) slider.value = value;
-            if (valueEl) valueEl.textContent = value.toFixed(decimals);
-        });
-        
-        // Update color pickers
-        const colorPickers = {
-            backgroundColor: this.backgroundColor,
-            edgeColorPicker: this.edgeColor,
-            objectColorPicker: this.objectColor,
-            keyLightColor: this.keyLightColor,
-        };
-        
-        Object.entries(colorPickers).forEach(([id, value]) => {
-            const picker = document.getElementById(id);
-            if (picker) picker.value = value;
-        });
+        // Update all UI elements
+        this.syncUIFromState();
         
         // Apply all rendering settings
         this.updateBackgroundColor();
-        this.updateMaterial();
-        this.updateAnnotationDisplay();
+        this.applyAllRenderingSettings();
         this.updateMaterialControlsVisibility();
         
         // Apply lighting settings
@@ -683,6 +849,9 @@ export class RenderingPanel {
         // Save to userConfig
         this.saveRenderingConfig();
         this.saveLightingConfig();
+        
+        // Emit event
+        this._emitRenderingChanged('all', null, 'user');
     }
     
     /**
@@ -719,8 +888,7 @@ export class RenderingPanel {
         
         // Apply all settings
         this.applyInitialSettings();
-        this.updateMaterial();
-        this.updateAnnotationDisplay();
+        this.applyAllRenderingSettings();
         this.updateMaterialControlsVisibility();
     }
     
@@ -779,22 +947,97 @@ export class RenderingPanel {
         });
     }
     
+    // ========================================
+    // Lifecycle Methods
+    // ========================================
+    
     /**
      * Called when panel is shown.
+     * Can be used for any refresh operations needed on panel show.
      */
     onShow() {
-        // Sync UI with current state
+        // Sync UI with current state in case anything changed externally
+        this.syncUIFromState();
     }
     
     /**
-     * Clean up resources.
+     * Clean up resources and unsubscribe from EventBus.
+     * Should be called when the panel is destroyed.
      */
     dispose() {
+        // Clean up EventBus subscriptions using namespace
+        eventBus.offNamespace(EVENTBUS_NAMESPACE);
+        
+        // Clean up Three.js resources
         if (this.envMap) {
             this.envMap.dispose();
+            this.envMap = null;
         }
         if (this.pmremGenerator) {
             this.pmremGenerator.dispose();
+            this.pmremGenerator = null;
         }
+    }
+    
+    // ========================================
+    // Public Getters
+    // ========================================
+    
+    /**
+     * Get the current annotation mode.
+     * @returns {string} Current annotation mode ('full', 'edges', 'segments', 'none')
+     */
+    getAnnotationMode() {
+        return this.annotationMode;
+    }
+    
+    /**
+     * Get the current edge color.
+     * @returns {string} Edge color as hex string
+     */
+    getEdgeColor() {
+        return this.edgeColor;
+    }
+    
+    /**
+     * Get the current object color.
+     * @returns {string} Object color as hex string
+     */
+    getObjectColor() {
+        return this.objectColor;
+    }
+    
+    /**
+     * Get all current rendering settings as an object.
+     * @returns {Object} Current rendering settings
+     */
+    getRenderingSettings() {
+        return {
+            annotationMode: this.annotationMode,
+            wireframeMode: this.wireframeMode,
+            flatShading: this.flatShading,
+            materialType: this.materialType,
+            metalness: this.metalness,
+            roughness: this.roughness,
+            envMapIntensity: this.envMapIntensity,
+            backgroundColor: this.backgroundColor,
+            edgeColor: this.edgeColor,
+            objectColor: this.objectColor,
+        };
+    }
+    
+    /**
+     * Get all current lighting settings as an object.
+     * @returns {Object} Current lighting settings
+     */
+    getLightingSettings() {
+        return {
+            keyLightIntensity: this.keyLightIntensity,
+            fillLightIntensity: this.fillLightIntensity,
+            ambientLightIntensity: this.ambientLightIntensity,
+            keyLightColor: this.keyLightColor,
+            lightFollowsCamera: this.lightFollowsCamera,
+            currentLightingPreset: this.currentLightingPreset,
+        };
     }
 }

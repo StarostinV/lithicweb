@@ -37,7 +37,7 @@ export class MatchedVisualization extends BaseVisualization {
         });
 
         // Color vertices based on match status
-        const totalVertices = this.meshObject.positions.length / 3;
+        const totalVertices = this.meshView.positions.length / 3;
         
         for (let i = 0; i < totalVertices; i++) {
             const gtId = gtSegmentLabels[i];
@@ -46,18 +46,18 @@ export class MatchedVisualization extends BaseVisualization {
 
             if (errorType === 'matched') {
                 // Vertex is in the intersection of a matched pair
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.matched);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.matched);
             } else if (errorType === 'boundary') {
                 // Vertex is in a matched pair but not in intersection
                 // Determine if it's GT-only or Pred-only
                 if (matchedPairs.has(gtId) && matchedPairs.get(gtId) !== predId) {
                     // GT vertex not covered by matched pred (under-detection)
-                    this.meshObject.colorVertex(i, EVALUATION_COLORS.boundary);
+                    this.meshView.colorVertex(i, EVALUATION_COLORS.boundary);
                 } else if (predId !== 0 && gtId === 0) {
                     // Pred vertex not in any GT (over-detection)
-                    this.meshObject.colorVertex(i, EVALUATION_COLORS.boundary);
+                    this.meshView.colorVertex(i, EVALUATION_COLORS.boundary);
                 } else {
-                    this.meshObject.colorVertex(i, EVALUATION_COLORS.matchedSubtle);
+                    this.meshView.colorVertex(i, EVALUATION_COLORS.matchedSubtle);
                 }
             }
         }
@@ -65,11 +65,11 @@ export class MatchedVisualization extends BaseVisualization {
         // Show GT edges
         if (this.evaluationManager.groundTruth) {
             this.evaluationManager.groundTruth.edgeIndices.forEach(i => {
-                this.meshObject.colorVertex(i, EVALUATION_COLORS.gtEdge);
+                this.meshView.colorVertex(i, EVALUATION_COLORS.gtEdge);
             });
         }
 
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = true;
     }
 

@@ -56,16 +56,16 @@ export const EVALUATION_COLORS = Object.freeze({
 export class BaseVisualization {
     /**
      * Create a visualization.
-     * @param {MeshObject} meshObject - The mesh object to visualize
+     * @param {MeshView} meshView - The mesh object to visualize
      * @param {EvaluationManager} evaluationManager - The evaluation manager
      */
-    constructor(meshObject, evaluationManager) {
+    constructor(meshView, evaluationManager) {
         if (new.target === BaseVisualization) {
             throw new Error('BaseVisualization is abstract and cannot be instantiated directly');
         }
         
-        /** @type {MeshObject} */
-        this.meshObject = meshObject;
+        /** @type {MeshView} */
+        this.meshView = meshView;
         
         /** @type {EvaluationManager} */
         this.evaluationManager = evaluationManager;
@@ -119,11 +119,11 @@ export class BaseVisualization {
      * Reset all vertex colors to the base object color.
      */
     resetColors() {
-        const totalVertices = this.meshObject.positions.length / 3;
+        const totalVertices = this.meshView.positions.length / 3;
         for (let i = 0; i < totalVertices; i++) {
-            this.meshObject.colorVertex(i, this.meshObject.objectColor);
+            this.meshView.colorVertex(i, this.meshView.objectColor);
         }
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
         this.isApplied = false;
     }
 
@@ -134,9 +134,9 @@ export class BaseVisualization {
      */
     colorVertices(indices, color) {
         for (const idx of indices) {
-            this.meshObject.colorVertex(idx, color);
+            this.meshView.colorVertex(idx, color);
         }
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
     }
 
     /**
@@ -145,9 +145,9 @@ export class BaseVisualization {
      */
     applyColorMap(colorMap) {
         colorMap.forEach((color, idx) => {
-            this.meshObject.colorVertex(idx, color);
+            this.meshView.colorVertex(idx, color);
         });
-        this.meshObject.mesh.geometry.attributes.color.needsUpdate = true;
+        this.meshView.mesh.geometry.attributes.color.needsUpdate = true;
     }
 
     /**
@@ -191,19 +191,19 @@ export class BaseVisualization {
 /**
  * Factory function to create visualization instances.
  * @param {string} mode - Visualization mode identifier
- * @param {MeshObject} meshObject - The mesh object
+ * @param {MeshView} meshView - The mesh object
  * @param {EvaluationManager} evaluationManager - The evaluation manager
  * @returns {BaseVisualization|null} Visualization instance or null if mode unknown
  */
-export function createVisualization(mode, meshObject, evaluationManager) {
+export function createVisualization(mode, meshView, evaluationManager) {
     // Import here to avoid circular dependencies
     const visualizations = {
-        matched: () => import('./MatchedVisualization.js').then(m => new m.MatchedVisualization(meshObject, evaluationManager)),
-        overseg: () => import('./OverSegVisualization.js').then(m => new m.OverSegVisualization(meshObject, evaluationManager)),
-        underseg: () => import('./UnderSegVisualization.js').then(m => new m.UnderSegVisualization(meshObject, evaluationManager)),
-        missingGt: () => import('./MissingGTVisualization.js').then(m => new m.MissingGTVisualization(meshObject, evaluationManager)),
-        missingPred: () => import('./MissingPredVisualization.js').then(m => new m.MissingPredVisualization(meshObject, evaluationManager)),
-        all: () => import('./AllErrorsVisualization.js').then(m => new m.AllErrorsVisualization(meshObject, evaluationManager))
+        matched: () => import('./MatchedVisualization.js').then(m => new m.MatchedVisualization(meshView, evaluationManager)),
+        overseg: () => import('./OverSegVisualization.js').then(m => new m.OverSegVisualization(meshView, evaluationManager)),
+        underseg: () => import('./UnderSegVisualization.js').then(m => new m.UnderSegVisualization(meshView, evaluationManager)),
+        missingGt: () => import('./MissingGTVisualization.js').then(m => new m.MissingGTVisualization(meshView, evaluationManager)),
+        missingPred: () => import('./MissingPredVisualization.js').then(m => new m.MissingPredVisualization(meshView, evaluationManager)),
+        all: () => import('./AllErrorsVisualization.js').then(m => new m.AllErrorsVisualization(meshView, evaluationManager))
     };
     
     if (visualizations[mode]) {
