@@ -6,7 +6,14 @@
  * - Export/import settings to/from JSON file
  * - Reset all settings to defaults
  * - Clear local storage
+ * 
+ * ## Event Bus Integration
+ * 
+ * Subscribes to:
+ * - `Events.CONFIG_CHANGED` - Updates settings summary when config changes
  */
+
+import { eventBus, Events } from '../utils/EventBus.js';
 
 export class SettingsPanel {
     /**
@@ -53,15 +60,24 @@ export class SettingsPanel {
     
     /**
      * Initialize config change listener to auto-update summary when visible.
+     * Uses EventBus for subscription.
      */
     initConfigListener() {
-        this.userConfig.addListener('*', () => {
+        eventBus.on(Events.CONFIG_CHANGED, () => {
             // Only update if settings panel is visible
             const settingsPanel = document.getElementById('settingsPanel');
             if (settingsPanel && !settingsPanel.classList.contains('hidden')) {
                 this.updateSettingsSummary();
             }
-        });
+        }, 'settingsPanel');
+    }
+    
+    /**
+     * Clean up resources and EventBus subscriptions.
+     * Call this when the panel is being destroyed.
+     */
+    dispose() {
+        eventBus.offNamespace('settingsPanel');
     }
     
     /**

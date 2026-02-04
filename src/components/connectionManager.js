@@ -2,9 +2,27 @@
  * Connection Manager Component
  * Manages server connection state, settings modal, and status display.
  * This is shared across the application for consistent connection handling.
+ * 
+ * ## Event Bus Integration
+ * 
+ * ConnectionManager emits the following events via the global EventBus:
+ * - `Events.CONNECTION_CHANGED` - When connection status changes
+ *   Data: { isConnected: boolean, config: { serverUrl, apiToken } }
+ * - `Events.CONNECTION_MODAL_OPENED` - When the settings modal is opened
+ * 
+ * Components can subscribe to these events instead of using addListener():
+ * ```javascript
+ * import { eventBus, Events } from '../utils/EventBus.js';
+ * eventBus.on(Events.CONNECTION_CHANGED, (data) => {
+ *     if (data.isConnected) { ... }
+ * });
+ * ```
+ * 
+ * @module ConnectionManager
  */
 
 import { lithicClient } from '../api/lithicClient.js';
+import { eventBus, Events } from '../utils/EventBus.js';
 
 export class ConnectionManager {
     constructor() {
@@ -18,6 +36,15 @@ export class ConnectionManager {
 
     /**
      * Add a listener to be called when connection status changes.
+     * 
+     * @deprecated Prefer using EventBus for new code:
+     * ```javascript
+     * import { eventBus, Events } from '../utils/EventBus.js';
+     * eventBus.on(Events.CONNECTION_CHANGED, (data) => {
+     *     // data.isConnected, data.config
+     * });
+     * ```
+     * 
      * @param {Function} callback - Called with (isConnected, config)
      */
     addListener(callback) {
@@ -26,10 +53,19 @@ export class ConnectionManager {
 
     /**
      * Notify all listeners of connection status change.
+     * Emits both to legacy listeners and the global EventBus.
      */
     notifyListeners() {
         const config = lithicClient.getConfig();
+        
+        // Legacy listener pattern (for backward compatibility)
         this.listeners.forEach(cb => cb(this.isConnected, config));
+        
+        // EventBus pattern (preferred for new code)
+        eventBus.emit(Events.CONNECTION_CHANGED, {
+            isConnected: this.isConnected,
+            config: config
+        });
     }
 
     createSettingsModal() {
@@ -141,6 +177,7 @@ export class ConnectionManager {
 
     /**
      * Open the connection settings modal.
+     * Emits Events.CONNECTION_MODAL_OPENED via EventBus.
      */
     openModal() {
         const modal = document.getElementById('connectionModal');
@@ -157,6 +194,9 @@ export class ConnectionManager {
         }
         
         modal.style.display = 'flex';
+        
+        // Emit event for components that want to react to modal opening
+        eventBus.emit(Events.CONNECTION_MODAL_OPENED);
     }
 
     async testConnection() {

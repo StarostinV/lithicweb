@@ -4,10 +4,18 @@
  * Displays the history timeline with undo/redo capabilities and
  * allows labeling states as Ground Truth or Prediction for evaluation.
  * 
+ * ## Event Bus Integration
+ * 
+ * Subscribes to:
+ * - `Events.HISTORY_CHANGED` - Updates UI when history changes
+ * - `Events.EVALUATION_GT_CHANGED` - Updates GT label display
+ * - `Events.EVALUATION_PRED_CHANGED` - Updates Pred label display
+ * 
  * @module HistoryPanel
  */
 
 import { escapeHtml } from '../utils/sanitize.js';
+import { eventBus, Events } from '../utils/EventBus.js';
 
 export class HistoryPanel {
     /**
@@ -35,29 +43,54 @@ export class HistoryPanel {
         this.predictionIndex = null;
 
         this.setupEventListeners();
+        this._setupEventBusSubscriptions();
         this.updateUI(meshObject.history);
+    }
+    
+    /**
+     * Setup EventBus subscriptions.
+     * Uses namespace for easy cleanup in dispose().
+     * @private
+     */
+    _setupEventBusSubscriptions() {
+        // Listen to history changes via EventBus
+        eventBus.on(Events.HISTORY_CHANGED, () => {
+            this.updateUI(this.meshObject.history);
+        }, 'historyPanel');
+        
+        // Listen to evaluation changes via EventBus
+        eventBus.on(Events.EVALUATION_GT_CHANGED, (data) => {
+            this.groundTruthIndex = data.stateIndex;
+            this.updateUI(this.meshObject.history);
+        }, 'historyPanel');
+        
+        eventBus.on(Events.EVALUATION_PRED_CHANGED, (data) => {
+            this.predictionIndex = data.stateIndex;
+            this.updateUI(this.meshObject.history);
+        }, 'historyPanel');
+    }
+    
+    /**
+     * Clean up resources and EventBus subscriptions.
+     * Call this when the panel is being destroyed.
+     */
+    dispose() {
+        eventBus.offNamespace('historyPanel');
     }
 
     /**
      * Set the evaluation manager (for deferred initialization).
+     * Note: EventBus subscriptions for evaluation changes are set up in _setupEventBusSubscriptions(),
+     * so this method just stores the reference for direct method calls.
      * @param {EvaluationManager} evaluationManager
      */
     setEvaluationManager(evaluationManager) {
         this.evaluationManager = evaluationManager;
-        
-        // Listen to evaluation manager changes to update UI
-        if (this.evaluationManager) {
-            this.evaluationManager.addListener((state) => {
-                this.groundTruthIndex = state.groundTruth?.stateIndex ?? null;
-                this.predictionIndex = state.prediction?.stateIndex ?? null;
-                this.updateUI(this.meshObject.history);
-            });
-        }
+        // EventBus subscriptions handle UI updates; no need for direct listener
     }
 
     setupEventListeners() {
-        // Listen to history changes
-        this.meshObject.history.addListener((history) => this.updateUI(history));
+        // Note: History changes are now listened via EventBus in _setupEventBusSubscriptions()
 
         // Undo button (panel)
         this.undoBtn.addEventListener('click', () => {

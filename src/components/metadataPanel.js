@@ -18,6 +18,12 @@
  *    - Stored per-action in the history system
  *    - Note: Called "state metadata" in code for historical reasons
  * 
+ * ## Event Bus Integration
+ * 
+ * Subscribes to:
+ * - `Events.MESH_LOADED` - Updates UI when a mesh is loaded
+ * - `Events.HISTORY_CHANGED` - Updates annotation metadata display when history changes
+ * 
  * Provides a visual interface to:
  * - View mesh metadata (persisted across all states)
  * - View annotation metadata (unique per history state, e.g., evaluation metrics)
@@ -28,6 +34,8 @@
  * 
  * @module MetadataPanel
  */
+
+import { eventBus, Events } from '../utils/EventBus.js';
 
 export class MetadataPanel {
     /**
@@ -55,17 +63,33 @@ export class MetadataPanel {
         this.stateMetadataBadge = document.getElementById('stateMetadataBadge');
         
         this.setupEventListeners();
+        this._setupEventBusSubscriptions();
         this.updateUI();
-        
-        // Subscribe to file load events to auto-update when a new file is loaded
-        this.meshLoader.addLoadListener(() => {
+    }
+    
+    /**
+     * Setup EventBus subscriptions.
+     * Uses namespace for easy cleanup in dispose().
+     * @private
+     */
+    _setupEventBusSubscriptions() {
+        // Subscribe to mesh load events to auto-update when a new file is loaded
+        eventBus.on(Events.MESH_LOADED, () => {
             this.updateUI();
-        });
+        }, 'metadataPanel');
         
         // Subscribe to history changes to update annotation metadata display
-        this.meshObject.history.addListener(() => {
+        eventBus.on(Events.HISTORY_CHANGED, () => {
             this.updateStateMetadataUI();
-        });
+        }, 'metadataPanel');
+    }
+    
+    /**
+     * Clean up resources and EventBus subscriptions.
+     * Call this when the panel is being destroyed.
+     */
+    dispose() {
+        eventBus.offNamespace('metadataPanel');
     }
 
     /**

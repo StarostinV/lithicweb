@@ -1,0 +1,450 @@
+/**
+ * EventBus - Centralized pub/sub event system for component communication.
+ * 
+ * Provides a decoupled way for components to communicate without direct references.
+ * Components can emit events and subscribe to events from other components.
+ * 
+ * ## Features
+ * - Namespaced subscriptions for easy cleanup
+ * - One-time listeners with `once()`
+ * - Debug logging (controlled via localStorage)
+ * - Proper cleanup with `off()` supporting multiple removal patterns
+ * 
+ * ## Usage
+ * 
+ * ```javascript
+ * import { eventBus, Events } from '../utils/EventBus.js';
+ * 
+ * // Subscribe to an event
+ * eventBus.on(Events.CONNECTION_CHANGED, (data) => {
+ *     console.log('Connection changed:', data.isConnected);
+ * });
+ * 
+ * // Subscribe with namespace for easy cleanup
+ * eventBus.on(Events.CONNECTION_CHANGED, handler, 'myComponent');
+ * 
+ * // Emit an event
+ * eventBus.emit(Events.CONNECTION_CHANGED, { isConnected: true, config: {...} });
+ * 
+ * // One-time subscription
+ * eventBus.once(Events.MESH_LOADED, (data) => {
+ *     console.log('Mesh loaded (only fires once)');
+ * });
+ * 
+ * // Remove specific listener
+ * eventBus.off(Events.CONNECTION_CHANGED, handler);
+ * 
+ * // Remove all listeners for an event
+ * eventBus.off(Events.CONNECTION_CHANGED);
+ * 
+ * // Remove all listeners in a namespace (useful for component cleanup)
+ * eventBus.offNamespace('myComponent');
+ * ```
+ * 
+ * @module EventBus
+ */
+
+import { logger } from './logger.js';
+
+const log = logger.withPrefix('[EventBus]');
+
+/**
+ * Event type constants for type-safe event names.
+ * Using constants prevents typos and enables autocomplete.
+ * 
+ * Naming convention: DOMAIN_ACTION (e.g., CONNECTION_CHANGED, MESH_LOADED)
+ */
+export const Events = Object.freeze({
+    // Connection events
+    /** Fired when server connection status changes. Data: { isConnected: boolean, config: object } */
+    CONNECTION_CHANGED: 'connection:changed',
+    /** Fired when connection settings are opened. Data: none */
+    CONNECTION_MODAL_OPENED: 'connection:modalOpened',
+    
+    // Mesh events
+    /** Fired when a mesh is loaded (from file or cloud). Data: { source: 'file'|'cloud', filename: string } */
+    MESH_LOADED: 'mesh:loaded',
+    /** Fired when mesh is uploaded to cloud. Data: { meshId: string } */
+    MESH_UPLOADED: 'mesh:uploaded',
+    
+    // Annotation/State events
+    /** Fired when annotation state changes (draw, erase, undo, redo). Data: { action: object, stateIndex: number } */
+    STATE_CHANGED: 'state:changed',
+    /** Fired when state is saved to cloud. Data: { meshId: string, stateId: string } */
+    STATE_SAVED: 'state:saved',
+    /** Fired when state is loaded from cloud. Data: { meshId: string, stateId: string } */
+    STATE_LOADED: 'state:loaded',
+    
+    // History events
+    /** Fired when history changes (undo, redo, clear). Data: { action: 'undo'|'redo'|'clear', history: object } */
+    HISTORY_CHANGED: 'history:changed',
+    
+    // Evaluation events
+    /** Fired when ground truth is set/cleared. Data: { stateIndex: number|null, description: string|null } */
+    EVALUATION_GT_CHANGED: 'evaluation:gtChanged',
+    /** Fired when prediction is set/cleared. Data: { stateIndex: number|null, description: string|null } */
+    EVALUATION_PRED_CHANGED: 'evaluation:predChanged',
+    /** Fired when metrics are computed. Data: { metrics: object } */
+    EVALUATION_METRICS_COMPUTED: 'evaluation:metricsComputed',
+    /** Fired when evaluation mode is entered/exited. Data: { isActive: boolean } */
+    EVALUATION_MODE_CHANGED: 'evaluation:modeChanged',
+    
+    // Mode events
+    /** Fired when interaction mode changes. Data: { mode: string, previousMode: string } */
+    MODE_CHANGED: 'mode:changed',
+    
+    // UI events
+    /** Fired when a panel is shown. Data: { panelId: string } */
+    PANEL_SHOWN: 'ui:panelShown',
+    /** Fired when a panel is hidden. Data: { panelId: string } */
+    PANEL_HIDDEN: 'ui:panelHidden',
+    
+    // Config events
+    /** Fired when user configuration changes. Data: { path: string, newValue: any, oldValue: any } */
+    CONFIG_CHANGED: 'config:changed',
+});
+
+/**
+ * @typedef {Object} Listener
+ * @property {Function} callback - The callback function
+ * @property {string|null} namespace - Optional namespace for grouping
+ * @property {boolean} once - If true, listener is removed after first call
+ */
+
+/**
+ * EventBus class - centralized event management.
+ * 
+ * Implements the publish-subscribe pattern for loose coupling between components.
+ */
+class EventBus {
+    constructor() {
+        /**
+         * Map of event names to arrays of listeners.
+         * @type {Map<string, Listener[]>}
+         * @private
+         */
+        this._listeners = new Map();
+        
+        /**
+         * Whether to log events for debugging.
+         * Controlled via localStorage key 'lithicjs_eventbus_debug'.
+         * @type {boolean}
+         * @private
+         */
+        this._debugEnabled = this._checkDebugEnabled();
+    }
+    
+    /**
+     * Check if debug mode is enabled for EventBus.
+     * @private
+     * @returns {boolean}
+     */
+    _checkDebugEnabled() {
+        try {
+            return localStorage.getItem('lithicjs_eventbus_debug') === 'true';
+        } catch (e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Enable or disable debug logging.
+     * @param {boolean} enabled - Whether to enable debug logging
+     */
+    setDebug(enabled) {
+        this._debugEnabled = enabled;
+        try {
+            if (enabled) {
+                localStorage.setItem('lithicjs_eventbus_debug', 'true');
+                log.info('Debug mode enabled');
+            } else {
+                localStorage.removeItem('lithicjs_eventbus_debug');
+                log.info('Debug mode disabled');
+            }
+        } catch (e) {
+            // localStorage not available
+        }
+    }
+    
+    /**
+     * Subscribe to an event.
+     * 
+     * @param {string} event - Event name (use Events constants)
+     * @param {Function} callback - Function to call when event is emitted
+     * @param {string} [namespace=null] - Optional namespace for grouping listeners
+     * @returns {Function} Unsubscribe function for convenience
+     * 
+     * @example
+     * // Basic subscription
+     * eventBus.on(Events.CONNECTION_CHANGED, (data) => console.log(data));
+     * 
+     * // With namespace for easy cleanup
+     * eventBus.on(Events.CONNECTION_CHANGED, handler, 'cloudStoragePanel');
+     * 
+     * // Using returned unsubscribe function
+     * const unsubscribe = eventBus.on(Events.MESH_LOADED, handler);
+     * unsubscribe(); // removes the listener
+     */
+    on(event, callback, namespace = null) {
+        if (typeof callback !== 'function') {
+            log.warn(`Attempted to register non-function listener for event "${event}"`);
+            return () => {};
+        }
+        
+        if (!this._listeners.has(event)) {
+            this._listeners.set(event, []);
+        }
+        
+        const listener = {
+            callback,
+            namespace,
+            once: false
+        };
+        
+        this._listeners.get(event).push(listener);
+        
+        if (this._debugEnabled) {
+            const nsInfo = namespace ? ` (namespace: ${namespace})` : '';
+            log.debug(`Subscribed to "${event}"${nsInfo}`);
+        }
+        
+        // Return unsubscribe function
+        return () => this.off(event, callback);
+    }
+    
+    /**
+     * Subscribe to an event for one-time execution.
+     * The listener is automatically removed after the first call.
+     * 
+     * @param {string} event - Event name (use Events constants)
+     * @param {Function} callback - Function to call when event is emitted
+     * @param {string} [namespace=null] - Optional namespace for grouping
+     * @returns {Function} Unsubscribe function
+     * 
+     * @example
+     * eventBus.once(Events.MESH_LOADED, (data) => {
+     *     console.log('First mesh loaded:', data.filename);
+     * });
+     */
+    once(event, callback, namespace = null) {
+        if (typeof callback !== 'function') {
+            log.warn(`Attempted to register non-function once listener for event "${event}"`);
+            return () => {};
+        }
+        
+        if (!this._listeners.has(event)) {
+            this._listeners.set(event, []);
+        }
+        
+        const listener = {
+            callback,
+            namespace,
+            once: true
+        };
+        
+        this._listeners.get(event).push(listener);
+        
+        if (this._debugEnabled) {
+            log.debug(`Subscribed (once) to "${event}"`);
+        }
+        
+        return () => this.off(event, callback);
+    }
+    
+    /**
+     * Unsubscribe from an event.
+     * 
+     * Can be called in several ways:
+     * - `off(event, callback)` - Remove specific listener
+     * - `off(event)` - Remove all listeners for an event
+     * 
+     * @param {string} event - Event name
+     * @param {Function} [callback] - Specific callback to remove (optional)
+     * 
+     * @example
+     * // Remove specific listener
+     * eventBus.off(Events.CONNECTION_CHANGED, myHandler);
+     * 
+     * // Remove all listeners for an event
+     * eventBus.off(Events.CONNECTION_CHANGED);
+     */
+    off(event, callback = null) {
+        if (!this._listeners.has(event)) {
+            return;
+        }
+        
+        if (callback === null) {
+            // Remove all listeners for this event
+            const count = this._listeners.get(event).length;
+            this._listeners.delete(event);
+            if (this._debugEnabled) {
+                log.debug(`Removed all ${count} listeners for "${event}"`);
+            }
+        } else {
+            // Remove specific callback
+            const listeners = this._listeners.get(event);
+            const initialLength = listeners.length;
+            const filtered = listeners.filter(l => l.callback !== callback);
+            
+            if (filtered.length === 0) {
+                this._listeners.delete(event);
+            } else {
+                this._listeners.set(event, filtered);
+            }
+            
+            if (this._debugEnabled && filtered.length !== initialLength) {
+                log.debug(`Removed listener from "${event}"`);
+            }
+        }
+    }
+    
+    /**
+     * Remove all listeners in a specific namespace.
+     * Useful for cleaning up all subscriptions when a component is destroyed.
+     * 
+     * @param {string} namespace - Namespace to clear
+     * 
+     * @example
+     * // In component constructor
+     * eventBus.on(Events.CONNECTION_CHANGED, this.onConnection, 'myComponent');
+     * eventBus.on(Events.MESH_LOADED, this.onMeshLoaded, 'myComponent');
+     * 
+     * // In component destructor
+     * eventBus.offNamespace('myComponent');
+     */
+    offNamespace(namespace) {
+        let totalRemoved = 0;
+        
+        for (const [event, listeners] of this._listeners.entries()) {
+            const filtered = listeners.filter(l => l.namespace !== namespace);
+            const removed = listeners.length - filtered.length;
+            totalRemoved += removed;
+            
+            if (filtered.length === 0) {
+                this._listeners.delete(event);
+            } else {
+                this._listeners.set(event, filtered);
+            }
+        }
+        
+        if (this._debugEnabled && totalRemoved > 0) {
+            log.debug(`Removed ${totalRemoved} listeners from namespace "${namespace}"`);
+        }
+    }
+    
+    /**
+     * Emit an event to all subscribers.
+     * 
+     * @param {string} event - Event name (use Events constants)
+     * @param {*} [data=null] - Data to pass to listeners
+     * 
+     * @example
+     * eventBus.emit(Events.CONNECTION_CHANGED, {
+     *     isConnected: true,
+     *     config: { serverUrl: 'https://...', apiToken: '...' }
+     * });
+     */
+    emit(event, data = null) {
+        if (this._debugEnabled) {
+            log.debug(`Emit "${event}"`, data);
+        }
+        
+        const listeners = this._listeners.get(event);
+        if (!listeners || listeners.length === 0) {
+            return;
+        }
+        
+        // Create a copy to avoid issues if listeners modify the array
+        const listenersCopy = [...listeners];
+        const toRemove = [];
+        
+        for (const listener of listenersCopy) {
+            try {
+                listener.callback(data);
+                
+                if (listener.once) {
+                    toRemove.push(listener);
+                }
+            } catch (error) {
+                log.error(`Error in listener for "${event}":`, error);
+            }
+        }
+        
+        // Remove once listeners
+        if (toRemove.length > 0) {
+            const remaining = listeners.filter(l => !toRemove.includes(l));
+            if (remaining.length === 0) {
+                this._listeners.delete(event);
+            } else {
+                this._listeners.set(event, remaining);
+            }
+        }
+    }
+    
+    /**
+     * Check if an event has any listeners.
+     * 
+     * @param {string} event - Event name
+     * @returns {boolean} True if event has listeners
+     */
+    hasListeners(event) {
+        const listeners = this._listeners.get(event);
+        return listeners && listeners.length > 0;
+    }
+    
+    /**
+     * Get the count of listeners for an event.
+     * 
+     * @param {string} event - Event name
+     * @returns {number} Number of listeners
+     */
+    listenerCount(event) {
+        const listeners = this._listeners.get(event);
+        return listeners ? listeners.length : 0;
+    }
+    
+    /**
+     * Remove all listeners for all events.
+     * Use with caution - typically only needed for testing or app shutdown.
+     */
+    clear() {
+        if (this._debugEnabled) {
+            let total = 0;
+            for (const listeners of this._listeners.values()) {
+                total += listeners.length;
+            }
+            log.debug(`Clearing all ${total} listeners`);
+        }
+        this._listeners.clear();
+    }
+    
+    /**
+     * Get debug information about current subscriptions.
+     * Useful for debugging memory leaks or unexpected behavior.
+     * 
+     * @returns {Object} Map of event names to listener counts and namespaces
+     */
+    getDebugInfo() {
+        const info = {};
+        for (const [event, listeners] of this._listeners.entries()) {
+            info[event] = {
+                count: listeners.length,
+                namespaces: [...new Set(listeners.map(l => l.namespace).filter(Boolean))]
+            };
+        }
+        return info;
+    }
+}
+
+/**
+ * Global event bus instance.
+ * Import this singleton to use the event bus throughout the application.
+ */
+export const eventBus = new EventBus();
+
+// Make available on window for debugging
+if (typeof window !== 'undefined') {
+    window.debugGlobalVar = window.debugGlobalVar || {};
+    window.debugGlobalVar.eventBus = eventBus;
+    window.debugGlobalVar.Events = Events;
+}

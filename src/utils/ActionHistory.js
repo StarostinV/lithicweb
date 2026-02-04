@@ -1,3 +1,5 @@
+import { eventBus, Events } from './EventBus.js';
+
 /**
  * ActionHistory manages undo/redo history for mesh annotation operations.
  * 
@@ -14,6 +16,20 @@
  * When saving to cloud storage:
  * - "state" = "annotation" (the edge annotations being saved)
  * - "stateMetadata" = "annotation metadata" (metadata specific to that annotation)
+ * 
+ * ## Event Bus Integration
+ * 
+ * ActionHistory emits the following events via the global EventBus:
+ * - `Events.HISTORY_CHANGED` - When history changes (push, undo, redo, clear, etc.)
+ *   Data: { action: 'push'|'undo'|'redo'|'clear'|'jump'|'update', currentIndex: number, totalStates: number }
+ * 
+ * Components can subscribe to these events instead of using addListener():
+ * ```javascript
+ * import { eventBus, Events } from '../utils/EventBus.js';
+ * eventBus.on(Events.HISTORY_CHANGED, (data) => {
+ *     console.log('History changed:', data.action);
+ * });
+ * ```
  */
 export class ActionHistory {
     constructor(maxHistorySize = 100) {
@@ -113,7 +129,7 @@ export class ActionHistory {
         }
         
         this.currentViewIndex = this.undoStack.length; // Update view to latest
-        this.notifyListeners();
+        this.notifyListeners('push');
     }
 
     undo() {
@@ -121,7 +137,7 @@ export class ActionHistory {
         const action = this.undoStack.pop();
         this.redoStack.push(action);
         this.currentViewIndex = this.undoStack.length;
-        this.notifyListeners();
+        this.notifyListeners('undo');
         return action;
     }
 
@@ -130,7 +146,7 @@ export class ActionHistory {
         const action = this.redoStack.pop();
         this.undoStack.push(action);
         this.currentViewIndex = this.undoStack.length;
-        this.notifyListeners();
+        this.notifyListeners('redo');
         return action;
     }
 
@@ -156,7 +172,7 @@ export class ActionHistory {
         }
 
         this.currentViewIndex = targetIndex;
-        this.notifyListeners();
+        this.notifyListeners('jump');
         return true;
     }
 
@@ -175,7 +191,7 @@ export class ActionHistory {
         this.redoStack = [];
         this.currentViewIndex = 0;
         this.initialStateMetadata = {};
-        this.notifyListeners();
+        this.notifyListeners('clear');
     }
 
     getUndoStack() {
@@ -215,7 +231,7 @@ export class ActionHistory {
         const action = this.getActionAtIndex(stateIndex);
         if (action) {
             action.protected = isProtected;
-            this.notifyListeners();
+            this.notifyListeners('update');
         }
     }
 
@@ -228,7 +244,7 @@ export class ActionHistory {
         const action = this.getActionAtIndex(stateIndex);
         if (action) {
             action.customDescription = newDescription;
-            this.notifyListeners();
+            this.notifyListeners('update');
         }
     }
 
@@ -240,7 +256,7 @@ export class ActionHistory {
         const action = this.getActionAtIndex(stateIndex);
         if (action) {
             delete action.customDescription;
-            this.notifyListeners();
+            this.notifyListeners('update');
         }
     }
 
@@ -267,6 +283,20 @@ export class ActionHistory {
     }
 
     // Listener pattern for UI updates
+    
+    /**
+     * Add a listener for history changes.
+     * 
+     * @deprecated Prefer using EventBus for new code:
+     * ```javascript
+     * import { eventBus, Events } from '../utils/EventBus.js';
+     * eventBus.on(Events.HISTORY_CHANGED, (data) => {
+     *     // data.action, data.currentIndex, data.totalStates
+     * });
+     * ```
+     * 
+     * @param {Function} callback - Called with (history) when history changes
+     */
     addListener(callback) {
         this.listeners.push(callback);
     }
@@ -275,8 +305,21 @@ export class ActionHistory {
         this.listeners = this.listeners.filter(l => l !== callback);
     }
 
-    notifyListeners() {
+    /**
+     * Notify all listeners of history change.
+     * Emits both to legacy listeners and the global EventBus.
+     * @param {string} [actionType='update'] - Type of change: 'push', 'undo', 'redo', 'clear', 'jump', 'update'
+     */
+    notifyListeners(actionType = 'update') {
+        // Legacy listener pattern (for backward compatibility)
         this.listeners.forEach(callback => callback(this));
+        
+        // EventBus pattern (preferred for new code)
+        eventBus.emit(Events.HISTORY_CHANGED, {
+            action: actionType,
+            currentIndex: this.currentViewIndex,
+            totalStates: this.getTotalStates()
+        });
     }
 
     // ========================================
@@ -318,7 +361,7 @@ export class ActionHistory {
     setStateMetadataKey(stateIndex, key, value) {
         if (stateIndex === 0) {
             this.initialStateMetadata[key] = value;
-            this.notifyListeners();
+            this.notifyListeners('update');
             return;
         }
         
@@ -328,7 +371,7 @@ export class ActionHistory {
                 action.stateMetadata = {};
             }
             action.stateMetadata[key] = value;
-            this.notifyListeners();
+            this.notifyListeners('update');
         }
     }
     
@@ -353,7 +396,7 @@ export class ActionHistory {
         
         if (key in metadata) {
             delete metadata[key];
-            this.notifyListeners();
+            this.notifyListeners('update');
             return true;
         }
         return false;
@@ -370,7 +413,7 @@ export class ActionHistory {
     updateStateMetadata(stateIndex, updates) {
         if (stateIndex === 0) {
             this.initialStateMetadata = { ...this.initialStateMetadata, ...updates };
-            this.notifyListeners();
+            this.notifyListeners('update');
             return;
         }
         
@@ -380,7 +423,7 @@ export class ActionHistory {
                 action.stateMetadata = {};
             }
             Object.assign(action.stateMetadata, updates);
-            this.notifyListeners();
+            this.notifyListeners('update');
         }
     }
     
@@ -394,14 +437,14 @@ export class ActionHistory {
     clearStateMetadata(stateIndex) {
         if (stateIndex === 0) {
             this.initialStateMetadata = {};
-            this.notifyListeners();
+            this.notifyListeners('update');
             return;
         }
         
         const action = this.getActionAtIndex(stateIndex);
         if (action) {
             action.stateMetadata = {};
-            this.notifyListeners();
+            this.notifyListeners('update');
         }
     }
 

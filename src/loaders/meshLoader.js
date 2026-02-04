@@ -1,5 +1,6 @@
 import CustomPLYLoader from "./customPLYLoader";
 import { read as readmat } from "mat-for-js"
+import { eventBus, Events } from '../utils/EventBus.js';
 
 
 /**
@@ -9,6 +10,22 @@ import { read as readmat } from "mat-for-js"
  * - Loaded from PLY file comments
  * - Modified programmatically via getMetadata/setMetadata/updateMetadata
  * - Exported back to PLY files via meshExporter
+ * 
+ * ## Event Bus Integration
+ * 
+ * MeshLoader emits the following events via the global EventBus:
+ * - `Events.MESH_LOADED` - When a mesh is loaded from a local file
+ *   Data: { source: 'file', filename: string, metadata: object }
+ * 
+ * Components can subscribe to these events instead of using addLoadListener():
+ * ```javascript
+ * import { eventBus, Events } from '../utils/EventBus.js';
+ * eventBus.on(Events.MESH_LOADED, (data) => {
+ *     if (data.source === 'file') {
+ *         console.log('File loaded:', data.filename);
+ *     }
+ * });
+ * ```
  * 
  * @example
  * // Access metadata after loading
@@ -54,6 +71,17 @@ export default class MeshLoader {
     /**
      * Add a listener to be notified when a file is loaded.
      * The listener receives an object with { fileName, metadata, comments }.
+     * 
+     * @deprecated Prefer using EventBus for new code:
+     * ```javascript
+     * import { eventBus, Events } from '../utils/EventBus.js';
+     * eventBus.on(Events.MESH_LOADED, (data) => {
+     *     if (data.source === 'file') {
+     *         // data.filename, data.metadata
+     *     }
+     * });
+     * ```
+     * 
      * @param {Function} listener - Callback function
      */
     addLoadListener(listener) {
@@ -73,6 +101,7 @@ export default class MeshLoader {
     
     /**
      * Notify all listeners that a file was loaded.
+     * Emits both to legacy listeners and the global EventBus.
      * @private
      */
     notifyLoadListeners() {
@@ -81,7 +110,16 @@ export default class MeshLoader {
             metadata: this.metadata,
             comments: this.comments
         };
+        
+        // Legacy listener pattern (for backward compatibility)
         this.loadListeners.forEach(listener => listener(data));
+        
+        // EventBus pattern (preferred for new code)
+        eventBus.emit(Events.MESH_LOADED, {
+            source: 'file',
+            filename: this.currentFileName,
+            metadata: this.metadata
+        });
     }
     
     /**

@@ -7,10 +7,19 @@
  * - Computing and displaying metrics
  * - Selecting visualization modes
  * 
+ * ## Event Bus Integration
+ * 
+ * Subscribes to:
+ * - `Events.EVALUATION_GT_CHANGED` - Updates GT status display
+ * - `Events.EVALUATION_PRED_CHANGED` - Updates Pred status display
+ * - `Events.EVALUATION_METRICS_COMPUTED` - Updates metrics display
+ * - `Events.EVALUATION_MODE_CHANGED` - Handles evaluation mode entry/exit
+ * 
  * @module EvaluationPanel
  */
 
 import { summarizeMetrics } from '../evaluation/MetricsComputer.js';
+import { eventBus, Events } from '../utils/EventBus.js';
 import { 
     MatchedVisualization, 
     OverSegVisualization, 
@@ -50,6 +59,85 @@ export class EvaluationPanel {
         // Initialize UI
         this._initializeUI();
         this._setupEventListeners();
+        this._setupEventBusSubscriptions();
+    }
+    
+    /**
+     * Setup EventBus subscriptions.
+     * Uses namespace for easy cleanup in dispose().
+     * @private
+     */
+    _setupEventBusSubscriptions() {
+        // Listen to evaluation changes via EventBus
+        eventBus.on(Events.EVALUATION_GT_CHANGED, (data) => {
+            this._onGtChanged(data);
+        }, 'evaluationPanel');
+        
+        eventBus.on(Events.EVALUATION_PRED_CHANGED, (data) => {
+            this._onPredChanged(data);
+        }, 'evaluationPanel');
+        
+        eventBus.on(Events.EVALUATION_METRICS_COMPUTED, (data) => {
+            if (data.metrics) {
+                this._displayMetrics(data.metrics);
+            }
+        }, 'evaluationPanel');
+    }
+    
+    /**
+     * Handle GT changed event.
+     * @private
+     */
+    _onGtChanged(data) {
+        if (this.gtStatusEl) {
+            if (data.stateIndex !== null) {
+                this.gtStatusEl.textContent = data.description || `State #${data.stateIndex}`;
+                this.gtStatusEl.classList.remove('text-gray-400');
+                this.gtStatusEl.classList.add('text-green-600');
+            } else {
+                this.gtStatusEl.textContent = 'Not set';
+                this.gtStatusEl.classList.remove('text-green-600');
+                this.gtStatusEl.classList.add('text-gray-400');
+            }
+        }
+        this._updateComputeButtonState();
+    }
+    
+    /**
+     * Handle Pred changed event.
+     * @private
+     */
+    _onPredChanged(data) {
+        if (this.predStatusEl) {
+            if (data.stateIndex !== null) {
+                this.predStatusEl.textContent = data.description || `State #${data.stateIndex}`;
+                this.predStatusEl.classList.remove('text-gray-400');
+                this.predStatusEl.classList.add('text-purple-600');
+            } else {
+                this.predStatusEl.textContent = 'Not set';
+                this.predStatusEl.classList.remove('text-purple-600');
+                this.predStatusEl.classList.add('text-gray-400');
+            }
+        }
+        this._updateComputeButtonState();
+    }
+    
+    /**
+     * Update compute button enabled state.
+     * @private
+     */
+    _updateComputeButtonState() {
+        if (this.computeBtn) {
+            this.computeBtn.disabled = !this.evaluationManager.canComputeMetrics();
+        }
+    }
+    
+    /**
+     * Clean up resources and EventBus subscriptions.
+     * Call this when the panel is being destroyed.
+     */
+    dispose() {
+        eventBus.offNamespace('evaluationPanel');
     }
 
     /**
@@ -87,8 +175,7 @@ export class EvaluationPanel {
      * @private
      */
     _setupEventListeners() {
-        // Listen to evaluation manager state changes
-        this.evaluationManager.addListener((state) => this._onEvaluationStateChange(state));
+        // Note: Evaluation state changes are now listened via EventBus in _setupEventBusSubscriptions()
 
         // Clear buttons
         this.clearGtBtn?.addEventListener('click', () => {
@@ -148,49 +235,6 @@ export class EvaluationPanel {
         }
         if (this.undersegValue) {
             this.undersegValue.textContent = this.undersegThreshold.toFixed(2);
-        }
-    }
-
-    /**
-     * Handle evaluation state changes.
-     * @private
-     */
-    _onEvaluationStateChange(state) {
-        // Update GT/Pred status
-        if (this.gtStatusEl) {
-            if (state.groundTruth) {
-                this.gtStatusEl.textContent = state.groundTruth.description;
-                this.gtStatusEl.classList.remove('text-gray-400');
-                this.gtStatusEl.classList.add('text-green-600');
-            } else {
-                this.gtStatusEl.textContent = 'Not set';
-                this.gtStatusEl.classList.remove('text-green-600');
-                this.gtStatusEl.classList.add('text-gray-400');
-            }
-        }
-
-        if (this.predStatusEl) {
-            if (state.prediction) {
-                this.predStatusEl.textContent = state.prediction.description;
-                this.predStatusEl.classList.remove('text-gray-400');
-                this.predStatusEl.classList.add('text-purple-600');
-            } else {
-                this.predStatusEl.textContent = 'Not set';
-                this.predStatusEl.classList.remove('text-purple-600');
-                this.predStatusEl.classList.add('text-gray-400');
-            }
-        }
-
-        // Update compute button state
-        if (this.computeBtn) {
-            this.computeBtn.disabled = !this.evaluationManager.canComputeMetrics();
-        }
-
-        // If metrics were invalidated, clear results
-        if (!state.metricsResult && this.resultsContainer) {
-            this.resultsContainer.innerHTML = '<p class="text-gray-400 italic">Compute metrics to see results</p>';
-            this.errorBreakdown.innerHTML = '';
-            this._clearColorLegend();
         }
     }
 
@@ -484,17 +528,33 @@ export class EvaluationPanel {
     onShow() {
         // Refresh state display
         const state = this.evaluationManager.getSummary();
-        this._onEvaluationStateChange({
-            groundTruth: state.hasGroundTruth ? { 
-                stateIndex: state.groundTruthIndex,
-                description: `State #${state.groundTruthIndex}`
-            } : null,
-            prediction: state.hasPrediction ? {
-                stateIndex: state.predictionIndex,
-                description: `State #${state.predictionIndex}`
-            } : null,
-            metricsResult: this.evaluationManager.getMetrics()
+        
+        // Update GT status
+        this._onGtChanged({
+            stateIndex: state.hasGroundTruth ? state.groundTruthIndex : null,
+            description: state.hasGroundTruth ? `State #${state.groundTruthIndex}` : null
         });
+        
+        // Update Pred status
+        this._onPredChanged({
+            stateIndex: state.hasPrediction ? state.predictionIndex : null,
+            description: state.hasPrediction ? `State #${state.predictionIndex}` : null
+        });
+        
+        // Update metrics display if available
+        const metrics = this.evaluationManager.getMetrics();
+        if (metrics) {
+            this._displayMetrics(metrics);
+        } else {
+            // Clear results display
+            if (this.resultsContainer) {
+                this.resultsContainer.innerHTML = '<p class="text-gray-400 italic">Compute metrics to see results</p>';
+            }
+            if (this.errorBreakdown) {
+                this.errorBreakdown.innerHTML = '';
+            }
+            this._clearColorLegend();
+        }
     }
 
     /**

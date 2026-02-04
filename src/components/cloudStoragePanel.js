@@ -24,23 +24,35 @@
  * - When a mesh is loaded from cloud, cloudMeshInfo is set
  * - When saving an annotation, we verify the mesh matches before saving
  * 
+ * ## Event Bus Integration
+ * 
+ * Subscribes to:
+ * - `Events.CONNECTION_CHANGED` - Refreshes mesh list when connection is established
+ * 
+ * Emits:
+ * - `Events.MESH_LOADED` - When a mesh is loaded from cloud storage
+ * - `Events.MESH_UPLOADED` - When a mesh is uploaded to cloud storage
+ * - `Events.STATE_SAVED` - When an annotation state is saved to cloud
+ * - `Events.STATE_LOADED` - When an annotation state is loaded from cloud
+ * 
  * @module CloudStoragePanel
  */
 
 import { lithicClient } from '../api/lithicClient.js';
 import { exportMeshToBlob } from '../loaders/meshExporter.js';
+import { eventBus, Events } from '../utils/EventBus.js';
 
 export class CloudStoragePanel {
     /**
      * Create a CloudStoragePanel.
      * @param {MeshObject} meshObject - The mesh object with annotations
      * @param {MeshLoader} meshLoader - The mesh loader for loading PLY files
-     * @param {ConnectionManager} connectionManager - Connection manager for server status
+     * @param {ConnectionManager} [connectionManager] - Connection manager (legacy, now optional)
      */
-    constructor(meshObject, meshLoader, connectionManager) {
+    constructor(meshObject, meshLoader, connectionManager = null) {
         this.meshObject = meshObject;
         this.meshLoader = meshLoader;
-        this.connectionManager = connectionManager;
+        this.connectionManager = connectionManager; // Kept for backward compatibility
         
         // State
         this.meshes = [];
@@ -83,27 +95,39 @@ export class CloudStoragePanel {
         this.saveMeshMetadataPreview = document.getElementById('saveMeshMetadataPreview');
         
         this.setupEventListeners();
-        
-        // Listen to connection changes
-        if (this.connectionManager) {
-            this.connectionManager.addListener((isConnected) => {
-                if (isConnected) {
-                    this.refreshMeshList();
-                }
-            });
-        }
+        this._setupEventBusSubscriptions();
+    }
+    
+    /**
+     * Setup EventBus subscriptions.
+     * Uses namespace for easy cleanup in dispose().
+     * @private
+     */
+    _setupEventBusSubscriptions() {
+        // Listen to connection changes via EventBus
+        eventBus.on(Events.CONNECTION_CHANGED, (data) => {
+            if (data.isConnected) {
+                this.refreshMeshList();
+            }
+        }, 'cloudStoragePanel');
         
         // Listen to local file loads to reset cloud connection
-        if (this.meshLoader) {
-            this.meshLoader.addLoadListener((data) => {
-                // Only reset if this wasn't triggered by us loading from cloud
-                // We set a flag before loading from cloud to prevent this
-                if (!this._loadingFromCloud) {
-                    console.log('[CloudStorage] Local file loaded, resetting cloud connection');
-                    this.clearCloudConnection();
-                }
-            });
-        }
+        eventBus.on(Events.MESH_LOADED, (data) => {
+            // Only reset if this was a local file load (not from cloud)
+            // Cloud loads have source: 'cloud', local file loads have source: 'file'
+            if (data.source === 'file' && !this._loadingFromCloud) {
+                console.log('[CloudStorage] Local file loaded, resetting cloud connection');
+                this.clearCloudConnection();
+            }
+        }, 'cloudStoragePanel');
+    }
+    
+    /**
+     * Clean up resources and EventBus subscriptions.
+     * Call this when the panel is being destroyed.
+     */
+    dispose() {
+        eventBus.offNamespace('cloudStoragePanel');
     }
     
     /**
@@ -733,6 +757,13 @@ export class CloudStoragePanel {
             }
             
             this.setStatus('Mesh loaded successfully!', 'success');
+            
+            // Emit event for other components
+            eventBus.emit(Events.MESH_LOADED, {
+                source: 'cloud',
+                meshId: meshId,
+                filename: filename
+            });
         } catch (e) {
             this._loadingFromCloud = false;
             console.error('[CloudStorage] Load mesh failed:', e);
@@ -808,6 +839,13 @@ export class CloudStoragePanel {
             this.applyState(stateData);
             
             this.setStatus('State loaded successfully!', 'success');
+            
+            // Emit event for other components
+            eventBus.emit(Events.STATE_LOADED, {
+                meshId: meshId,
+                stateId: stateId,
+                metadata: stateData.metadata
+            });
         } catch (e) {
             console.error('[CloudStorage] Load state failed:', e);
             this.setStatus('Failed to load state: ' + e.message, 'error');
@@ -1178,6 +1216,13 @@ export class CloudStoragePanel {
             this.setStatus('Mesh uploaded!', 'success');
             await this.refreshMeshList();
             
+            // Emit event for other components
+            eventBus.emit(Events.MESH_UPLOADED, {
+                meshId: result.filename,
+                numVertices: numVertices,
+                numFaces: numFaces
+            });
+            
             return result.filename;
         } catch (e) {
             console.error('[CloudStorage] Upload failed:', e);
@@ -1271,6 +1316,14 @@ export class CloudStoragePanel {
             
             console.log('[CloudStorage] Save result:', result);
             this.setStatus('Annotation saved!', 'success');
+            
+            // Emit event for other components
+            eventBus.emit(Events.STATE_SAVED, {
+                meshId: meshId,
+                stateId: result.state_id,
+                name: name,
+                edgeCount: edgeIndices.length
+            });
             
             // Refresh states if this mesh is expanded
             if (this.selectedMeshId === meshId) {

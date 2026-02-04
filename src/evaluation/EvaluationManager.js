@@ -11,10 +11,31 @@
  * - Manage visualization modes
  * - Restore original state when exiting evaluation
  * 
+ * ## Event Bus Integration
+ * 
+ * EvaluationManager emits the following events via the global EventBus:
+ * - `Events.EVALUATION_GT_CHANGED` - When ground truth is set/cleared
+ *   Data: { stateIndex: number|null, description: string|null }
+ * - `Events.EVALUATION_PRED_CHANGED` - When prediction is set/cleared
+ *   Data: { stateIndex: number|null, description: string|null }
+ * - `Events.EVALUATION_METRICS_COMPUTED` - When metrics are computed
+ *   Data: { metrics: object }
+ * - `Events.EVALUATION_MODE_CHANGED` - When evaluation mode is entered/exited
+ *   Data: { isActive: boolean }
+ * 
+ * Components can subscribe to these events instead of using addListener():
+ * ```javascript
+ * import { eventBus, Events } from '../utils/EventBus.js';
+ * eventBus.on(Events.EVALUATION_GT_CHANGED, (data) => {
+ *     console.log('GT changed:', data.stateIndex);
+ * });
+ * ```
+ * 
  * @module EvaluationManager
  */
 
 import * as THREE from 'three';
+import { eventBus, Events } from '../utils/EventBus.js';
 import { computeInstanceSegmentationMetrics, classifyVertexErrors } from './MetricsComputer.js';
 import { MeshSegmenter } from '../geometry/segmentation.js';
 
@@ -90,7 +111,7 @@ export class EvaluationManager {
                 this.groundTruth = null;
                 this.prediction = null;
                 this.metricsResult = null;
-                this._notifyListeners();
+                this._notifyListeners('state');
             }
             
             previousTotalStates = currentTotal;
@@ -119,6 +140,16 @@ export class EvaluationManager {
 
     /**
      * Add a listener for state changes.
+     * 
+     * @deprecated Prefer using EventBus for new code:
+     * ```javascript
+     * import { eventBus, Events } from '../utils/EventBus.js';
+     * eventBus.on(Events.EVALUATION_GT_CHANGED, (data) => { ... });
+     * eventBus.on(Events.EVALUATION_PRED_CHANGED, (data) => { ... });
+     * eventBus.on(Events.EVALUATION_METRICS_COMPUTED, (data) => { ... });
+     * eventBus.on(Events.EVALUATION_MODE_CHANGED, (data) => { ... });
+     * ```
+     * 
      * @param {Function} callback - Called when evaluation state changes
      */
     addListener(callback) {
@@ -135,9 +166,11 @@ export class EvaluationManager {
 
     /**
      * Notify all listeners of state change.
+     * Emits both to legacy listeners and the global EventBus.
      * @private
+     * @param {string} [eventType='state'] - Type of change for targeted EventBus emission
      */
-    _notifyListeners() {
+    _notifyListeners(eventType = 'state') {
         const state = {
             groundTruth: this.groundTruth,
             prediction: this.prediction,
@@ -145,7 +178,36 @@ export class EvaluationManager {
             visualizationMode: this.visualizationMode,
             isInEvaluationMode: this.isInEvaluationMode
         };
+        
+        // Legacy listener pattern (for backward compatibility)
         this.listeners.forEach(cb => cb(state));
+        
+        // EventBus pattern (preferred for new code) - emit specific events
+        if (eventType === 'gt' || eventType === 'state') {
+            eventBus.emit(Events.EVALUATION_GT_CHANGED, {
+                stateIndex: this.groundTruth?.stateIndex ?? null,
+                description: this.groundTruth?.description ?? null
+            });
+        }
+        
+        if (eventType === 'pred' || eventType === 'state') {
+            eventBus.emit(Events.EVALUATION_PRED_CHANGED, {
+                stateIndex: this.prediction?.stateIndex ?? null,
+                description: this.prediction?.description ?? null
+            });
+        }
+        
+        if (eventType === 'metrics') {
+            eventBus.emit(Events.EVALUATION_METRICS_COMPUTED, {
+                metrics: this.metricsResult
+            });
+        }
+        
+        if (eventType === 'mode') {
+            eventBus.emit(Events.EVALUATION_MODE_CHANGED, {
+                isActive: this.isInEvaluationMode
+            });
+        }
     }
 
     /**
@@ -171,7 +233,7 @@ export class EvaluationManager {
             this.meshObject.history.setProtected(stateIndex, true);
             
             this.metricsResult = null; // Invalidate cached metrics
-            this._notifyListeners();
+            this._notifyListeners('gt');
         }
     }
 
@@ -198,7 +260,7 @@ export class EvaluationManager {
             this.meshObject.history.setProtected(stateIndex, true);
             
             this.metricsResult = null; // Invalidate cached metrics
-            this._notifyListeners();
+            this._notifyListeners('pred');
         }
     }
 
@@ -239,7 +301,7 @@ export class EvaluationManager {
             this._updateProtectionForState(prevIndex);
         }
         
-        this._notifyListeners();
+        this._notifyListeners('gt');
     }
 
     /**
@@ -255,7 +317,7 @@ export class EvaluationManager {
             this._updateProtectionForState(prevIndex);
         }
         
-        this._notifyListeners();
+        this._notifyListeners('pred');
     }
 
     /**
@@ -324,7 +386,7 @@ export class EvaluationManager {
             this.metricsResult
         );
 
-        this._notifyListeners();
+        this._notifyListeners('metrics');
         return this.metricsResult;
     }
 
@@ -346,7 +408,7 @@ export class EvaluationManager {
         this.savedState = new Set(this.meshObject.currentEdgeIndices);
         this.isInEvaluationMode = true;
 
-        this._notifyListeners();
+        this._notifyListeners('mode');
     }
 
     /**
@@ -367,7 +429,7 @@ export class EvaluationManager {
         this.visualizationMode = 'none';
         this.savedState = null;
 
-        this._notifyListeners();
+        this._notifyListeners('mode');
     }
 
     /**
@@ -379,7 +441,7 @@ export class EvaluationManager {
         if (this.isInEvaluationMode && this.metricsResult) {
             this._applyVisualization();
         }
-        this._notifyListeners();
+        this._notifyListeners('mode');
     }
 
     /**
@@ -391,7 +453,7 @@ export class EvaluationManager {
         if (this.isInEvaluationMode) {
             this._applyVisualization();
         }
-        this._notifyListeners();
+        this._notifyListeners('mode');
     }
 
     /**

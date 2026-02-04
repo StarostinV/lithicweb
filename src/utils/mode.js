@@ -1,3 +1,5 @@
+import { eventBus, Events } from './EventBus.js';
+
 export const MODES = Object.freeze({
     VIEW: 'view',
     DRAW: 'draw',
@@ -28,6 +30,20 @@ const MODE_LABELS = {
  * - Hold Ctrl: Move (translate) mode
  * 
  * Hold Alt from any mode to temporarily enter VIEW mode with gizmo.
+ * 
+ * ## Event Bus Integration
+ * 
+ * Mode emits the following events via the global EventBus:
+ * - `Events.MODE_CHANGED` - When interaction mode changes
+ *   Data: { mode: string, previousMode: string, rewritePrevious: boolean }
+ * 
+ * Components can subscribe to these events instead of using addModeChangeListener():
+ * ```javascript
+ * import { eventBus, Events } from '../utils/EventBus.js';
+ * eventBus.on(Events.MODE_CHANGED, (data) => {
+ *     console.log('Mode changed to:', data.mode);
+ * });
+ * ```
  */
 export class Mode {
     constructor(scene) {
@@ -154,6 +170,15 @@ export class Mode {
 
     /**
      * Add a listener for mode changes.
+     * 
+     * @deprecated Prefer using EventBus for new code:
+     * ```javascript
+     * import { eventBus, Events } from '../utils/EventBus.js';
+     * eventBus.on(Events.MODE_CHANGED, (data) => {
+     *     // data.mode, data.previousMode, data.rewritePrevious
+     * });
+     * ```
+     * 
      * @param {Function} callback - Called with (newMode, rewritePrevious) when mode changes
      */
     addModeChangeListener(callback) {
@@ -170,10 +195,19 @@ export class Mode {
 
     /**
      * Notify all mode change listeners.
+     * Emits both to legacy listeners and the global EventBus.
      * @private
      */
     _notifyModeChangeListeners(newMode, rewritePrevious) {
+        // Legacy listener pattern (for backward compatibility)
         this.modeChangeListeners.forEach(cb => cb(newMode, rewritePrevious));
+        
+        // EventBus pattern (preferred for new code)
+        eventBus.emit(Events.MODE_CHANGED, {
+            mode: newMode,
+            previousMode: this.previousMode,
+            rewritePrevious: rewritePrevious
+        });
     }
 
     update() {

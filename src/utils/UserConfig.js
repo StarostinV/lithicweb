@@ -7,7 +7,23 @@
  * - Import configuration from JSON file
  * - Default values with validation
  * - Event listeners for config changes
+ * 
+ * ## Event Bus Integration
+ * 
+ * UserConfig emits the following events via the global EventBus:
+ * - `Events.CONFIG_CHANGED` - When any configuration value changes
+ *   Data: { path: string, newValue: any, oldValue: any }
+ * 
+ * Components can subscribe to these events instead of using addListener():
+ * ```javascript
+ * import { eventBus, Events } from '../utils/EventBus.js';
+ * eventBus.on(Events.CONFIG_CHANGED, (data) => {
+ *     console.log('Config changed:', data.path, data.newValue);
+ * });
+ * ```
  */
+
+import { eventBus, Events } from './EventBus.js';
 
 const STORAGE_KEY = 'lithicjs_user_config';
 const CONFIG_VERSION = 1;
@@ -238,6 +254,15 @@ export class UserConfig {
     
     /**
      * Add a listener for configuration changes.
+     * 
+     * @deprecated Prefer using EventBus for new code:
+     * ```javascript
+     * import { eventBus, Events } from '../utils/EventBus.js';
+     * eventBus.on(Events.CONFIG_CHANGED, (data) => {
+     *     // data.path, data.newValue, data.oldValue
+     * });
+     * ```
+     * 
      * @param {string} path - Config path to listen to ('*' for all changes)
      * @param {function} callback - Function called with (newValue, oldValue, path)
      * @returns {function} Unsubscribe function
@@ -258,8 +283,10 @@ export class UserConfig {
     
     /**
      * Notify listeners of config changes.
+     * Emits both to legacy listeners and the global EventBus.
      */
     notifyListeners(path, newValue, oldValue) {
+        // Legacy listener pattern (for backward compatibility)
         // Notify specific path listeners
         const pathListeners = this.listeners.get(path);
         if (pathListeners) {
@@ -271,6 +298,13 @@ export class UserConfig {
         if (wildcardListeners) {
             wildcardListeners.forEach(cb => cb(newValue, oldValue, path));
         }
+        
+        // EventBus pattern (preferred for new code)
+        eventBus.emit(Events.CONFIG_CHANGED, {
+            path: path,
+            newValue: newValue,
+            oldValue: oldValue
+        });
     }
     
     /**

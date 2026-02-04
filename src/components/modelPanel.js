@@ -1,14 +1,22 @@
 /**
  * Model Panel Component
- * Manages inference sessions, configuration, and results
+ * Manages inference sessions, configuration, and results.
+ * 
+ * ## Event Bus Integration
+ * 
+ * Subscribes to:
+ * - `Events.CONNECTION_CHANGED` - Updates UI when connection status changes
+ * 
+ * @module ModelPanel
  */
 
 import { lithicClient, DEFAULT_INFERENCE_CONFIG, CONFIG_PARAMS } from '../api/lithicClient.js';
+import { eventBus, Events } from '../utils/EventBus.js';
 
 export class ModelPanel {
     constructor(meshObject, connectionManager = null) {
         this.meshObject = meshObject;
-        this.connectionManager = connectionManager;
+        this.connectionManager = connectionManager; // Kept for backward compatibility
         this.evaluationManager = null;
         this.cloudStoragePanel = null;
         this.currentSession = null;
@@ -17,11 +25,27 @@ export class ModelPanel {
         
         this.setupUI();
         this.setupEventListeners();
-        
-        // Listen to connection changes from the shared connection manager
-        if (this.connectionManager) {
-            this.connectionManager.addListener(() => this.onConnectionChange());
-        }
+        this._setupEventBusSubscriptions();
+    }
+    
+    /**
+     * Setup EventBus subscriptions.
+     * Uses namespace for easy cleanup in dispose().
+     * @private
+     */
+    _setupEventBusSubscriptions() {
+        // Listen to connection changes via EventBus
+        eventBus.on(Events.CONNECTION_CHANGED, (data) => {
+            this.onConnectionChange(data);
+        }, 'modelPanel');
+    }
+    
+    /**
+     * Clean up resources and EventBus subscriptions.
+     * Call this when the panel is being destroyed.
+     */
+    dispose() {
+        eventBus.offNamespace('modelPanel');
     }
 
     /**
@@ -55,12 +79,15 @@ export class ModelPanel {
     }
 
     /**
-     * Called when connection status changes from the shared ConnectionManager.
+     * Called when connection status changes.
+     * @param {Object} [data] - Event data from EventBus
+     * @param {boolean} [data.isConnected] - Whether connection is established
+     * @param {Object} [data.config] - Connection configuration
      */
-    onConnectionChange() {
+    onConnectionChange(data = {}) {
         // Connection manager already updates the UI, but we can do additional
         // model-panel specific updates here if needed
-        console.log('[ModelPanel] Connection status changed');
+        console.log('[ModelPanel] Connection status changed:', data.isConnected);
     }
 
     buildConfigUI() {

@@ -4,6 +4,7 @@ import './styles/main.css';
 import * as THREE from 'three';
 import { exportAnnotations } from './loaders/meshExporter.js';
 import { MODES, Mode } from './utils/mode.js';
+import { eventBus, Events } from './utils/EventBus.js';
 import {ArrowDrawer} from './components/arrow.js';
 import {MeshObject} from './geometry/meshObject.js';
 import Scene from './components/scene.js';
@@ -203,10 +204,10 @@ function syncAnnotationTabWithMode(mode) {
     }
 }
 
-// Hook into mode changes to sync tabs using the listener pattern
-mode.addModeChangeListener((newMode) => {
-    syncAnnotationTabWithMode(newMode);
-});
+// Hook into mode changes to sync tabs using EventBus
+eventBus.on(Events.MODE_CHANGED, (data) => {
+    syncAnnotationTabWithMode(data.mode);
+}, 'main');
 
 document.getElementById('modelPanelBtn').addEventListener('click', () => {
     showHidePanel('modelPanel');
