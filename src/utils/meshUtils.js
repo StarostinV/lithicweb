@@ -2,53 +2,125 @@ import * as THREE from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 import { standardizePositions } from '../geometry/standardizePositions.js';
 
-export function createThreeMesh(positions, labels, indices, edgeColor, objectColor) {
-    // Create new BufferGeometry and set attributes
+// ========================================
+// Fine-grained mesh creation utilities
+// ========================================
+
+/**
+ * Create a BufferGeometry from positions and indices.
+ * Does NOT include colors - those are view-specific.
+ * Includes BVH for efficient raycasting.
+ * 
+ * @param {Float32Array} positions - Vertex positions (x, y, z triplets)
+ * @param {Array} indices - Face indices (triangles)
+ * @returns {THREE.BufferGeometry} Geometry with positions, normals, and BVH
+ */
+export function createGeometry(positions, indices) {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(standardizePositions(positions), 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
+    
+    // Create BVH for efficient raycasting
+    const bvh = new MeshBVH(geometry);
+    geometry.boundsTree = bvh;
+    
+    return geometry;
+}
 
-    const meshColors = createMeshColors(positions.length, labels, edgeColor, objectColor);
-    geometry.setAttribute('color', new THREE.BufferAttribute(meshColors, 3));
+/**
+ * Create a color buffer filled with a single color.
+ * 
+ * @param {number} vertexCount - Number of vertices
+ * @param {THREE.Color} color - Default color
+ * @returns {Float32Array} Color buffer (r, g, b triplets)
+ */
+export function createColorBuffer(vertexCount, color) {
+    const colors = new Float32Array(vertexCount * 3);
+    for (let i = 0; i < vertexCount; i++) {
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+    }
+    return colors;
+}
 
+/**
+ * Create a color buffer from edge labels.
+ * 
+ * @param {Uint8Array|Array} labels - Edge labels (1 = edge, 0 = not edge)
+ * @param {THREE.Color} edgeColor - Color for edge vertices
+ * @param {THREE.Color} objectColor - Color for non-edge vertices
+ * @returns {Float32Array} Color buffer
+ */
+export function createColorBufferFromLabels(labels, edgeColor, objectColor) {
+    const colors = new Float32Array(labels.length * 3);
+    for (let i = 0; i < labels.length; i++) {
+        const color = labels[i] === 1 ? edgeColor : objectColor;
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+    }
+    return colors;
+}
+
+/**
+ * Create a Three.js mesh from geometry with a color buffer.
+ * 
+ * @param {THREE.BufferGeometry} geometry - The geometry (will be used directly, not cloned)
+ * @param {Float32Array} colorBuffer - Color buffer to use
+ * @returns {THREE.Mesh} The Three.js mesh
+ */
+export function createMeshFromGeometry(geometry, colorBuffer) {
+    // Clone geometry so each mesh can have its own color attribute
+    const meshGeometry = geometry.clone();
+    meshGeometry.setAttribute('color', new THREE.BufferAttribute(colorBuffer, 3));
+    
+    // Copy BVH reference to cloned geometry
+    if (geometry.boundsTree) {
+        meshGeometry.boundsTree = geometry.boundsTree;
+    }
+    
     const material = new THREE.MeshLambertMaterial({
         vertexColors: true,
     });
-
-    // Create mesh with the new geometry and material
-    const mesh = new THREE.Mesh(geometry, material);
+    
+    const mesh = new THREE.Mesh(meshGeometry, material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-
-    // Create BVH
-    const bvh = new MeshBVH(geometry);
-    geometry.boundsTree = bvh;
-
-    return { mesh, meshColors };
+    
+    return mesh;
 }
 
+// ========================================
+// Legacy function (for backward compatibility)
+// ========================================
 
-function createMeshColors(length, labels, drawColor, objectColor) {
-    const meshColors = new Float32Array(length);
-    if (labels.length > 0) {
-        for (let i = 0; i < length; i++) {
-            if (labels[i] === 1) {
-                meshColors[i * 3] = drawColor.r;
-                meshColors[i * 3 + 1] = drawColor.g;
-                meshColors[i * 3 + 2] = drawColor.b;
-            } else {
-                meshColors[i * 3] = objectColor.r;
-                meshColors[i * 3 + 1] = objectColor.g;
-                meshColors[i * 3 + 2] = objectColor.b;
-            }
-        }
+/**
+ * Create a Three.js mesh with colors based on labels.
+ * 
+ * @deprecated Use createGeometry + createColorBufferFromLabels + createMeshFromGeometry instead.
+ * This combined function is kept for backward compatibility with MeshObject.
+ * 
+ * @param {Float32Array} positions - Vertex positions
+ * @param {Uint8Array|Array} labels - Edge labels (can be empty)
+ * @param {Array} indices - Face indices
+ * @param {THREE.Color} edgeColor - Color for edge vertices
+ * @param {THREE.Color} objectColor - Color for non-edge vertices
+ * @returns {{mesh: THREE.Mesh, meshColors: Float32Array}}
+ */
+export function createThreeMesh(positions, labels, indices, edgeColor, objectColor) {
+    const geometry = createGeometry(positions, indices);
+    const vertexCount = positions.length / 3;
+    
+    let meshColors;
+    if (labels && labels.length > 0) {
+        meshColors = createColorBufferFromLabels(labels, edgeColor, objectColor);
     } else {
-        for (let i = 0; i < length; i += 3) {
-            meshColors[i] = objectColor.r;
-            meshColors[i + 1] = objectColor.g;
-            meshColors[i + 2] = objectColor.b;
-        }
+        meshColors = createColorBuffer(vertexCount, objectColor);
     }
-    return meshColors;
+    
+    const mesh = createMeshFromGeometry(geometry, meshColors);
+    
+    return { mesh, meshColors };
 }

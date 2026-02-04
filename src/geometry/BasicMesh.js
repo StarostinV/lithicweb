@@ -1,103 +1,175 @@
 import * as THREE from 'three';
-import { createThreeMesh } from '../utils/meshUtils.js';
+import { createGeometry } from '../utils/meshUtils.js';
 import { buildAdjacencyGraph } from '../utils/graphUtils.js';
-import { IntersectFinder } from './intersections.js';
 
+/**
+ * BasicMesh - Pure geometry container with mesh-level metadata.
+ * 
+ * Holds:
+ * - Geometry: positions, indices, adjacencyGraph, geometry
+ * - Mesh metadata: author, scan_date, source info (shared by all annotations)
+ * - Geometric query methods
+ * 
+ * This class does NOT hold annotation data (edgeLabels, arrows, etc.) - 
+ * that lives in the Annotation class and is managed by MeshView.
+ * 
+ * @example
+ * const mesh = new BasicMesh();
+ * mesh.setMesh(positions, indices, { author: 'John', scanDate: '2024-01-01' });
+ * mesh.setMetadata('version', '1.0');
+ */
 export class BasicMesh {
-    constructor(scene) {
-        this.scene = scene;
-        this.mesh = null;
+    constructor() {
+        this.geometry = null;
         this.positions = [];
         this.indices = [];
         this.adjacencyGraph = null;
-        this.intersectFinder = new IntersectFinder(scene);
+        
+        /**
+         * Mesh-level metadata (shared by all annotations on this mesh).
+         * Examples: author, scan_date, source_file, mesh_version
+         * This is distinct from annotation metadata which is per-annotation.
+         * @type {Object}
+         */
+        this.metadata = {};
     }
 
     isNull() {
-        return this.mesh === null;
+        return this.geometry === null;
     }
 
+    /**
+     * Clear the mesh and reset state.
+     */
     clear() {
-        if (this.mesh) {
-            this.scene.scene.remove(this.mesh);
-            this.mesh.geometry.dispose();
-            this.mesh.material.dispose();
-            this.mesh = null;
+        if (this.geometry) {
+            this.geometry.dispose();
+            this.geometry = null;
         }
+        this.adjacencyGraph = null;
+        this.metadata = {};
     }
 
-    setMesh(positions, indices) {
+    /**
+     * Set the mesh geometry.
+     * 
+     * @param {Float32Array} positions - Vertex positions (x, y, z triplets)
+     * @param {Array} indices - Face indices (triangles)
+     * @param {Object} [metadata={}] - Optional mesh-level metadata
+     */
+    setMesh(positions, indices, metadata = {}) {
         this.positions = positions;
         this.indices = indices;
 
         // Remove existing mesh if it exists
         this.clear();
+        
+        // Set metadata after clear() since clear() resets it
+        this.metadata = { ...metadata };
 
-        // Create new mesh using utility function
-        const { mesh } = createThreeMesh(positions, indices);
-
-        this.mesh = mesh;
-        this.scene.light.target = this.mesh;
-        this.scene.scene.add(this.mesh);
+        // Create new geometry (view will create a mesh from it)
+        this.geometry = createGeometry(positions, indices);
 
         // Build adjacency graph after setting the mesh
         this.adjacencyGraph = buildAdjacencyGraph(indices, positions.length / 3);
         this.checkMeshConnectivity();
     }
+    
+    // ========================================
+    // Mesh Metadata Methods
+    // ========================================
+    
+    /**
+     * Get a specific metadata value by key.
+     * @param {string} key - The metadata key to retrieve
+     * @returns {*} The metadata value, or undefined if not found
+     */
+    getMetadata(key) {
+        return this.metadata[key];
+    }
+    
+    /**
+     * Set a specific metadata value.
+     * @param {string} key - The metadata key to set
+     * @param {*} value - The value to set
+     */
+    setMetadata(key, value) {
+        this.metadata[key] = value;
+    }
+    
+    /**
+     * Get all metadata as an object.
+     * @returns {Object} Copy of all metadata key-value pairs
+     */
+    getAllMetadata() {
+        return { ...this.metadata };
+    }
+    
+    /**
+     * Update multiple metadata values at once.
+     * @param {Object} updates - Object containing key-value pairs to update
+     */
+    updateMetadata(updates) {
+        this.metadata = { ...this.metadata, ...updates };
+    }
+    
+    /**
+     * Clear all metadata.
+     */
+    clearMetadata() {
+        this.metadata = {};
+    }
+    
+    /**
+     * Delete a specific metadata key.
+     * @param {string} key - The metadata key to delete
+     * @returns {boolean} True if the key existed and was deleted
+     */
+    deleteMetadata(key) {
+        if (key in this.metadata) {
+            delete this.metadata[key];
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Check if a metadata key exists.
+     * @param {string} key - The metadata key to check
+     * @returns {boolean} True if the key exists
+     */
+    hasMetadata(key) {
+        return key in this.metadata;
+    }
 
     invertMeshNormals() {
         const indices = this.indices;
+        const currentMetadata = { ...this.metadata };
         for (let i = 0; i < indices.length; i += 3) {
             const temp = indices[i];
             indices[i] = indices[i + 1];
             indices[i + 1] = temp;
         }
-        this.setMesh(this.positions, indices);
-    }
-
-    // Geometric query methods
-    getClickedPoint(event) {
-        return this.intersectFinder.getClickedPoint(this.mesh, event);
-    }
-
-    getClickedFace(event) {
-        return this.intersectFinder.getClickedFace(this.mesh, event);
-    }
-
-    getClosestVertexIndex(event) {
-        const [, , closestVertexIndex] = this.intersectFinder.getClosestVertexIndex(this.mesh, event);
-        return closestVertexIndex;
+        this.setMesh(this.positions, indices, currentMetadata);
     }
 
     indexToVertex(vertexIndex) {
-        return new THREE.Vector3().fromArray(
-            this.mesh.geometry.attributes.position.array.slice(vertexIndex * 3, vertexIndex * 3 + 3)
+        if (!this.geometry?.attributes?.position) return null;
+        return new THREE.Vector3().fromBufferAttribute(
+            this.geometry.attributes.position,
+            vertexIndex
         );    
     }
 
-    getVerticesWithinRadius(event, radius) {
-        return this.intersectFinder.getVerticesWithinRadius(this.mesh, event, radius);
-    }
-
-    getAllIntersectionInfo(event) {
-        const [intersectPoint, faceIndex, closestVertexIndex] = this.intersectFinder.getClosestVertexIndex(this.mesh, event);
-        if (closestVertexIndex === -1) return [-1, -1, -1, -1, -1];
-        const vertexNormal = this.getVertexNormal(closestVertexIndex);
-        const vertex = this.indexToVertex(closestVertexIndex);
-        return [intersectPoint, faceIndex, vertexNormal, closestVertexIndex, vertex]
-    }
-
-
     getVertexNormal(vertexIndex) {
-        if (vertexIndex === -1) return -1;
+        if (vertexIndex === -1 || !this.geometry) return -1;
         
-        const geometry = this.mesh.geometry;
-        if (!geometry.attributes.normal) {
-            geometry.computeVertexNormals();
+        if (!this.geometry.attributes.normal) {
+            this.geometry.computeVertexNormals();
         }
     
         return new THREE.Vector3().fromArray(
-            geometry.attributes.normal.array.slice(vertexIndex * 3, vertexIndex * 3 + 3)
+            this.geometry.attributes.normal.array.slice(vertexIndex * 3, vertexIndex * 3 + 3)
         );
     }
 

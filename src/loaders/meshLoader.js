@@ -2,6 +2,67 @@ import CustomPLYLoader from "./customPLYLoader";
 import { read as readmat } from "mat-for-js"
 import { eventBus, Events } from '../utils/EventBus.js';
 
+/**
+ * Keys that belong to annotation metadata (everything else is mesh metadata).
+ * Used by separateMetadata() to split combined PLY metadata into mesh vs annotation parts.
+ */
+const ANNOTATION_METADATA_KEYS = [
+    'annotation-metadata',  // New explicit key for nested annotation metadata
+    'state-metadata',       // Legacy key (backward compatibility)
+    'evaluation',           // Evaluation metrics
+    'model_params',         // Model inference parameters
+    'annotator',            // Who created this annotation
+    'annotation_date',      // When annotation was created
+    'annotation_source'     // Source of annotation (manual, model, cloud)
+];
+
+/**
+ * Separate combined metadata from PLY file into mesh metadata and annotation metadata.
+ * 
+ * Mesh metadata: author, scan_date, source_file, etc. - shared by all annotations
+ * Annotation metadata: evaluation metrics, model params, etc. - unique per annotation
+ * 
+ * @param {Object} combined - Combined metadata from PLY file
+ * @returns {Object} { meshMetadata, annotationMetadata }
+ */
+export function separateMetadata(combined) {
+    const meshMetadata = {};
+    const annotationMetadata = {};
+    
+    for (const [key, value] of Object.entries(combined)) {
+        if (key === 'annotation-metadata' || key === 'state-metadata') {
+            // Nested annotation metadata object - spread its contents
+            if (typeof value === 'object' && value !== null) {
+                Object.assign(annotationMetadata, value);
+            }
+        } else if (ANNOTATION_METADATA_KEYS.includes(key)) {
+            annotationMetadata[key] = value;
+        } else {
+            meshMetadata[key] = value;
+        }
+    }
+    
+    return { meshMetadata, annotationMetadata };
+}
+
+/**
+ * Combine mesh metadata and annotation metadata for export to PLY.
+ * 
+ * @param {Object} meshMetadata - Mesh-level metadata
+ * @param {Object} annotationMetadata - Annotation-specific metadata
+ * @returns {Object} Combined metadata for PLY export
+ */
+export function combineMetadata(meshMetadata, annotationMetadata) {
+    const combined = { ...meshMetadata };
+    
+    // Only add annotation metadata if there's something to add
+    if (annotationMetadata && Object.keys(annotationMetadata).length > 0) {
+        combined['annotation-metadata'] = annotationMetadata;
+    }
+    
+    return combined;
+}
+
 
 /**
  * MeshLoader handles loading mesh files (PLY, MAT) and managing their metadata.

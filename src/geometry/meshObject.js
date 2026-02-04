@@ -7,6 +7,35 @@ import { MeshSegmenter } from './segmentation.js';
 import { ActionHistory } from '../utils/ActionHistory.js';
 
 /**
+ * @deprecated MeshObject is deprecated. Use BasicMesh + MeshView + Annotation instead.
+ * 
+ * MeshObject is a monolithic class that combines geometry, annotations, and rendering.
+ * The new architecture separates these concerns:
+ * 
+ * - **BasicMesh**: Pure geometry container with mesh metadata
+ * - **Annotation**: Lightweight annotation data (edgeIndices + arrows + metadata)
+ * - **MeshView**: Composes Mesh + Annotation for display/editing
+ * - **AnnotationLibrary**: Stores saved annotations
+ * 
+ * ## Migration Guide
+ * 
+ * ```javascript
+ * // OLD (deprecated)
+ * const meshObject = new MeshObject(scene, edgeColor, objectColor);
+ * meshObject.setMesh(positions, labels, indices, metadata);
+ * 
+ * // NEW (recommended)
+ * import { BasicMesh, Annotation } from './geometry/index.js';
+ * import { MeshView } from './components/MeshView.js';
+ * 
+ * const mesh = new BasicMesh();
+ * mesh.setMesh(positions, indices, meshMetadata);
+ * 
+ * const meshView = new MeshView(scene, mesh, { edgeColor, objectColor });
+ * const annotation = Annotation.fromEdgeLabels(labels, arrows, annotationMetadata);
+ * meshView.loadAnnotation(annotation);
+ * ```
+ * 
  * MeshObject manages a 3D mesh with annotations, segments, and metadata.
  * 
  * Features:
@@ -23,6 +52,14 @@ import { ActionHistory } from '../utils/ActionHistory.js';
  */
 export class MeshObject {
     constructor(scene, edgeColor, objectColor) {
+        // Deprecation warning (only in development)
+        if (typeof console !== 'undefined' && process?.env?.NODE_ENV !== 'production') {
+            console.warn(
+                '[DEPRECATED] MeshObject is deprecated. ' +
+                'Use BasicMesh + MeshView + Annotation instead. ' +
+                'See JSDoc for migration guide.'
+            );
+        }
         this.scene = scene;
         this.mesh = null;
         this.meshColors = null;

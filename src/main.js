@@ -6,7 +6,7 @@ import { exportAnnotations } from './loaders/meshExporter.js';
 import { MODES, Mode } from './utils/mode.js';
 import { eventBus, Events } from './utils/EventBus.js';
 import {ArrowDrawer} from './components/arrow.js';
-import {MeshObject} from './geometry/meshObject.js';
+import { BasicMesh } from './geometry/BasicMesh.js';
 import Scene from './components/scene.js';
 import DrawLines from './components/drawLines.js';
 import MeshLoader from './loaders/meshLoader.js';
@@ -22,10 +22,8 @@ import { SettingsPanel } from './components/settingsPanel.js';
 import { UserConfig } from './utils/UserConfig.js';
 import { CloudStoragePanel } from './components/cloudStoragePanel.js';
 import { initUI } from './components/uiSetup.js';
+import { MeshView } from './components/MeshView.js';
 
-//colors
-const drawColor = new THREE.Color(1, 0.6, 0.2); // Orange
-const objectColor = new THREE.Color(0.5, 0.5, 0.5); // Gray
 
 // User configuration (persisted to localStorage)
 const userConfig = new UserConfig();
@@ -36,8 +34,9 @@ const scene = new Scene();
 // control mode
 const mode = new Mode(scene);
 
-// Mesh object
-const meshObject = new MeshObject(scene, drawColor, objectColor);
+// Mesh (geometry) + View (rendering + editing)
+const basicMesh = new BasicMesh();
+const meshObject = new MeshView(scene, basicMesh);
 
 // Arrow drawer
 const arrowDrawer = new ArrowDrawer(scene.canvas, meshObject, mode);
@@ -299,6 +298,7 @@ updateRendererSize();
 window.debugGlobalVar.connectionManager = connectionManager;
 window.debugGlobalVar.evaluationManager = evaluationManager;
 window.debugGlobalVar.meshObject = meshObject;
+window.debugGlobalVar.basicMesh = basicMesh;
 window.debugGlobalVar.meshLoader = meshLoader;
 window.debugGlobalVar.metadataPanel = metadataPanel;
 window.debugGlobalVar.cloudStoragePanel = cloudStoragePanel;

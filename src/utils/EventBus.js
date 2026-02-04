@@ -102,6 +102,12 @@ export const Events = Object.freeze({
     // Config events
     /** Fired when user configuration changes. Data: { path: string, newValue: any, oldValue: any } */
     CONFIG_CHANGED: 'config:changed',
+    
+    // Library events
+    /** Fired when library changes. Data: { action: 'save'|'delete'|'rename'|'update'|etc, id: string, annotation?: object } */
+    LIBRARY_CHANGED: 'library:changed',
+    /** Fired when library is cleared (new mesh loaded). Data: {} */
+    LIBRARY_CLEARED: 'library:cleared',
 });
 
 /**
