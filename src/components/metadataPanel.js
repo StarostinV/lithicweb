@@ -504,6 +504,11 @@ export class MetadataPanel {
             return this.createEvaluationMetadataItem(key, value);
         }
         
+        // Special rendering for inference data
+        if (key === 'inference' && typeof value === 'object' && value !== null) {
+            return this.createInferenceMetadataItem(key, value);
+        }
+        
         const item = document.createElement('div');
         item.className = 'metadata-item state-metadata-item';
         
@@ -607,6 +612,106 @@ export class MetadataPanel {
         deleteBtn.addEventListener('click', () => this.deleteStateMetadata(key));
         
         return item;
+    }
+    
+    /**
+     * Create a special inference metadata item with formatted view.
+     * @param {string} key - The metadata key ('inference')
+     * @param {Object} value - The inference data object
+     * @returns {HTMLElement} The item element
+     */
+    createInferenceMetadataItem(key, value) {
+        const item = document.createElement('div');
+        item.className = 'metadata-item state-metadata-item inference-item';
+        
+        // Format timestamp nicely
+        const inferredAt = value.model?.inferredAt 
+            ? new Date(value.model.inferredAt).toLocaleString() 
+            : 'Unknown';
+        
+        // Build the table view HTML
+        const tableHtml = this.buildInferenceTable(value);
+        const rawJson = this.formatValue(value);
+        
+        item.innerHTML = `
+            <div class="metadata-item-header">
+                <div class="metadata-key">
+                    <span class="key-name"><i class="fas fa-robot"></i> ${this.escapeHtml(key)}</span>
+                    <span class="type-badge type-object">model</span>
+                    <span class="state-badge">state-specific</span>
+                </div>
+                <div class="metadata-actions">
+                    <button class="inference-view-toggle" title="Toggle table/raw view">
+                        <i class="fas fa-code"></i>
+                    </button>
+                    <button class="metadata-delete-btn state-meta-delete" data-key="${this.escapeHtml(key)}" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="inference-computed-at">
+                <i class="fas fa-clock"></i> Inferred: ${this.escapeHtml(inferredAt)}
+                ${value.model?.edgeCount !== undefined ? ` | ${value.model.edgeCount} edges` : ''}
+            </div>
+            <div class="inference-table-view">
+                ${tableHtml}
+            </div>
+            <div class="inference-raw-view hidden">
+                <pre class="metadata-value type-object long-value">${this.escapeHtml(rawJson)}</pre>
+            </div>
+        `;
+        
+        // Setup toggle button handler
+        const toggleBtn = item.querySelector('.inference-view-toggle');
+        const tableView = item.querySelector('.inference-table-view');
+        const rawView = item.querySelector('.inference-raw-view');
+        
+        toggleBtn.addEventListener('click', () => {
+            tableView.classList.toggle('hidden');
+            rawView.classList.toggle('hidden');
+            const icon = toggleBtn.querySelector('i');
+            if (rawView.classList.contains('hidden')) {
+                icon.className = 'fas fa-code';
+                toggleBtn.title = 'Show raw JSON';
+            } else {
+                icon.className = 'fas fa-table';
+                toggleBtn.title = 'Show table view';
+            }
+        });
+        
+        // Setup delete button handler
+        const deleteBtn = item.querySelector('.state-meta-delete');
+        deleteBtn.addEventListener('click', () => this.deleteStateMetadata(key));
+        
+        return item;
+    }
+    
+    /**
+     * Build HTML table for inference metadata.
+     * @param {Object} data - The inference data
+     * @returns {string} HTML string for the table
+     */
+    buildInferenceTable(data) {
+        const sections = [];
+        
+        // Model config section
+        if (data.model?.config) {
+            const config = data.model.config;
+            const configRows = Object.entries(config)
+                .map(([k, v]) => `<div class="inference-config-row"><span class="config-key">${this.escapeHtml(k)}</span><span class="config-value">${this.escapeHtml(String(v))}</span></div>`)
+                .join('');
+            
+            sections.push(`
+                <div class="inference-section">
+                    <div class="inference-section-title">Model Configuration</div>
+                    <div class="inference-config-list">
+                        ${configRows}
+                    </div>
+                </div>
+            `);
+        }
+        
+        return sections.join('');
     }
     
     /**

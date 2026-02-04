@@ -621,3 +621,172 @@
     margin-top: 8px;
     font-style: italic;
 }
+
+/* ==========================================================================
+   Dual View Controls
+   ========================================================================== */
+
+/* Dual View Toggle Section */
+.dual-view-section {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--gray-200);
+}
+
+.dual-view-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+    border: 1px solid #86efac;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.dual-view-toggle-row:hover {
+    background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%);
+    border-color: #4ade80;
+}
+
+.dual-view-toggle-row.active {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-color: #059669;
+}
+
+.dual-view-toggle-row.active .dual-view-toggle-label,
+.dual-view-toggle-row.active .dual-view-toggle-hint {
+    color: white;
+}
+
+.dual-view-toggle-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dual-view-toggle-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #059669;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dual-view-toggle-label i {
+    font-size: 14px;
+}
+
+.dual-view-toggle-hint {
+    font-size: 11px;
+    color: #6b7280;
+}
+
+/* Per-View Visualization Controls */
+.dual-view-controls {
+    margin-top: 12px;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    display: none;
+}
+
+.dual-view-controls.visible {
+    display: block;
+}
+
+.dual-view-controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.view-control-column {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.view-control-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
+
+.view-control-header.left-view {
+    background: #dcfce7;
+    color: #059669;
+    border-left: 3px solid #10b981;
+}
+
+.view-control-header.right-view {
+    background: #f3e8ff;
+    color: #7c3aed;
+    border-left: 3px solid #8b5cf6;
+}
+
+.view-control-header i {
+    font-size: 10px;
+}
+
+/* View Mode Select */
+.view-mode-select {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 11px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    background: white;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.view-mode-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.view-mode-select option {
+    padding: 8px;
+}
+
+/* Swap Views Button */
+.swap-views-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    background: white;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.swap-views-btn:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+    color: var(--gray-800);
+}
+
+.swap-views-btn i {
+    transition: transform 0.2s;
+}
+
+.swap-views-btn:hover i {
+    transform: rotate(180deg);
+}

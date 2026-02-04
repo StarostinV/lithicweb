@@ -244,3 +244,129 @@ body.sidebar-collapsed .floating-controls {
         font-size: 16px;
     }
 }
+
+/* ==========================================================================
+   Dual View Mode
+   ========================================================================== */
+
+/* Dual view divider - vertical line separating views */
+.dual-view-divider {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 2px;
+    height: 100%;
+    background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 10%,
+        rgba(255, 255, 255, 0.5) 50%,
+        rgba(255, 255, 255, 0.3) 90%,
+        transparent 100%
+    );
+    pointer-events: none;
+    z-index: 100;
+    transform: translateX(-50%);
+}
+
+/* View labels */
+.dual-view-label {
+    position: absolute;
+    top: 16px;
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    border-radius: 8px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 100;
+    pointer-events: none;
+    user-select: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dual-view-label-left {
+    left: 16px;
+    border-left: 3px solid #10b981; /* Green for GT */
+}
+
+.dual-view-label-right {
+    right: calc(var(--sidebar-width) + 16px);
+    border-left: 3px solid #8b5cf6; /* Purple for Pred */
+}
+
+/* Adjust right label when sidebar is collapsed */
+body.sidebar-collapsed .dual-view-label-right {
+    right: 16px;
+}
+
+/* Full-screen canvas adjustment for dual view labels */
+.canvas-container.canvas-fullscreen .dual-view-label-right {
+    right: 16px;
+}
+
+/* Hide mode indicator in dual view to avoid clutter */
+.canvas-container.dual-view-active .mode-indicator {
+    opacity: 0.7;
+}
+
+/* Adjust floating controls in dual view */
+.canvas-container.dual-view-active ~ .floating-controls {
+    left: calc((100vw - var(--sidebar-width)) / 4);
+}
+
+body.sidebar-collapsed .canvas-container.dual-view-active ~ .floating-controls {
+    left: 25%;
+}
+
+/* Dual view color coding for labels */
+.dual-view-label[data-view="gt"] {
+    border-left-color: #10b981;
+}
+
+.dual-view-label[data-view="pred"] {
+    border-left-color: #8b5cf6;
+}
+
+.dual-view-label[data-view="matched"] {
+    border-left-color: #3b82f6;
+}
+
+.dual-view-label[data-view="overseg"] {
+    border-left-color: #f97316;
+}
+
+.dual-view-label[data-view="underseg"] {
+    border-left-color: #eab308;
+}
+
+.dual-view-label[data-view="missingGt"] {
+    border-left-color: #ef4444;
+}
+
+.dual-view-label[data-view="missingPred"] {
+    border-left-color: #ec4899;
+}
+
+.dual-view-label[data-view="all"] {
+    border-left-color: #6366f1;
+}
+
+/* Responsive adjustments for dual view */
+@media (max-width: 1024px) {
+    .dual-view-label-right {
+        right: calc(340px + 16px);
+    }
+}
+
+@media (max-width: 768px) {
+    .dual-view-label {
+        font-size: 11px;
+        padding: 6px 12px;
+    }
+    
+    .dual-view-label-right {
+        right: 16px;
+    }
+}

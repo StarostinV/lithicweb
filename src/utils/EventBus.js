@@ -122,6 +122,10 @@ export const Events = Object.freeze({
     LIBRARY_CHANGED: 'library:changed',
     /** Fired when library is cleared (new mesh loaded). Data: {} */
     LIBRARY_CLEARED: 'library:cleared',
+    
+    // Dual view events
+    /** Fired when dual-view mode is enabled/disabled. Data: { enabled: boolean } */
+    DUAL_VIEW_CHANGED: 'dualView:changed',
 });
 
 /**

@@ -18,6 +18,7 @@ import { MetadataPanel } from './components/metadataPanel.js';
 import { ConnectionManager } from './components/connectionManager.js';
 import { EvaluationManager } from './evaluation/EvaluationManager.js';
 import { EvaluationPanel } from './components/evaluationPanel.js';
+import { DualViewManager } from './components/DualViewManager.js';
 import { RenderingPanel } from './components/renderingPanel.js';
 import { SettingsPanel } from './components/settingsPanel.js';
 import { UserConfig } from './utils/UserConfig.js';
@@ -55,6 +56,9 @@ const annotationLibrary = new AnnotationLibrary();
 // Evaluation manager (must be created before panels that depend on it)
 const evaluationManager = new EvaluationManager(meshView);
 
+// Dual view manager for side-by-side comparison
+const dualViewManager = new DualViewManager(scene, meshView);
+
 // Clear library, evaluation, and metadata when a new mesh is loaded
 eventBus.on(Events.MESH_LOADED, () => {
     console.log('[main] Mesh loaded - clearing library, evaluation, and resetting metadata');
@@ -81,6 +85,7 @@ modelPanel.setEvaluationManager(evaluationManager);
 
 // Evaluation panel
 const evaluationPanel = new EvaluationPanel(meshView, evaluationManager);
+evaluationPanel.setDualViewManager(dualViewManager);
 
 // Metadata panel
 const metadataPanel = new MetadataPanel(meshView, meshLoader);
@@ -345,6 +350,7 @@ updateRendererSize();
 // Export for debugging
 window.debugGlobalVar.connectionManager = connectionManager;
 window.debugGlobalVar.evaluationManager = evaluationManager;
+window.debugGlobalVar.dualViewManager = dualViewManager;
 window.debugGlobalVar.meshView = meshView;
 window.debugGlobalVar.basicMesh = basicMesh;
 window.debugGlobalVar.meshLoader = meshLoader;

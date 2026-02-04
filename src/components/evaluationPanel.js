@@ -6,6 +6,7 @@
  * - Adjusting metric thresholds (IoU, overseg, underseg)
  * - Computing and displaying metrics
  * - Selecting visualization modes
+ * - Dual-view comparison mode
  * 
  * ## Event Bus Integration
  * 
@@ -14,6 +15,7 @@
  * - `Events.EVALUATION_PRED_CHANGED` - Updates Pred status display
  * - `Events.EVALUATION_METRICS_COMPUTED` - Updates metrics display
  * - `Events.EVALUATION_MODE_CHANGED` - Handles evaluation mode entry/exit
+ * - `Events.DUAL_VIEW_CHANGED` - Updates dual-view UI state
  * 
  * @module EvaluationPanel
  */
@@ -55,11 +57,22 @@ export class EvaluationPanel {
 
         // Cache visualization instances
         this.visualizations = {};
+        
+        // Dual view manager (set via setDualViewManager)
+        this.dualViewManager = null;
 
         // Initialize UI
         this._initializeUI();
         this._setupEventListeners();
         this._setupEventBusSubscriptions();
+    }
+    
+    /**
+     * Set the DualViewManager reference.
+     * @param {DualViewManager} dualViewManager - The dual view manager
+     */
+    setDualViewManager(dualViewManager) {
+        this.dualViewManager = dualViewManager;
     }
     
     /**
@@ -80,6 +93,24 @@ export class EvaluationPanel {
         eventBus.on(Events.EVALUATION_METRICS_COMPUTED, (data) => {
             if (data.metrics) {
                 this._displayMetrics(data.metrics);
+                // If dual view is enabled, refresh it with new metrics
+                if (this.dualViewManager?.isEnabled()) {
+                    this._updateDualViewVisualizations();
+                }
+            }
+        }, 'evaluationPanel');
+        
+        // Listen to dual view changes (in case it's toggled externally)
+        eventBus.on(Events.DUAL_VIEW_CHANGED, (data) => {
+            if (this.dualViewEnabled) {
+                this.dualViewEnabled.checked = data.enabled;
+            }
+            if (data.enabled) {
+                this.dualViewToggle?.classList.add('active');
+                this.dualViewControls?.classList.add('visible');
+            } else {
+                this.dualViewToggle?.classList.remove('active');
+                this.dualViewControls?.classList.remove('visible');
             }
         }, 'evaluationPanel');
     }
@@ -165,6 +196,14 @@ export class EvaluationPanel {
         this.vizModeRadios = document.querySelectorAll('input[name="evalVizMode"]');
         this.showGtEdgesCheckbox = document.getElementById('evalShowGtEdges');
         this.colorLegend = document.getElementById('evalColorLegend');
+        
+        // Dual view controls
+        this.dualViewToggle = document.getElementById('dualViewToggle');
+        this.dualViewEnabled = document.getElementById('dualViewEnabled');
+        this.dualViewControls = document.getElementById('dualViewControls');
+        this.leftViewModeSelect = document.getElementById('leftViewMode');
+        this.rightViewModeSelect = document.getElementById('rightViewMode');
+        this.swapViewsBtn = document.getElementById('swapViewsBtn');
 
         // Update initial slider values
         this._updateSliderDisplays();
@@ -220,6 +259,146 @@ export class EvaluationPanel {
         this.showGtEdgesCheckbox?.addEventListener('change', (e) => {
             this.evaluationManager.setShowGtEdgeOverlay(e.target.checked);
         });
+        
+        // Dual view toggle - handle click on the row only if not on the toggle-switch area
+        this.dualViewToggle?.addEventListener('click', (e) => {
+            // Check if the click is on the toggle-switch or its children (label, checkbox, slider)
+            const toggleSwitch = this.dualViewToggle.querySelector('.toggle-switch');
+            const isOnToggleSwitch = toggleSwitch && (toggleSwitch.contains(e.target) || e.target === toggleSwitch);
+            
+            // Only manually toggle if clicking outside the toggle-switch area
+            if (!isOnToggleSwitch && this.dualViewEnabled) {
+                this.dualViewEnabled.checked = !this.dualViewEnabled.checked;
+                this._toggleDualView();
+            }
+        });
+        
+        // Handle checkbox change directly (this fires when clicking on the toggle-switch)
+        this.dualViewEnabled?.addEventListener('change', () => {
+            this._toggleDualView();
+        });
+        
+        // Left view mode change
+        this.leftViewModeSelect?.addEventListener('change', (e) => {
+            this._updateDualViewMode('left', e.target.value);
+        });
+        
+        // Right view mode change
+        this.rightViewModeSelect?.addEventListener('change', (e) => {
+            this._updateDualViewMode('right', e.target.value);
+        });
+        
+        // Swap views button
+        this.swapViewsBtn?.addEventListener('click', () => {
+            this._swapViews();
+        });
+    }
+    
+    /**
+     * Toggle dual view mode on/off.
+     * @private
+     */
+    _toggleDualView() {
+        if (!this.dualViewManager) {
+            console.warn('DualViewManager not set');
+            return;
+        }
+        
+        const enabled = this.dualViewEnabled?.checked || false;
+        
+        if (enabled) {
+            // Need metrics to enable dual view
+            if (!this.evaluationManager.getMetrics()) {
+                alert('Please compute metrics first before enabling dual view.');
+                this.dualViewEnabled.checked = false;
+                return;
+            }
+            
+            this.dualViewManager.enable();
+            this.dualViewToggle?.classList.add('active');
+            this.dualViewControls?.classList.add('visible');
+            
+            // Set initial visualizations for both views
+            this._updateDualViewVisualizations();
+        } else {
+            this.dualViewManager.disable();
+            this.dualViewToggle?.classList.remove('active');
+            this.dualViewControls?.classList.remove('visible');
+            
+            // Restore single view visualization
+            const selectedMode = document.querySelector('input[name="evalVizMode"]:checked')?.value || 'all';
+            this._setVisualizationMode(selectedMode);
+        }
+    }
+    
+    /**
+     * Update visualization mode for a specific view in dual view mode.
+     * @private
+     * @param {'left'|'right'} view - Which view to update
+     * @param {string} mode - Visualization mode
+     */
+    _updateDualViewMode(view, mode) {
+        if (!this.dualViewManager) return;
+        
+        if (view === 'left') {
+            this.dualViewManager.setLeftViewMode(mode);
+        } else {
+            this.dualViewManager.setRightViewMode(mode);
+        }
+        
+        this._updateDualViewVisualizations();
+    }
+    
+    /**
+     * Swap left and right view modes.
+     * @private
+     */
+    _swapViews() {
+        if (!this.leftViewModeSelect || !this.rightViewModeSelect) return;
+        
+        const leftMode = this.leftViewModeSelect.value;
+        const rightMode = this.rightViewModeSelect.value;
+        
+        this.leftViewModeSelect.value = rightMode;
+        this.rightViewModeSelect.value = leftMode;
+        
+        if (this.dualViewManager) {
+            this.dualViewManager.setLeftViewMode(rightMode);
+            this.dualViewManager.setRightViewMode(leftMode);
+            this._updateDualViewVisualizations();
+        }
+    }
+    
+    /**
+     * Update dual view visualizations based on current mode selections.
+     * @private
+     */
+    _updateDualViewVisualizations() {
+        if (!this.dualViewManager || !this.dualViewManager.isEnabled()) return;
+        
+        const result = this.evaluationManager.getMetrics();
+        if (!result) return;
+        
+        const leftMode = this.leftViewModeSelect?.value || 'gt';
+        const rightMode = this.rightViewModeSelect?.value || 'pred';
+        
+        // Create visualization instances
+        const leftViz = this._createVisualization(leftMode);
+        const rightViz = this._createVisualization(rightMode);
+        
+        // Set visualizations on dual view manager
+        this.dualViewManager.setVisualizations({
+            leftVisualization: leftViz,
+            rightVisualization: rightViz,
+            metrics: result
+        });
+        
+        // Update labels
+        this.dualViewManager.setLeftViewMode(leftMode);
+        this.dualViewManager.setRightViewMode(rightMode);
+        
+        // Refresh the rendering
+        this.dualViewManager.refresh();
     }
 
     /**
@@ -261,8 +440,8 @@ export class EvaluationPanel {
         if (result) {
             this._displayMetrics(result);
             
-            // Log metrics
-            this._logMetrics(result);
+            // Save evaluation metrics to annotation metadata
+            this._saveEvaluationMetadata(result);
             
             // Apply default visualization
             const selectedMode = document.querySelector('input[name="evalVizMode"]:checked')?.value || 'all';
@@ -271,31 +450,57 @@ export class EvaluationPanel {
     }
     
     /**
-     * Log evaluation metrics (could be saved to annotation metadata in future).
+     * Save evaluation metrics to the current annotation's metadata.
+     * This persists the evaluation results with the annotation for later reference.
      * @private
      * @param {Object} result - The metrics result object
      */
-    _logMetrics(result) {
+    _saveEvaluationMetadata(result) {
         const summary = this.evaluationManager.getSummary();
         
-        console.log('Evaluation metrics:', {
-            gt: summary.groundTruthDescription,
-            pred: summary.predictionDescription,
-            thresholds: {
-                iou: this.iouThreshold,
-                overseg: this.oversegThreshold,
-                underseg: this.undersegThreshold
+        // Build structured evaluation metadata matching metadataPanel's expected format
+        const evaluationMetadata = {
+            general: {
+                computedAt: Date.now(),
+                gtDescription: summary.groundTruthDescription,
+                predDescription: summary.predictionDescription,
+                nGtInstances: result.nGtInstances,
+                nPredInstances: result.nPredInstances
             },
-            results: {
+            detection: {
                 TP: result.TP,
                 FP: result.FP,
                 FN: result.FN,
                 precision: result.precision,
                 recall: result.recall,
-                f1: result.f1,
-                PQ: result.PQ
+                f1: result.f1
+            },
+            panoptic: {
+                PQ: result.PQ,
+                RQ: result.RQ,
+                SQ: result.SQ
+            },
+            errors: {
+                nOversegGt: result.nOversegGt,
+                oversegFrac: result.oversegFrac,
+                nUndersegPred: result.nUndersegPred,
+                undersegFrac: result.undersegFrac,
+                nMissingGt: result.nMissingGt,
+                missingGtFrac: result.missingGtFrac,
+                nMissingPred: result.nMissingPred,
+                missingPredFrac: result.missingPredFrac
+            },
+            thresholds: {
+                iouThresh: this.iouThreshold,
+                oversegThresh: this.oversegThreshold,
+                undersegThresh: this.undersegThreshold
             }
-        });
+        };
+        
+        // Save to current state's annotation metadata
+        this.meshView.setCurrentStateMetadata('evaluation', evaluationMetadata);
+        
+        console.log('Evaluation metrics saved to annotation metadata:', evaluationMetadata);
     }
 
     /**
@@ -533,6 +738,16 @@ export class EvaluationPanel {
      * Called when panel is hidden / mode switches away.
      */
     onHide() {
+        // Disable dual view if enabled
+        if (this.dualViewManager?.isEnabled()) {
+            this.dualViewManager.disable();
+            if (this.dualViewEnabled) {
+                this.dualViewEnabled.checked = false;
+            }
+            this.dualViewToggle?.classList.remove('active');
+            this.dualViewControls?.classList.remove('visible');
+        }
+        
         // Exit evaluation mode to restore normal view
         this.evaluationManager.exitEvaluationMode();
     }
@@ -541,6 +756,16 @@ export class EvaluationPanel {
      * Reset the panel state.
      */
     reset() {
+        // Disable dual view if enabled
+        if (this.dualViewManager?.isEnabled()) {
+            this.dualViewManager.disable();
+        }
+        if (this.dualViewEnabled) {
+            this.dualViewEnabled.checked = false;
+        }
+        this.dualViewToggle?.classList.remove('active');
+        this.dualViewControls?.classList.remove('visible');
+        
         this.evaluationManager.clearGroundTruth();
         this.evaluationManager.clearPrediction();
         this.evaluationManager.exitEvaluationMode();

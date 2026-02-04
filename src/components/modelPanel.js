@@ -485,6 +485,17 @@ export class ModelPanel {
         // Finish draw operation to record in history (type 'model' -> 'AI segmentation')
         this.meshView.finishDrawOperation();
         
+        // Save model inference metadata to current state's annotation metadata
+        const inferenceMetadata = {
+            model: {
+                inferredAt: Date.now(),
+                config: { ...this.config },
+                sessionId: this.currentSession?.session_id,
+                edgeCount: edgeIndices.size
+            }
+        };
+        this.meshView.setCurrentStateMetadata('inference', inferenceMetadata);
+        
         // Create Annotation object from inference results for library auto-save
         const annotation = new Annotation({
             edgeIndices: edgeIndices,
