@@ -68,6 +68,7 @@ export class CloudStoragePanel {
         this.selectedMeshId = null;
         this.states = [];
         this.isLoading = false;
+        this.searchFilter = '';
         
         /**
          * Cloud mesh connection info. Tracks which cloud mesh the current viewer mesh is linked to.
@@ -85,6 +86,8 @@ export class CloudStoragePanel {
         this.uploadMeshBtn = document.getElementById('uploadMeshToCloudBtn');
         this.saveStateBtn = document.getElementById('saveStateToCloudBtn');
         this.meshUploadInput = document.getElementById('cloudMeshUploadInput');
+        this.meshSearchInput = document.getElementById('cloudMeshSearch');
+        this.meshSearchClear = document.getElementById('cloudMeshSearchClear');
         
         // Save Annotation Modal elements
         this.saveAnnotationModal = document.getElementById('saveAnnotationModal');
@@ -244,6 +247,16 @@ export class CloudStoragePanel {
             this.meshUploadInput.addEventListener('change', (e) => this.handleMeshUpload(e));
         }
         
+        // Mesh search input
+        if (this.meshSearchInput) {
+            this.meshSearchInput.addEventListener('input', (e) => this.handleSearchInput(e));
+        }
+        
+        // Mesh search clear button
+        if (this.meshSearchClear) {
+            this.meshSearchClear.addEventListener('click', () => this.clearSearch());
+        }
+        
         // Save state button
         if (this.saveStateBtn) {
             this.saveStateBtn.addEventListener('click', () => this.showSaveAnnotationModal());
@@ -281,6 +294,56 @@ export class CloudStoragePanel {
         } else {
             this.setStatus('Not connected. Configure server connection first.', 'warning');
         }
+    }
+    
+    /**
+     * Handle search input changes.
+     * @param {Event} e - Input event
+     */
+    handleSearchInput(e) {
+        this.searchFilter = e.target.value.toLowerCase().trim();
+        this.updateSearchUI();
+        this.renderMeshList();
+    }
+    
+    /**
+     * Clear the search filter.
+     */
+    clearSearch() {
+        this.searchFilter = '';
+        if (this.meshSearchInput) {
+            this.meshSearchInput.value = '';
+        }
+        this.updateSearchUI();
+        this.renderMeshList();
+    }
+    
+    /**
+     * Update the search UI state (show/hide clear button).
+     */
+    updateSearchUI() {
+        const searchContainer = this.meshSearchInput?.parentElement;
+        if (searchContainer) {
+            if (this.searchFilter) {
+                searchContainer.classList.add('has-value');
+            } else {
+                searchContainer.classList.remove('has-value');
+            }
+        }
+    }
+    
+    /**
+     * Get meshes filtered by search term.
+     * @returns {Array} Filtered meshes
+     */
+    getFilteredMeshes() {
+        if (!this.searchFilter) {
+            return this.meshes;
+        }
+        return this.meshes.filter(mesh => {
+            const name = (mesh.original_name || mesh.filename || '').toLowerCase();
+            return name.includes(this.searchFilter);
+        });
     }
 
     /**
@@ -335,7 +398,20 @@ export class CloudStoragePanel {
             return;
         }
         
-        this.meshList.innerHTML = this.meshes.map(mesh => this.createMeshItem(mesh)).join('');
+        const filteredMeshes = this.getFilteredMeshes();
+        
+        if (filteredMeshes.length === 0) {
+            this.meshList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-search"></i>
+                    <p>No meshes match "${this.escapeHtml(this.searchFilter)}"</p>
+                    <p class="text-xs text-gray-500">${this.meshes.length} mesh${this.meshes.length !== 1 ? 'es' : ''} total</p>
+                </div>
+            `;
+            return;
+        }
+        
+        this.meshList.innerHTML = filteredMeshes.map(mesh => this.createMeshItem(mesh)).join('');
         
         // Setup click handlers
         this.meshList.querySelectorAll('.cloud-mesh-item').forEach(item => {

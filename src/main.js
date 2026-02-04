@@ -133,6 +133,24 @@ function showHidePanel(panelId, callbacks = {}) {
 
     panel.classList.remove('hidden');
     
+    // If sidebar is collapsed, open it to show the panel
+    const sideMenu = document.getElementById('sideMenu');
+    if (sideMenu && sideMenu.classList.contains('sidebar-collapsed')) {
+        const canvasContainer = document.querySelector('.canvas-container');
+        const sidebarShowBtn = document.getElementById('sidebarShowBtn');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        
+        sideMenu.classList.remove('sidebar-collapsed');
+        canvasContainer?.classList.remove('canvas-fullscreen');
+        sidebarShowBtn?.classList.remove('visible');
+        sidebarToggle?.classList.remove('sidebar-hidden');
+        document.body.classList.remove('sidebar-collapsed');
+        localStorage.setItem('lithicjs_sidebar_collapsed', 'false');
+        
+        // Trigger resize to update Three.js canvas
+        window.dispatchEvent(new Event('resize'));
+    }
+    
     // Handle entering new panel
     if (panelId === 'evaluationPanel') {
         evaluationPanel.onShow();
