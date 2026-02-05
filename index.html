@@ -80,17 +80,13 @@
             <div class="nav-group">
                 <span class="nav-group-label">Data</span>
                 <div class="nav-group-buttons">
-                    <button id="historyPanelBtn" class="nav-btn" title="Undo/Redo History">
-                        <i class="fas fa-history"></i>
-                        <span>History</span>
-                    </button>
-                    <button id="libraryPanelBtn" class="nav-btn" title="Saved Annotations Library">
-                        <i class="fas fa-bookmark"></i>
-                        <span>Library</span>
-                    </button>
                     <button id="metadataPanelBtn" class="nav-btn" title="View/Edit Metadata">
                         <i class="fas fa-tags"></i>
                         <span>Metadata</span>
+                    </button>
+                    <button id="libraryPanelBtn" class="nav-btn" title="Saved Annotations Library">
+                        <i class="fas fa-bookmark"></i>
+                        <span>Annotations</span>
                     </button>
                     <button id="cloudStoragePanelBtn" class="nav-btn" title="Cloud Storage">
                         <i class="fas fa-cloud"></i>
@@ -99,11 +95,15 @@
                 </div>
             </div>
             <div class="nav-group">
-                <span class="nav-group-label">Config</span>
+                <span class="nav-group-label">General</span>
                 <div class="nav-group-buttons">
                     <button id="settingsPanelBtn" class="nav-btn" title="Application Settings">
                         <i class="fas fa-cog"></i>
-                        <span>Settings</span>
+                        <span>Config</span>
+                    </button>
+                    <button id="historyPanelBtn" class="nav-btn" title="Undo/Redo History">
+                        <i class="fas fa-history"></i>
+                        <span>History</span>
                     </button>
                 </div>
             </div>
@@ -163,7 +163,7 @@
             </button>
             <button class="nav-btn mobile-nav-btn" data-panel="libraryPanel" title="Saved Annotations Library">
                 <i class="fas fa-bookmark"></i>
-                <span>Library</span>
+                <span>Annotations</span>
             </button>
             <button class="nav-btn mobile-nav-btn" data-panel="metadataPanel" title="View/Edit Metadata">
                 <i class="fas fa-tags"></i>
@@ -631,8 +631,8 @@
             <div class="panel-header">
                 <div class="panel-header-icon library-icon"><i class="fas fa-bookmark"></i></div>
                 <div class="panel-header-text">
-                    <h2>Library</h2>
-                    <span class="panel-subtitle">Saved annotations</span>
+                    <h2>Annotation Library</h2>
+                    <span class="panel-subtitle">Locally saved annotations</span>
                 </div>
             </div>
             
