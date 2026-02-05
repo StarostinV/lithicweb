@@ -101,6 +101,7 @@ libraryPanel.setCloudStoragePanel(cloudStoragePanel);
 
 // Rendering panel (view mode controls) - with userConfig for persistence
 const renderingPanel = new RenderingPanel(scene, meshView, userConfig);
+renderingPanel.setDualViewManager(dualViewManager);
 
 // Settings panel (settings management)
 const settingsPanel = new SettingsPanel(userConfig, renderingPanel);
@@ -252,6 +253,39 @@ eventBus.on(Events.MODE_CHANGED, (data) => {
     syncAnnotationTabWithMode(data.mode);
 }, 'main');
 
+// Handle panel switch requests from other components (e.g., cloud storage -> library)
+eventBus.on(Events.SWITCH_PANEL, (data) => {
+    const { panelId } = data;
+    if (!panelId) return;
+    
+    // Map panel IDs to their button IDs and onShow callbacks
+    const panelConfig = {
+        'viewPanel': { btnId: 'viewPanelBtn', onShow: null },
+        'annotationPanel': { btnId: 'annotationPanelBtn', onShow: null },
+        'modelPanel': { btnId: 'modelPanelBtn', onShow: null },
+        'historyPanel': { btnId: 'historyPanelBtn', onShow: null },
+        'libraryPanel': { btnId: 'libraryPanelBtn', onShow: null },
+        'metadataPanel': { btnId: 'metadataPanelBtn', onShow: () => metadataPanel.onShow() },
+        'evaluationPanel': { btnId: 'evaluationPanelBtn', onShow: null },
+        'cloudStoragePanel': { btnId: 'cloudStoragePanelBtn', onShow: () => cloudStoragePanel.onShow() },
+        'settingsPanel': { btnId: 'settingsPanelBtn', onShow: () => settingsPanel.onShow() }
+    };
+    
+    const config = panelConfig[panelId];
+    if (!config) {
+        console.warn('[main] Unknown panel ID for switch:', panelId);
+        return;
+    }
+    
+    showHidePanel(panelId, config.onShow ? { onShow: config.onShow } : {});
+    setActiveNavBtn(config.btnId);
+    
+    // Switch to view mode (consistent with manual panel switching)
+    if (panelId !== 'annotationPanel') {
+        mode.setMode(MODES.VIEW, true);
+    }
+}, 'main');
+
 document.getElementById('modelPanelBtn').addEventListener('click', () => {
     showHidePanel('modelPanel');
     setActiveNavBtn('modelPanelBtn');
@@ -312,6 +346,50 @@ window.addEventListener('keydown', (event) => {
         event.preventDefault();
         meshView.redo();
     }
+});
+
+// =====================================================
+// Annotation Label (top-left of canvas)
+// Shows current annotation name, clicks open library panel
+// =====================================================
+const annotationLabel = document.getElementById('annotationLabel');
+const annotationLabelText = document.getElementById('annotationLabelText');
+
+/**
+ * Shorten text to fit in the UI label.
+ * @param {string} text - Text to shorten
+ * @param {number} maxLength - Maximum length before truncating
+ * @returns {string} Shortened text
+ */
+function shortenLabelText(text, maxLength = 20) {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 1) + '…';
+}
+
+/**
+ * Update the annotation label with current annotation name.
+ */
+function updateAnnotationLabel() {
+    const annotation = meshView.getAnnotation();
+    const name = annotation?.name || 'Untitled';
+    annotationLabelText.textContent = shortenLabelText(name);
+    annotationLabel.title = `${name} - Click to open Annotation Library`;
+}
+
+// Update label on annotation-related events
+// NOTE: Only subscribe to events that actually change the current annotation:
+// - MESH_LOADED: New mesh loaded, creates initial annotation with mesh/file name
+// - ANNOTATION_ACTIVE_CHANGED: Current annotation changed (loaded from library, renamed, etc.)
+// Do NOT subscribe to:
+// - ANNOTATION_IMPORTED: This is for library auto-save, not UI updates
+// - LIBRARY_CHANGED: Library changes don't change the current working annotation
+// - STATE_LOADED: Use ANNOTATION_ACTIVE_CHANGED for UI updates instead
+eventBus.on(Events.ANNOTATION_ACTIVE_CHANGED, updateAnnotationLabel, 'main');
+eventBus.on(Events.MESH_LOADED, updateAnnotationLabel, 'main');
+
+// Click to open library panel
+annotationLabel.addEventListener('click', () => {
+    eventBus.emit(Events.SWITCH_PANEL, { panelId: 'libraryPanel' });
 });
 
 // Initialize UI components (file input, modal, sidebar resize, annotation tabs)

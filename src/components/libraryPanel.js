@@ -3,14 +3,14 @@
  * 
  * The library is the single source of truth for saved annotations and tags.
  * Users can manually save annotations using the "Save" button, and annotations
- * loaded from external sources (cloud, model) are auto-saved to the library.
+ * imported from external sources (cloud, model) are auto-saved to the library.
  * 
  * Features:
  * - Save current annotation to library
  * - Load annotations into the view
  * - Rename/delete saved annotations
  * - Assign GT/Pred tags for evaluation
- * - Auto-save annotations loaded from cloud/model sources
+ * - Auto-save annotations imported from cloud/model sources
  * 
  * ## Event Bus Integration
  * 
@@ -19,7 +19,10 @@
  * - `Events.LIBRARY_CLEARED` - Clears UI when library is cleared
  * - `Events.EVALUATION_GT_CHANGED` - Updates GT indicators
  * - `Events.EVALUATION_PRED_CHANGED` - Updates Pred indicators
- * - `Events.ANNOTATION_LOADED` - Auto-saves annotations loaded from external sources
+ * - `Events.ANNOTATION_IMPORTED` - Auto-saves annotations from external sources (cloud/model)
+ * 
+ * Emits:
+ * - `Events.ANNOTATION_ACTIVE_CHANGED` - When annotation is loaded from library or renamed
  * 
  * ## Memory Optimization
  * 
@@ -86,10 +89,10 @@ export class LibraryPanel {
             this.updateUI();
         }, 'libraryPanel');
         
-        // Listen to annotations loaded from external sources (cloud, model, import)
+        // Listen to annotations imported from external sources (cloud, model, import)
         // Auto-save them to the library for tracking and evaluation workflows
-        eventBus.on(Events.ANNOTATION_LOADED, (data) => {
-            this._handleAnnotationLoaded(data);
+        eventBus.on(Events.ANNOTATION_IMPORTED, (data) => {
+            this._handleAnnotationImported(data);
         }, 'libraryPanel');
         
         // Listen to mesh loaded/uploaded events to refresh UI
@@ -109,31 +112,34 @@ export class LibraryPanel {
     }
     
     /**
-     * Handle annotations loaded from external sources.
+     * Handle annotations imported from external sources.
      * Automatically saves them to the library and tracks cloud links if applicable.
      * 
-     * This allows loaded annotations to be:
+     * This allows imported annotations to be:
      * - Visible in the library panel
      * - Tagged as GT/Pred for evaluation
      * - Tracked for cloud sync status
      * 
+     * NOTE: This is only called for ANNOTATION_IMPORTED events (external sources).
+     * Library-sourced annotations do NOT trigger this - they emit ANNOTATION_ACTIVE_CHANGED instead.
+     * 
      * @param {Object} data - Event data
-     * @param {Annotation} data.annotation - The loaded annotation object
+     * @param {Annotation} data.annotation - The imported annotation object
      * @param {string} data.source - Source: 'cloud', 'model', or 'import'
      * @param {Object} [data.cloudInfo] - Cloud-specific info (if source is 'cloud')
      * @param {string} [data.cloudInfo.meshId] - Cloud mesh ID
      * @param {string} [data.cloudInfo.stateId] - Cloud state ID
      * @private
      */
-    _handleAnnotationLoaded(data) {
+    _handleAnnotationImported(data) {
         const { annotation, source, cloudInfo } = data;
         
         if (!annotation) {
-            console.warn('[LibraryPanel] Received ANNOTATION_LOADED without annotation object');
+            console.warn('[LibraryPanel] Received ANNOTATION_IMPORTED without annotation object');
             return;
         }
         
-        console.log(`[LibraryPanel] Auto-saving annotation from ${source}:`, annotation.name);
+        console.log(`[LibraryPanel] Auto-saving imported annotation from ${source}:`, annotation.name);
         
         // Check if this cloud annotation already exists in the library
         if (source === 'cloud' && cloudInfo?.stateId) {
@@ -212,6 +218,9 @@ export class LibraryPanel {
 
     /**
      * Save the current annotation to the library.
+     * 
+     * After saving, this updates the workingAnnotation to link it to the library
+     * entry and emits ANNOTATION_ACTIVE_CHANGED so the UI label reflects the new name.
      */
     saveCurrentAnnotation() {
         const annotation = this.meshView.getAnnotation();
@@ -225,8 +234,22 @@ export class LibraryPanel {
         const name = prompt('Enter a name for this annotation:', currentName);
         if (name === null) return; // Cancelled
         
-        annotation.name = name || currentName;
+        const finalName = name.trim() || currentName;
+        annotation.name = finalName;
         const id = this.library.save(annotation);
+        
+        // Update workingAnnotation to link to the library entry
+        // This ensures subsequent renames of this library entry affect the current annotation
+        if (this.meshView.workingAnnotation) {
+            this.meshView.workingAnnotation.id = id;
+            this.meshView.workingAnnotation.metadata.name = finalName;
+        }
+        
+        // Emit ANNOTATION_ACTIVE_CHANGED to update the UI label
+        eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
+            name: finalName,
+            source: 'library'
+        });
         
         // Link to current history state if applicable
         const currentIndex = this.meshView.history.getCurrentIndex();
@@ -252,6 +275,13 @@ export class LibraryPanel {
         // Apply the annotation state
         this.meshView._restoreEdgeState(annotation.edgeIndices);
         
+        // Update workingAnnotation metadata to reflect the loaded annotation
+        // This ensures getAnnotation() returns the correct name, source, etc.
+        if (this.meshView.workingAnnotation) {
+            this.meshView.workingAnnotation.metadata = { ...annotation.metadata };
+            this.meshView.workingAnnotation.id = annotation.id;
+        }
+        
         // Finish the operation
         this.meshView.finishDrawOperation();
         
@@ -260,6 +290,13 @@ export class LibraryPanel {
         if (autoSegments?.checked) {
             this.meshView.updateSegments();
         }
+        
+        // Emit ANNOTATION_ACTIVE_CHANGED to update UI (label, etc.)
+        // Note: We do NOT emit ANNOTATION_IMPORTED since this is already in the library
+        eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
+            name: annotation.name,
+            source: 'library'
+        });
     }
 
     /**
@@ -430,6 +467,16 @@ export class LibraryPanel {
             const newName = prompt('Enter new name:', annotation.name);
             if (newName !== null && newName.trim()) {
                 this.library.rename(id, newName.trim());
+                
+                // If renaming the currently loaded annotation, update workingAnnotation too
+                if (this.meshView.workingAnnotation?.id === id) {
+                    this.meshView.workingAnnotation.metadata.name = newName.trim();
+                    // Emit event to update the annotation label
+                    eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
+                        name: newName.trim(),
+                        source: 'library'
+                    });
+                }
             }
         });
         

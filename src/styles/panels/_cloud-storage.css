@@ -207,6 +207,16 @@
     opacity: 1;
 }
 
+/* Save to Library button - prominent styling */
+.mesh-item-actions .save-to-library-btn {
+    color: var(--primary);
+}
+
+.mesh-item-actions .save-to-library-btn:hover {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary);
+}
+
 /* Always show buttons on touch devices (tablets) */
 @media (pointer: coarse), (max-width: 1024px) {
     .mesh-item-actions .icon-btn {

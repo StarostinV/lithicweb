@@ -102,6 +102,12 @@
     color: white;
 }
 
+.tool-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .tool-btn-lg {
     padding: 16px 12px;
 }

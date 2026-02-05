@@ -269,6 +269,50 @@ body.sidebar-collapsed .floating-controls {
     transform: translateX(-50%);
 }
 
+/* Single-view Annotation Label */
+.annotation-label {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    border-radius: 8px;
+    border-left: 3px solid #6366f1;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 100;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 200px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.annotation-label:hover {
+    transform: scale(1.05);
+    background: rgba(0, 0, 0, 0.75);
+}
+
+.annotation-label i {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.annotation-label span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Hide annotation label when dual view is active */
+.canvas-container.dual-view-active .annotation-label {
+    display: none;
+}
+
 /* View labels */
 .dual-view-label {
     position: absolute;
@@ -353,6 +397,50 @@ body.sidebar-collapsed .canvas-container.dual-view-active ~ .floating-controls {
     border-left-color: #6366f1;
 }
 
+/* Clickable view labels for general mode */
+.dual-view-label-btn {
+    pointer-events: auto;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dual-view-label-btn:hover {
+    transform: scale(1.05);
+    background: rgba(0, 0, 0, 0.75);
+}
+
+.dual-view-label-btn i {
+    font-size: 12px;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+}
+
+.dual-view-label-btn.active {
+    border-left-color: #10b981;
+    background: rgba(16, 185, 129, 0.2);
+}
+
+.dual-view-label-btn.active i {
+    color: #10b981;
+    opacity: 1;
+}
+
+/* General mode specific styling */
+.canvas-container.dual-view-general .dual-view-label-left {
+    border-left-color: #6366f1;
+}
+
+.canvas-container.dual-view-general .dual-view-label-right {
+    border-left-color: #8b5cf6;
+}
+
+.canvas-container.dual-view-general .dual-view-label-btn.active {
+    border-left-color: #10b981;
+}
+
 /* Responsive adjustments for dual view */
 @media (max-width: 1024px) {
     .dual-view-label-right {
@@ -368,5 +456,9 @@ body.sidebar-collapsed .canvas-container.dual-view-active ~ .floating-controls {
     
     .dual-view-label-right {
         right: 16px;
+    }
+    
+    .dual-view-label-btn i {
+        font-size: 10px;
     }
 }

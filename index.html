@@ -188,6 +188,10 @@
     <!-- Main Canvas Area -->
     <div class="canvas-container">
         <canvas id="renderCanvas"></canvas>
+        <!-- Annotation Label (single-view mode - hidden in dual-view) -->
+        <div id="annotationLabel" class="annotation-label" title="Click to open Annotation Library">
+            <i class="fas fa-tag"></i> <span id="annotationLabelText">Untitled</span>
+        </div>
     </div>
 
     <!-- Mode Indicator (clickable: toggles between view and previous tool) -->
@@ -336,6 +340,30 @@
                             </label>
                             <span>Show rotation controls</span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Dual View Section -->
+                <div class="panel-section dual-view-section">
+                    <div class="section-header">
+                        <i class="fas fa-columns"></i>
+                        <span>Dual View</span>
+                    </div>
+                    <div class="section-content">
+                        <!-- Toggle Button -->
+                        <div id="renderDualViewToggle" class="dual-view-toggle-row" title="Enable side-by-side dual view">
+                            <div class="dual-view-toggle-content">
+                                <span class="dual-view-toggle-label">
+                                    <i class="fas fa-columns"></i> Dual View Mode
+                                </span>
+                                <span class="dual-view-toggle-hint">View mesh from two angles side-by-side</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="renderDualViewEnabled">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <p class="help-text">Click on a view to make it active. The active view receives all interactions.</p>
                     </div>
                 </div>
 

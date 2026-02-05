@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { eventBus, Events } from '../utils/EventBus.js';
+import { DUAL_VIEW_MODES } from './DualViewManager.js';
 
 /**
  * RenderingPanel - Manages rendering controls for publication-ready visualization.
@@ -76,6 +77,9 @@ export class RenderingPanel {
         this.meshView = meshView;
         this.userConfig = userConfig;
         
+        // DualViewManager reference (set via setDualViewManager)
+        this.dualViewManager = null;
+        
         // Load from userConfig or use defaults
         const renderingConfig = userConfig?.getSection('rendering') || {};
         const lightingConfig = userConfig?.getSection('lighting') || {};
@@ -107,6 +111,7 @@ export class RenderingPanel {
         // Initialize UI controls
         this.initControls();
         this.initLightingControls();
+        this.initDualViewControls();
         this.createEnvironmentMap();
         
         // Apply loaded settings to scene (background, lighting)
@@ -114,6 +119,14 @@ export class RenderingPanel {
         
         // Subscribe to EventBus events
         this._setupEventBusSubscriptions();
+    }
+    
+    /**
+     * Set the DualViewManager reference.
+     * @param {DualViewManager} dualViewManager - The dual view manager
+     */
+    setDualViewManager(dualViewManager) {
+        this.dualViewManager = dualViewManager;
     }
     
     // ========================================
@@ -546,6 +559,92 @@ export class RenderingPanel {
                 this.syncLightingUIFromScene();
                 this.saveLightingConfig();
             });
+        }
+    }
+    
+    /**
+     * Initialize dual view controls.
+     * @private
+     */
+    initDualViewControls() {
+        // Dual View Toggle
+        this.dualViewToggle = document.getElementById('renderDualViewToggle');
+        this.dualViewEnabled = document.getElementById('renderDualViewEnabled');
+        
+        // Handle toggle row click
+        this.dualViewToggle?.addEventListener('click', (e) => {
+            const toggleSwitch = this.dualViewToggle.querySelector('.toggle-switch');
+            const isOnToggleSwitch = toggleSwitch && (toggleSwitch.contains(e.target) || e.target === toggleSwitch);
+            
+            // Only toggle if clicking outside the toggle-switch area
+            if (!isOnToggleSwitch && this.dualViewEnabled) {
+                this.dualViewEnabled.checked = !this.dualViewEnabled.checked;
+                this._toggleDualView();
+            }
+        });
+        
+        // Handle checkbox change directly
+        this.dualViewEnabled?.addEventListener('change', () => {
+            this._toggleDualView();
+        });
+        
+        // Listen to dual view changes from other sources (e.g., evaluation panel)
+        eventBus.on(Events.DUAL_VIEW_CHANGED, (data) => {
+            this._onDualViewChanged(data);
+        }, EVENTBUS_NAMESPACE);
+    }
+    
+    /**
+     * Toggle dual view mode on/off.
+     * @private
+     */
+    _toggleDualView() {
+        if (!this.dualViewManager) {
+            console.warn('[RenderingPanel] DualViewManager not set');
+            return;
+        }
+        
+        const enabled = this.dualViewEnabled?.checked || false;
+        
+        if (enabled) {
+            // Check if mesh is loaded
+            if (this.meshView.isNull()) {
+                alert('Please load a mesh first before enabling dual view.');
+                if (this.dualViewEnabled) {
+                    this.dualViewEnabled.checked = false;
+                }
+                return;
+            }
+            
+            this.dualViewManager.enable(DUAL_VIEW_MODES.GENERAL);
+            this.dualViewToggle?.classList.add('active');
+        } else {
+            this.dualViewManager.disable();
+            this.dualViewToggle?.classList.remove('active');
+        }
+    }
+    
+    /**
+     * Handle dual view changed event from EventBus.
+     * Updates UI state to match external changes.
+     * @private
+     * @param {Object} data - Event data
+     */
+    _onDualViewChanged(data) {
+        // Only sync checkbox if it's a general mode change or disable
+        const isGeneralMode = data.mode === DUAL_VIEW_MODES.GENERAL;
+        
+        if (this.dualViewEnabled) {
+            // Only sync checkbox if it's a general mode change or disable
+            if (!data.enabled || isGeneralMode) {
+                this.dualViewEnabled.checked = data.enabled && isGeneralMode;
+            }
+        }
+        
+        if (data.enabled && isGeneralMode) {
+            this.dualViewToggle?.classList.add('active');
+        } else {
+            this.dualViewToggle?.classList.remove('active');
         }
     }
     

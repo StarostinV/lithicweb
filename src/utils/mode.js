@@ -10,6 +10,19 @@ export const MODES = Object.freeze({
     RIDGE: 'ridge'
 });
 
+/**
+ * Drawing/annotation modes that require single-view rendering.
+ * These are disabled when dual view mode is active.
+ */
+const DRAWING_MODES = new Set([
+    MODES.DRAW,
+    MODES.ERASE,
+    MODES.ARROW,
+    MODES.DELETEARROWS,
+    MODES.DRAWLINES,
+    MODES.RIDGE
+]);
+
 // Mode display names for the UI indicator
 const MODE_LABELS = {
     [MODES.VIEW]: { label: 'View', icon: 'fa-eye', color: '#6366f1' },
@@ -56,12 +69,14 @@ export class Mode {
         this.showGizmo = true;  // User preference for gizmo visibility
         this.modeChangeListeners = [];  // Listeners for mode changes
         this.transformMode = 'rotate';  // 'rotate' or 'translate'
+        this.dualViewActive = false;  // Track if dual view is active (blocks drawing modes)
 
         this.handleModeSwitch = this.handleModeSwitch.bind(this);
         this.setMode = this.setMode.bind(this);
         this.toPreviousMode = this.toPreviousMode.bind(this);
         this._onKeyDown = this._onKeyDown.bind(this);
         this._onKeyUp = this._onKeyUp.bind(this);
+        this._onDualViewChanged = this._onDualViewChanged.bind(this);
 
         // Add event listeners to mode buttons (if they exist)
         ['view', 'draw', 'drawLines', 'erase', 'arrow', 'deleteArrows'].forEach(modeType => {
@@ -90,6 +105,9 @@ export class Mode {
 
         window.addEventListener('keydown', this._onKeyDown);
         window.addEventListener('keyup', this._onKeyUp);
+        
+        // Listen for dual view changes to disable drawing modes
+        eventBus.on(Events.DUAL_VIEW_CHANGED, this._onDualViewChanged);
         
         // Make mode indicator clickable - toggle between view and previous tool
         const modeIndicator = document.getElementById('modeIndicator');
@@ -178,6 +196,47 @@ export class Mode {
     }
     
     /**
+     * Handle dual view state changes.
+     * Forces VIEW mode when dual view is enabled since drawing requires single-view coordinates.
+     * @private
+     */
+    _onDualViewChanged(data) {
+        this.dualViewActive = data.enabled;
+        
+        if (data.enabled && DRAWING_MODES.has(this.currentMode)) {
+            // Force switch to VIEW mode when dual view is enabled
+            this.setMode(MODES.VIEW, true);
+        }
+        
+        // Update UI to reflect tool availability
+        this._updateDrawingToolsAvailability();
+    }
+    
+    /**
+     * Updates the visual state of drawing tool buttons based on dual view state.
+     * Disables drawing tools when dual view is active.
+     * @private
+     */
+    _updateDrawingToolsAvailability() {
+        const toolButtons = document.querySelectorAll('.tool-btn');
+        toolButtons.forEach(btn => {
+            // Check if this button triggers a drawing mode
+            const modeId = btn.id.replace('Mode', '');
+            const isDrawingTool = DRAWING_MODES.has(modeId);
+            
+            if (isDrawingTool) {
+                if (this.dualViewActive) {
+                    btn.classList.add('disabled');
+                    btn.setAttribute('title', 'Drawing tools are disabled in dual view mode');
+                } else {
+                    btn.classList.remove('disabled');
+                    btn.removeAttribute('title');
+                }
+            }
+        });
+    }
+    
+    /**
      * Sets the gizmo transform mode.
      * @private
      */
@@ -191,6 +250,13 @@ export class Mode {
         if (!Object.values(MODES).includes(mode)) {
             throw new Error(`Invalid mode: ${mode}`);
         }
+        
+        // Block drawing modes when dual view is active
+        if (this.dualViewActive && DRAWING_MODES.has(mode)) {
+            console.warn(`Mode '${mode}' is disabled while dual view is active`);
+            return;
+        }
+        
         if (rewritePrevious) {
             this.previousMode = mode;
         } else {

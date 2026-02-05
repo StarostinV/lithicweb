@@ -149,23 +149,22 @@ export class HistoryPanel {
     createInitialStateItem(stateIndex, isCurrent) {
         const item = document.createElement('div');
         
-        item.className = `text-xs p-2 rounded mb-1 cursor-pointer transition-all ${
-            isCurrent 
-                ? 'bg-blue-500 text-white border-2 border-blue-700 shadow-md' 
-                : 'bg-white border border-gray-300 hover:bg-blue-50 hover:border-blue-300'
-        }`;
+        item.className = `history-item ${isCurrent ? 'current' : ''}`;
         
         // Get initial state edge count
         const initialEdgeCount = this.meshView.initialState ? this.meshView.initialState.size : 0;
         const edgeText = initialEdgeCount === 0 ? 'No annotations' : 'Loaded state';
         
         item.innerHTML = `
-            <div class="flex justify-between items-center">
-                <div class="flex-1">
-                    <div class="font-semibold"><i class="fas fa-circle"></i> Initial State</div>
-                    <div class="${isCurrent ? 'text-blue-100' : 'text-gray-500'}">${edgeText} | ${initialEdgeCount} edges</div>
+            <div class="history-item-content">
+                <div class="history-item-header">
+                    <span class="history-item-name"><i class="fas fa-circle"></i> Initial State</span>
+                    ${isCurrent ? '<i class="fas fa-check-circle history-item-indicator"></i>' : ''}
                 </div>
-                ${isCurrent ? '<i class="fas fa-check-circle text-white"></i>' : ''}
+                <div class="history-item-meta">
+                    <span>${edgeText}</span>
+                    <span>${initialEdgeCount} edges</span>
+                </div>
             </div>
         `;
         
@@ -184,11 +183,7 @@ export class HistoryPanel {
         const item = document.createElement('div');
         const hasLibraryLink = !!action.libraryId;
         
-        item.className = `text-xs p-2 rounded mb-1 cursor-pointer transition-all ${
-            isCurrent 
-                ? 'bg-blue-500 text-white border-2 border-blue-700 shadow-md' 
-                : 'bg-white border border-gray-300 hover:bg-blue-50 hover:border-blue-300'
-        }`;
+        item.className = `history-item ${isCurrent ? 'current' : ''}`;
         
         const timestamp = new Date(action.timestamp).toLocaleTimeString();
         // Support both new (annotation) and legacy (newState) formats
@@ -196,11 +191,11 @@ export class HistoryPanel {
             ? action.annotation.edgeCount 
             : (action.newState ? action.newState.size : 0);
         
-        let icon = '<i class="fas fa-pen"></i>';
+        let icon = '<i class="fas fa-pen text-gray-500"></i>';
         if (action.type === 'erase') {
-            icon = '<i class="fas fa-eraser"></i>';
+            icon = '<i class="fas fa-eraser text-gray-500"></i>';
         } else if (action.type === 'model') {
-            icon = '<i class="fas fa-brain text-purple-600"></i>';
+            icon = '<i class="fas fa-brain text-purple-500"></i>';
         } else if (action.type === 'cloud') {
             icon = '<i class="fas fa-cloud-download-alt text-blue-500"></i>';
         } else if (action.type === 'library-load') {
@@ -208,15 +203,18 @@ export class HistoryPanel {
         }
         
         const displayName = escapeHtml(action.customDescription || action.description || action.type);
-        const libraryIcon = hasLibraryLink ? '<i class="fas fa-bookmark text-amber-500 ml-1" title="Saved to library"></i>' : '';
+        const libraryIcon = hasLibraryLink ? '<i class="fas fa-bookmark text-amber-500" title="Saved to library"></i>' : '';
         
         item.innerHTML = `
-            <div class="flex justify-between items-center">
-                <div class="flex-1">
-                    <div class="font-semibold">${icon} ${displayName}${libraryIcon}</div>
-                    <div class="${isCurrent ? 'text-blue-100' : 'text-gray-500'}">${escapeHtml(timestamp)} | ${edgeCount} edges</div>
+            <div class="history-item-content">
+                <div class="history-item-header">
+                    <span class="history-item-name">${icon} ${displayName}${libraryIcon}</span>
+                    ${isCurrent ? '<i class="fas fa-check-circle history-item-indicator"></i>' : ''}
                 </div>
-                ${isCurrent ? '<i class="fas fa-check-circle text-white"></i>' : ''}
+                <div class="history-item-meta">
+                    <span>${escapeHtml(timestamp)}</span>
+                    <span>${edgeCount} edges</span>
+                </div>
             </div>
         `;
         

@@ -83,73 +83,91 @@
     margin: 4px 0;
 }
 
-/* History Item */
+/* History Item - Unified with Library Panel styling */
 .history-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px 12px;
     background: white;
     border: 1px solid var(--gray-200);
     border-radius: 8px;
     margin-bottom: 8px;
-    cursor: pointer;
     transition: all 0.15s;
+    overflow: hidden;
 }
 
 .history-item:hover {
     border-color: var(--primary-light);
-    background: var(--gray-50);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .history-item.current {
     border-color: var(--primary);
-    background: rgba(99, 102, 241, 0.05);
+    background: rgba(99, 102, 241, 0.02);
 }
 
 .history-item.future {
     opacity: 0.5;
 }
 
-.history-item-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    background: var(--gray-100);
-    color: var(--gray-500);
-    flex-shrink: 0;
-}
-
-.history-item.current .history-item-icon {
-    background: var(--primary);
-    color: white;
-}
-
 .history-item-content {
-    flex: 1;
-    min-width: 0;
+    padding: 10px 12px;
+    cursor: pointer;
 }
 
-.history-item-title {
+.history-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.history-item-name {
     font-size: 12px;
     font-weight: 500;
     color: var(--gray-800);
-    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.history-item-name i {
+    flex-shrink: 0;
+}
+
+.history-item.current .history-item-name {
+    color: var(--primary);
+}
+
+.history-item-indicator {
+    color: var(--primary);
+    flex-shrink: 0;
 }
 
 .history-item-meta {
+    display: flex;
+    gap: 12px;
     font-size: 10px;
     color: var(--gray-500);
 }
 
-.history-item-time {
-    font-size: 10px;
-    color: var(--gray-400);
-    flex-shrink: 0;
+/* Source icons in history items */
+.history-item .text-purple-500 {
+    color: #8b5cf6;
+}
+
+.history-item .text-blue-500 {
+    color: #3b82f6;
+}
+
+.history-item .text-amber-500 {
+    color: #f59e0b;
+}
+
+.history-item .text-gray-500 {
+    color: #6b7280;
 }
 
 /* Evaluation Labels on History Items */

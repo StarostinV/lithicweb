@@ -8,7 +8,8 @@
  * - `Events.CONNECTION_CHANGED` - Updates UI when connection status changes
  * 
  * Emits:
- * - `Events.ANNOTATION_LOADED` - When model inference results are applied (for library auto-save)
+ * - `Events.ANNOTATION_IMPORTED` - When model inference results are applied (for library auto-save)
+ * - `Events.ANNOTATION_ACTIVE_CHANGED` - When inference results are applied (for UI updates)
  * 
  * ## Memory Optimization
  * 
@@ -433,7 +434,8 @@ export class ModelPanel {
 
     /**
      * Apply inference results to the mesh view.
-     * Creates an Annotation and emits ANNOTATION_LOADED for library auto-save.
+     * Creates an Annotation and emits ANNOTATION_IMPORTED for library auto-save,
+     * and ANNOTATION_ACTIVE_CHANGED for UI updates.
      * 
      * @param {Object} result - Inference result from server
      * @param {Array<number>} result.labels - Edge labels (0 or 1)
@@ -497,19 +499,32 @@ export class ModelPanel {
         this.meshView.setCurrentStateMetadata('inference', inferenceMetadata);
         
         // Create Annotation object from inference results for library auto-save
+        const annotationMetadata = {
+            name: `Model Prediction ${new Date().toLocaleString()}`,
+            source: 'model',
+            config: { ...this.config }  // Include model config for reproducibility
+        };
+        
         const annotation = new Annotation({
             edgeIndices: edgeIndices,
             arrows: [],
-            metadata: {
-                name: `Model Prediction ${new Date().toLocaleString()}`,
-                source: 'model',
-                config: { ...this.config }  // Include model config for reproducibility
-            }
+            metadata: annotationMetadata
         });
         
-        // Emit ANNOTATION_LOADED for library auto-save
-        eventBus.emit(Events.ANNOTATION_LOADED, {
+        // Update workingAnnotation metadata so getAnnotation() returns correct name
+        if (this.meshView.workingAnnotation) {
+            Object.assign(this.meshView.workingAnnotation.metadata, annotationMetadata);
+        }
+        
+        // Emit ANNOTATION_IMPORTED for library auto-save
+        eventBus.emit(Events.ANNOTATION_IMPORTED, {
             annotation: annotation,
+            source: 'model'
+        });
+        
+        // Emit ANNOTATION_ACTIVE_CHANGED for UI updates (label, etc.)
+        eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
+            name: annotation.name,
             source: 'model'
         });
         

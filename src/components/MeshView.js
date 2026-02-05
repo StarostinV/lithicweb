@@ -194,8 +194,9 @@ export class MeshView {
      * @param {Uint8Array|Array} labels - Edge labels (1 = edge, 0 = not edge)
      * @param {Array} indices - Face indices
      * @param {Object} [metadata={}] - Mesh-level metadata
+     * @param {Object} [annotationOptions={}] - Annotation options (name, source, etc.)
      */
-    setMesh(positions, labels, indices, metadata = {}) {
+    setMesh(positions, labels, indices, metadata = {}, annotationOptions = {}) {
         const vertexCount = positions.length / 3;
         let edgeLabels = labels;
 
@@ -216,8 +217,8 @@ export class MeshView {
         }
         this.initialState = new Set(this.currentEdgeIndices);
         
-        // Create initial annotation and clear history
-        this.workingAnnotation = Annotation.fromEdgeLabels(this.edgeLabels, [], {});
+        // Create initial annotation with provided options (name, source, etc.)
+        this.workingAnnotation = Annotation.fromEdgeLabels(this.edgeLabels, [], annotationOptions);
         this.history.clear();
         this.history.setInitialAnnotation(this.workingAnnotation);
 

@@ -20,8 +20,8 @@ import { Annotation } from '../geometry/Annotation.js';
  * - `Events.LIBRARY_CHANGED` - When library changes (save, delete, rename, update, cloud_linked)
  * - `Events.LIBRARY_CLEARED` - When library is cleared
  * 
- * The LibraryPanel subscribes to `Events.ANNOTATION_LOADED` (from cloud/model sources)
- * and automatically saves loaded annotations to this library.
+ * The LibraryPanel subscribes to `Events.ANNOTATION_IMPORTED` (from cloud/model sources)
+ * and automatically saves imported annotations to this library.
  * 
  * ## Memory Optimization
  * 

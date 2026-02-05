@@ -81,6 +81,14 @@ export function combineMetadata(meshMetadata, annotationMetadata) {
  * - `Events.MESH_LOADED` - When a mesh is loaded from a local file
  *   Data: { source: 'file', filename: string, metadata: object }
  * 
+ * - `Events.ANNOTATION_IMPORTED` - When a PLY file contains annotations (non-empty labels)
+ *   This triggers auto-save to the library.
+ *   Data: { annotation: Annotation, source: 'file' }
+ * 
+ * - `Events.ANNOTATION_ACTIVE_CHANGED` - When a PLY file with annotations is loaded
+ *   This updates the UI label to show the annotation name.
+ *   Data: { name: string, source: 'file' }
+ * 
  * @example
  * // Subscribe to mesh load events
  * import { eventBus, Events } from '../utils/EventBus.js';
@@ -267,11 +275,23 @@ export default class MeshLoader {
                 this.metadata = metadata || {};
                 this.comments = comments || [];
             
-                this.meshView.setMesh(positions, labels, indices, this.metadata);
+                // Extract annotation name from PLY metadata if available, otherwise use filename
+                // Check both 'annotation-metadata' (new format) and 'state-metadata' (legacy)
+                const annotationMetadata = this.metadata['annotation-metadata'] || this.metadata['state-metadata'];
+                const annotationName = annotationMetadata?.name || this.currentFileName;
+                
+                // Pass annotation options with the resolved name
+                const annotationOptions = {
+                    name: annotationName,
+                    source: 'file',
+                    // Include any annotation-specific metadata from the file
+                    ...(annotationMetadata || {})
+                };
+                this.meshView.setMesh(positions, labels, indices, this.metadata, annotationOptions);
                 this.arrowDrawer.clear();
                 this.arrowDrawer.load(arrows);
                 
-                // Apply state-metadata to initial state if present in loaded metadata
+                // Apply state-metadata to initial state if present in loaded metadata (for history tracking)
                 if (this.metadata['state-metadata']) {
                     this.meshView.history.updateStateMetadata(0, this.metadata['state-metadata']);
                     delete this.metadata['state-metadata'];
@@ -279,6 +299,29 @@ export default class MeshLoader {
                 
                 // Emit MESH_LOADED event for other components
                 this._emitMeshLoaded();
+                
+                // If the loaded file has annotations (non-empty labels), emit annotation events
+                // This ensures annotations from files are auto-saved to the library and the UI updates
+                const hasAnnotations = labels && labels.length > 0 && 
+                    Array.from(labels).some(label => label !== 0);
+                
+                if (hasAnnotations) {
+                    // Get the current annotation from meshView (now populated with correct metadata)
+                    const annotation = this.meshView.getAnnotation();
+                    
+                    // Emit ANNOTATION_IMPORTED for library auto-save
+                    eventBus.emit(Events.ANNOTATION_IMPORTED, {
+                        annotation: annotation,
+                        source: 'file'
+                    });
+                    
+                    // Emit ANNOTATION_ACTIVE_CHANGED for UI label update
+                    eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
+                        name: annotation.name,
+                        source: 'file'
+                    });
+                }
+                
                 resolve();
             };
             

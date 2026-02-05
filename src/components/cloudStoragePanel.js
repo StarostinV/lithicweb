@@ -35,7 +35,8 @@
  * - `Events.MESH_UPLOADED` - When a mesh is uploaded to cloud storage
  * - `Events.STATE_SAVED` - When an annotation state is saved to cloud
  * - `Events.STATE_LOADED` - When an annotation state is loaded from cloud (cloud-specific)
- * - `Events.ANNOTATION_LOADED` - When an annotation is loaded (with Annotation object for library)
+ * - `Events.ANNOTATION_IMPORTED` - When annotation is loaded from cloud (for library auto-save)
+ * - `Events.ANNOTATION_ACTIVE_CHANGED` - When annotation is applied to view (for UI updates)
  * 
  * ## Memory Optimization
  * 
@@ -422,6 +423,12 @@ export class CloudStoragePanel {
                 this.toggleMeshExpanded(meshId);
             });
             
+            // Save to library button
+            item.querySelector('.save-to-library-btn')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.saveToLibrary(meshId);
+            });
+            
             // Load mesh button
             item.querySelector('.load-mesh-btn')?.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -451,6 +458,7 @@ export class CloudStoragePanel {
         const sizeKB = (mesh.size_bytes / 1024).toFixed(0);
         const sizeMB = (mesh.size_bytes / (1024 * 1024)).toFixed(1);
         const sizeStr = mesh.size_bytes > 1024 * 1024 ? `${sizeMB} MB` : `${sizeKB} KB`;
+        const hasAnnotations = mesh.state_count > 0;
         
         return `
             <div class="cloud-mesh-item ${isExpanded ? 'expanded' : ''} ${isCurrentMesh ? 'current' : ''}" data-mesh-id="${mesh.filename}">
@@ -463,9 +471,12 @@ export class CloudStoragePanel {
                         <div class="mesh-item-meta">
                             ${mesh.num_vertices.toLocaleString()} vertices · ${sizeStr} · ${date}
                         </div>
-                        ${mesh.state_count > 0 ? `<div class="mesh-item-meta"><span class="state-count">${mesh.state_count} annotation(s)</span></div>` : ''}
+                        ${hasAnnotations ? `<div class="mesh-item-meta"><span class="state-count">${mesh.state_count} annotation(s)</span></div>` : ''}
                     </div>
                     <div class="mesh-item-actions">
+                        <button class="icon-btn save-to-library-btn" title="Save mesh & annotations to library">
+                            <i class="fas fa-bookmark"></i>
+                        </button>
                         <button class="icon-btn load-mesh-btn" title="Load mesh">
                             <i class="fas fa-download"></i>
                         </button>
@@ -895,7 +906,8 @@ export class CloudStoragePanel {
      * 
      * After loading, emits:
      * - `Events.STATE_LOADED` - for cloud-specific tracking
-     * - `Events.ANNOTATION_LOADED` - for library auto-save and other components
+     * - `Events.ANNOTATION_IMPORTED` - for library auto-save
+     * - `Events.ANNOTATION_ACTIVE_CHANGED` - for UI updates (label, etc.)
      */
     async loadState(meshId, stateId) {
         // Check if the correct mesh is loaded
@@ -940,15 +952,20 @@ export class CloudStoragePanel {
                 metadata: stateData.metadata
             });
             
-            // Emit ANNOTATION_LOADED for library auto-save and other components
-            // The annotation object is passed so subscribers don't need to re-fetch or reconstruct
-            eventBus.emit(Events.ANNOTATION_LOADED, {
+            // Emit ANNOTATION_IMPORTED for library auto-save
+            eventBus.emit(Events.ANNOTATION_IMPORTED, {
                 annotation: annotation,
                 source: 'cloud',
                 cloudInfo: {
                     meshId: meshId,
                     stateId: stateId
                 }
+            });
+            
+            // Emit ANNOTATION_ACTIVE_CHANGED for UI updates (label, etc.)
+            eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
+                name: annotation.name,
+                source: 'cloud'
             });
         } catch (e) {
             console.error('[CloudStorage] Load state failed:', e);
@@ -958,6 +975,90 @@ export class CloudStoragePanel {
         }
     }
     
+    /**
+     * Save a cloud mesh and all its annotations to the local library.
+     * This downloads the mesh, loads all its annotations, saves them to the library,
+     * and switches to the library panel for seamless workflow.
+     * 
+     * @param {string} meshId - The cloud mesh ID to save to library
+     */
+    async saveToLibrary(meshId) {
+        if (!lithicClient.isConfigured()) {
+            this.setStatus('Not connected to server', 'error');
+            return;
+        }
+        
+        const mesh = this.meshes.find(m => m.filename === meshId);
+        if (!mesh) {
+            this.setStatus('Mesh not found', 'error');
+            return;
+        }
+        
+        const meshName = mesh.original_name || meshId;
+        
+        this.setLoading(true);
+        this.setStatus(`Saving "${meshName}" to library...`, 'info');
+        
+        try {
+            // Step 1: Load the mesh into the viewer
+            await this.loadMesh(meshId);
+            
+            // Verify mesh loaded successfully
+            if (this.cloudMeshInfo?.meshId !== meshId) {
+                throw new Error('Failed to load mesh');
+            }
+            
+            // Step 2: Fetch all annotations for this mesh
+            const statesResponse = await lithicClient.listStates(meshId);
+            const states = statesResponse.states || [];
+            
+            console.log(`[CloudStorage] Saving ${states.length} annotations to library for mesh: ${meshName}`);
+            
+            // Step 3: Load and save each annotation to the library
+            let savedCount = 0;
+            for (const state of states) {
+                try {
+                    // Fetch the full state data
+                    const stateData = await lithicClient.loadState(meshId, state.state_id);
+                    
+                    // Create annotation object
+                    const annotation = this._createAnnotationFromCloudState(stateData, state.state_id);
+                    
+                    // Emit ANNOTATION_IMPORTED to auto-save to library
+                    // Note: We do NOT emit ANNOTATION_ACTIVE_CHANGED here because
+                    // these annotations are being saved to library, not applied to the view
+                    eventBus.emit(Events.ANNOTATION_IMPORTED, {
+                        annotation: annotation,
+                        source: 'cloud',
+                        cloudInfo: {
+                            meshId: meshId,
+                            stateId: state.state_id
+                        }
+                    });
+                    
+                    savedCount++;
+                } catch (e) {
+                    console.warn(`[CloudStorage] Failed to load annotation ${state.state_id}:`, e);
+                }
+            }
+            
+            // Step 4: Update status and switch to library panel
+            const annotationMsg = savedCount > 0 
+                ? ` with ${savedCount} annotation${savedCount !== 1 ? 's' : ''}`
+                : '';
+            this.setStatus(`Saved "${meshName}"${annotationMsg} to library!`, 'success');
+            
+            // Step 5: Switch to the library panel
+            eventBus.emit(Events.SWITCH_PANEL, { panelId: 'libraryPanel' });
+            
+        } catch (e) {
+            console.error('[CloudStorage] Save to library failed:', e);
+            this.setStatus('Failed to save to library: ' + e.message, 'error');
+        } finally {
+            this.setLoading(false);
+        }
+    }
+
     /**
      * Create an Annotation object from cloud state data.
      * This creates a lightweight, serializable annotation for use by the library and other components.
@@ -1026,10 +1127,15 @@ export class CloudStoragePanel {
         // Finish draw operation
         this.meshView.finishDrawOperation();
         
-        // Apply loaded annotation metadata to the current state
+        // Apply loaded annotation metadata to the current state and workingAnnotation
         if (stateData.metadata && typeof stateData.metadata === 'object') {
             console.log('[CloudStorage] Applying annotation metadata:', stateData.metadata);
             this.meshView.updateCurrentStateMetadata(stateData.metadata);
+            
+            // Also update workingAnnotation metadata so getAnnotation() returns correct name
+            if (this.meshView.workingAnnotation) {
+                Object.assign(this.meshView.workingAnnotation.metadata, stateData.metadata);
+            }
         }
         
         // Update segments if auto-segmentation is enabled

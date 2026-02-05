@@ -22,6 +22,7 @@
 
 import { summarizeMetrics } from '../evaluation/MetricsComputer.js';
 import { eventBus, Events } from '../utils/EventBus.js';
+import { DUAL_VIEW_MODES } from './DualViewManager.js';
 import { 
     MatchedVisualization, 
     OverSegVisualization, 
@@ -102,10 +103,17 @@ export class EvaluationPanel {
         
         // Listen to dual view changes (in case it's toggled externally)
         eventBus.on(Events.DUAL_VIEW_CHANGED, (data) => {
+            // Only update UI if this is evaluation mode or if disabling
+            const isEvaluationMode = data.mode === DUAL_VIEW_MODES.EVALUATION;
+            
             if (this.dualViewEnabled) {
-                this.dualViewEnabled.checked = data.enabled;
+                // Only sync checkbox if it's an evaluation mode change or disable
+                if (!data.enabled || isEvaluationMode) {
+                    this.dualViewEnabled.checked = data.enabled && isEvaluationMode;
+                }
             }
-            if (data.enabled) {
+            
+            if (data.enabled && isEvaluationMode) {
                 this.dualViewToggle?.classList.add('active');
                 this.dualViewControls?.classList.add('visible');
             } else {
@@ -314,7 +322,7 @@ export class EvaluationPanel {
                 return;
             }
             
-            this.dualViewManager.enable();
+            this.dualViewManager.enable(DUAL_VIEW_MODES.EVALUATION);
             this.dualViewToggle?.classList.add('active');
             this.dualViewControls?.classList.add('visible');
             
