@@ -60,6 +60,17 @@ const MODE_LABELS = {
  * });
  * ```
  */
+/**
+ * Drawing modes that support the erase toggle button.
+ * When in these modes, the erase toggle button is visible.
+ */
+const ERASE_TOGGLE_MODES = new Set([
+    MODES.DRAW,
+    MODES.RIDGE,
+    MODES.DRAWLINES,
+    MODES.ERASE
+]);
+
 export class Mode {
     constructor(scene) {
         this.scene = scene;
@@ -70,6 +81,7 @@ export class Mode {
         this.modeChangeListeners = [];  // Listeners for mode changes
         this.transformMode = 'rotate';  // 'rotate' or 'translate'
         this.dualViewActive = false;  // Track if dual view is active (blocks drawing modes)
+        this.lastDrawMode = MODES.DRAW;  // Track last draw mode for erase toggle
 
         this.handleModeSwitch = this.handleModeSwitch.bind(this);
         this.setMode = this.setMode.bind(this);
@@ -136,6 +148,14 @@ export class Mode {
             });
         }
         
+        // Make erase toggle indicator clickable - toggle between draw modes and erase
+        const eraseToggleIndicator = document.getElementById('eraseToggleIndicator');
+        if (eraseToggleIndicator) {
+            eraseToggleIndicator.addEventListener('click', () => {
+                this.toggleEraseMode();
+            });
+        }
+        
         // Initialize UI state to match default mode (VIEW)
         this.update();
     }
@@ -158,6 +178,24 @@ export class Mode {
             this.transformMode = mode;
             this._setGizmoMode(mode);
             this.updateTransformModeIndicator();
+        }
+    }
+    
+    /**
+     * Toggles between erase mode and the last draw mode.
+     * If in a draw mode (DRAW, RIDGE, DRAWLINES), switches to ERASE.
+     * If in ERASE mode, switches back to the last draw mode.
+     */
+    toggleEraseMode() {
+        if (this.currentMode === MODES.ERASE) {
+            // Switch back to last draw mode
+            this.setMode(this.lastDrawMode, true);
+        } else if (this.currentMode === MODES.DRAW || 
+                   this.currentMode === MODES.RIDGE || 
+                   this.currentMode === MODES.DRAWLINES) {
+            // Remember this draw mode and switch to erase
+            this.lastDrawMode = this.currentMode;
+            this.setMode(MODES.ERASE, true);
         }
     }
     
@@ -262,6 +300,12 @@ export class Mode {
         } else {
             this.previousMode = this.currentMode;
         }
+        
+        // Track last draw mode for erase toggle
+        if (mode === MODES.DRAW || mode === MODES.RIDGE || mode === MODES.DRAWLINES) {
+            this.lastDrawMode = mode;
+        }
+        
         this.currentMode = mode;
 
         this.update();
@@ -317,6 +361,7 @@ export class Mode {
         this.updateToolButtonStates();
         this.updateModeIndicator();
         this.updateTransformModeIndicator();
+        this.updateEraseToggleIndicator();
         // Note: Nav button highlighting is now handled by setActiveNavBtn in main.js
         // Mode changes no longer affect which tab appears active
     }
@@ -387,6 +432,51 @@ export class Mode {
         } else {
             indicator.innerHTML = `<i class="fas fa-arrows-alt"></i> Move`;
             indicator.classList.add('move-mode');
+        }
+    }
+    
+    /**
+     * Updates the erase toggle indicator visibility and content.
+     * Visible in draw modes (DRAW, RIDGE, DRAWLINES) and ERASE mode.
+     * Shows "→ Erase" when in draw mode, shows "→ Draw/Ridge/Lines" when in erase mode.
+     * The arrow makes it clear this is an action button showing what you'll switch TO.
+     */
+    updateEraseToggleIndicator() {
+        const indicator = document.getElementById('eraseToggleIndicator');
+        if (!indicator) return;
+        
+        // Remove all mode classes
+        indicator.classList.remove('draw-mode', 'ridge-mode', 'lines-mode');
+        
+        // Show only in draw modes and erase mode
+        if (ERASE_TOGGLE_MODES.has(this.currentMode)) {
+            indicator.classList.add('visible');
+        } else {
+            indicator.classList.remove('visible');
+            return;
+        }
+        
+        // Update content based on current mode
+        // Arrow indicates "switch to" action
+        if (this.currentMode === MODES.ERASE) {
+            // In erase mode - show option to switch back to draw mode
+            const drawModeInfo = MODE_LABELS[this.lastDrawMode];
+            indicator.innerHTML = `<i class="fas fa-arrow-right switch-arrow"></i><i class="fas ${drawModeInfo.icon}"></i> ${drawModeInfo.label}`;
+            indicator.title = `Switch to ${drawModeInfo.label} mode`;
+            
+            // Apply the color of the draw mode we'd switch to
+            if (this.lastDrawMode === MODES.DRAW) {
+                indicator.classList.add('draw-mode');
+            } else if (this.lastDrawMode === MODES.RIDGE) {
+                indicator.classList.add('ridge-mode');
+            } else if (this.lastDrawMode === MODES.DRAWLINES) {
+                indicator.classList.add('lines-mode');
+            }
+        } else {
+            // In a draw mode - show option to switch to erase
+            indicator.innerHTML = `<i class="fas fa-arrow-right switch-arrow"></i><i class="fas fa-eraser"></i> Erase`;
+            indicator.title = 'Switch to Erase mode';
+            // Keep the red erase color (default)
         }
     }
 

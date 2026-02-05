@@ -288,7 +288,8 @@ export class DualViewManager {
         if (!meshColors) return;
         
         const sourceBuffer = this.activeView === 'left' ? this.leftViewColors : this.rightViewColors;
-        if (sourceBuffer) {
+        // Only restore if buffer sizes match (they won't match if a new mesh was loaded)
+        if (sourceBuffer && sourceBuffer.length === meshColors.length) {
             meshColors.set(sourceBuffer);
             
             const mesh = this.meshView.mesh;
@@ -388,7 +389,8 @@ export class DualViewManager {
         if (!meshColors) return;
         
         const sourceBuffer = this.activeView === 'left' ? this.leftViewColors : this.rightViewColors;
-        if (sourceBuffer) {
+        // Safety check: only apply if buffer sizes match (prevents errors when mesh changes)
+        if (sourceBuffer && sourceBuffer.length === meshColors.length) {
             meshColors.set(sourceBuffer);
             
             const mesh = this.meshView.mesh;
@@ -655,6 +657,9 @@ export class DualViewManager {
         const colors = view === 'left' ? this.leftViewColors : this.rightViewColors;
         if (!colors || !this.meshView.meshColors) return;
         
+        // Safety check: only apply if buffer sizes match (prevents errors when mesh changes)
+        if (colors.length !== this.meshView.meshColors.length) return;
+        
         this.meshView.meshColors.set(colors);
         
         const mesh = this.meshView.mesh;
@@ -748,7 +753,8 @@ export class DualViewManager {
         if (!meshColors) return;
         
         const targetBuffer = this.activeView === 'left' ? this.leftViewColors : this.rightViewColors;
-        if (targetBuffer) {
+        // Safety check: only sync if buffer sizes match (prevents errors when mesh changes)
+        if (targetBuffer && targetBuffer.length === meshColors.length) {
             targetBuffer.set(meshColors);
         }
     }

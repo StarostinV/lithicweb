@@ -133,6 +133,75 @@
     --transform-color: #f59e0b;
 }
 
+/* Erase Toggle Indicator (Draw/Erase toggle in drawing modes) */
+.erase-toggle-indicator {
+    --erase-color: #ef4444;
+    position: fixed;
+    bottom: 24px;
+    left: 140px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid var(--erase-color);
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--erase-color);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(8px);
+    z-index: 50;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    user-select: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-10px);
+}
+
+.erase-toggle-indicator.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+}
+
+.erase-toggle-indicator:hover {
+    transform: scale(1.05);
+    box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1));
+}
+
+.erase-toggle-indicator.visible:hover {
+    transform: scale(1.05);
+}
+
+.erase-toggle-indicator:active {
+    transform: scale(0.98);
+}
+
+.erase-toggle-indicator i {
+    font-size: 14px;
+}
+
+.erase-toggle-indicator .switch-arrow {
+    font-size: 10px;
+    opacity: 0.6;
+    margin-right: 4px;
+}
+
+/* Draw mode variants for the erase toggle */
+.erase-toggle-indicator.draw-mode {
+    --erase-color: #f59e0b;
+}
+
+.erase-toggle-indicator.ridge-mode {
+    --erase-color: #14b8a6;
+}
+
+.erase-toggle-indicator.lines-mode {
+    --erase-color: #8b5cf6;
+}
+
 /* Floating Controls - centered in the canvas area */
 .floating-controls {
     position: fixed;
@@ -232,6 +301,13 @@ body.sidebar-collapsed .floating-controls {
     }
     
     .transform-mode-indicator {
+        left: 120px;
+        bottom: 16px;
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+    
+    .erase-toggle-indicator {
         left: 120px;
         bottom: 16px;
         padding: 8px 12px;
