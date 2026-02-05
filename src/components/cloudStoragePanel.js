@@ -1072,14 +1072,21 @@ export class CloudStoragePanel {
      */
     _createAnnotationFromCloudState(stateData, stateId) {
         const edgeIndices = new Set(stateData.edge_indices || []);
-        const name = stateData.metadata?.name || stateData.name || 'Cloud annotation';
         
         // Build annotation metadata from cloud state metadata
+        // IMPORTANT: Spread cloud metadata FIRST, then override with our canonical fields
+        // This prevents corrupted names (e.g., "Load: ...") from persisting
+        const cloudMetadata = stateData.metadata || {};
+        
+        // Determine the correct name: prioritize stateData.name over metadata.name if present
+        // This allows the cloud API to provide a clean name separate from potentially corrupted metadata
+        const name = stateData.name || cloudMetadata.name || 'Cloud annotation';
+        
         const metadata = {
-            name: name,
-            source: 'cloud',
-            cloudStateId: stateId,
-            ...(stateData.metadata || {})
+            ...cloudMetadata,      // Spread cloud metadata first (may contain corrupted fields)
+            name: name,            // Override with clean name
+            source: 'cloud',       // Always mark as cloud source
+            cloudStateId: stateId, // Track cloud state ID
         };
         
         return new Annotation({
@@ -1095,18 +1102,37 @@ export class CloudStoragePanel {
      * @param {Array<number>} stateData.edge_indices - Array of edge indices to apply
      * @param {Object} [stateData.metadata] - Optional metadata for the state
      */
+    /**
+     * Apply loaded state data to the mesh view.
+     * 
+     * Architecture:
+     * - workingAnnotation is THE source of truth for current state
+     * - Cloud is just storage (we load FROM it into workingAnnotation)
+     * - History stores snapshots for undo/redo
+     * 
+     * @param {Object} stateData - State data from cloud
+     */
     applyState(stateData) {
         if (!stateData || !Array.isArray(stateData.edge_indices)) {
             console.error('[CloudStorage] Invalid state data received:', stateData);
             this.setStatus('Failed to apply state: invalid data format', 'error');
             return;
         }
-        const edgeIndices = new Set(stateData.edge_indices);
         
-        // Start a draw operation for history tracking
-        const description = stateData.metadata?.name || stateData.name || 'Cloud state';
+        const edgeIndices = new Set(stateData.edge_indices);
+        const annotationName = stateData.name || stateData.metadata?.name || 'Cloud state';
+        
+        // Update workingAnnotation (THE source of truth)
+        if (this.meshView.workingAnnotation) {
+            Object.assign(this.meshView.workingAnnotation.metadata, {
+                ...(stateData.metadata || {}),
+                name: annotationName,
+                source: 'cloud',
+            });
+        }
+        
+        // Record to history for undo/redo
         this.meshView.startDrawOperation('cloud');
-        this.meshView.pendingAction.description = `Loaded: ${description}`;
         
         // Clear current edges
         this.meshView.currentEdgeIndices.forEach(index => {
@@ -1124,19 +1150,7 @@ export class CloudStoragePanel {
             }
         });
         
-        // Finish draw operation
         this.meshView.finishDrawOperation();
-        
-        // Apply loaded annotation metadata to the current state and workingAnnotation
-        if (stateData.metadata && typeof stateData.metadata === 'object') {
-            console.log('[CloudStorage] Applying annotation metadata:', stateData.metadata);
-            this.meshView.updateCurrentStateMetadata(stateData.metadata);
-            
-            // Also update workingAnnotation metadata so getAnnotation() returns correct name
-            if (this.meshView.workingAnnotation) {
-                Object.assign(this.meshView.workingAnnotation.metadata, stateData.metadata);
-            }
-        }
         
         // Update segments if auto-segmentation is enabled
         if (document.getElementById('auto-segments')?.checked) {

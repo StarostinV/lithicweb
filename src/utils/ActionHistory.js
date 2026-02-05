@@ -67,20 +67,25 @@ export class ActionHistory {
      * @returns {Action} The created action
      */
     createAction({ edgeIndices, arrows = [], type, description, metadata = {} }) {
+        // Determine the annotation name - prioritize existing metadata.name over description
+        // This prevents overwriting original annotation names with action descriptions like "Load: ..."
+        const annotationName = metadata.name || description || this._getDefaultDescription(type);
+        const actionDescription = description || this._getDefaultDescription(type);
+        
         const annotation = new Annotation({
             edgeIndices: new Set(edgeIndices),
             arrows: arrows.map(a => ({ ...a })),
             source: type === 'model' ? 'model' : type === 'cloud' ? 'cloud' : 'manual',
             metadata: {
                 ...metadata,
-                name: description || this._getDefaultDescription(type),
+                name: annotationName,
             }
         });
         
         return {
             annotation,
             type,
-            description: description || this._getDefaultDescription(type),
+            description: actionDescription,
             timestamp: Date.now(),
         };
     }

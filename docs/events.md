@@ -43,6 +43,67 @@ eventBus.offNamespace('myComponent');
 
 ---
 
+## Data Architecture: Source of Truth
+
+Understanding where data lives is critical to avoiding sync bugs.
+
+### The Rule
+
+**`workingAnnotation` is THE source of truth for the current annotation state.**
+
+All storage systems store complete Annotation snapshots (edges + metadata):
+- **Library** - saved annotations
+- **Cloud** - remote annotations
+- **History** - past states for undo/redo
+- **Filesystem** - PLY files
+
+When you load from ANY storage, you copy the full snapshot to `workingAnnotation`.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│   STORAGE                              LIVE STATE            │
+│   (complete Annotation snapshots)                            │
+│                                                              │
+│   ┌─────────────┐      load        ┌────────────────────┐   │
+│   │  Library    │─────────────────▶│                    │   │
+│   │  Cloud      │◀─────────────────│  workingAnnotation │   │
+│   │  Filesystem │      save        │  (SOURCE OF TRUTH) │   │
+│   │  History    │                  │                    │   │
+│   └─────────────┘                  └────────────────────┘   │
+│                                             │               │
+│   All storage works the same way:           │               │
+│   - Library: user clicks "load"             ▼               │
+│   - Cloud: user clicks "load from cloud"   ┌──────────────┐ │
+│   - History: user clicks "undo/redo"       │currentEdge-  │ │
+│   - Filesystem: user opens file            │Indices       │ │
+│                                            │(for render)  │ │
+│                                            └──────────────┘ │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### What This Means
+
+1. **To get current annotation**: Call `meshView.getAnnotation()` - returns `workingAnnotation`
+2. **To modify**: Update `workingAnnotation` directly (edges via drawing, metadata via panel)
+3. **All storage is the same**: Library, Cloud, History, Filesystem all store complete Annotation objects
+4. **Undo/redo restores full state**: Edges AND metadata are restored from history
+
+### Common Operations
+
+| Storage | Load (to workingAnnotation) | Save (from workingAnnotation) |
+|---------|----------------------------|------------------------------|
+| Library | User clicks "load" | User clicks "save" |
+| Cloud | User clicks "load from cloud" | User clicks "upload" |
+| History | User clicks "undo/redo" | Automatic on draw operation |
+| Filesystem | User opens PLY file | User exports PLY file |
+
+All load operations copy the full Annotation snapshot → `workingAnnotation`.
+All save operations clone `workingAnnotation` → storage.
+
+---
+
 ## Event Categories
 
 ### Connection Events
@@ -207,6 +268,7 @@ eventBus.emit(Events.ANNOTATION_IMPORTED, {
 |-----------|---------|--------|
 | `main.js` | `updateAnnotationLabel()` | Updates annotation label in UI |
 | `DualViewManager` | `_updateActiveViewLabel()` | Updates active view's label button in dual view mode |
+| `MetadataPanel` | `updateStateMetadataUI()` | Refreshes annotation metadata display |
 
 #### Example
 
@@ -505,6 +567,54 @@ Every event emission should have a corresponding test verifying:
 1. **Check all subscribers**: Multiple components may subscribe
 2. **Use `eventBus.getDebugInfo()`**: Shows all active subscriptions
 3. **Review event documentation**: Ensure correct event is being used
+
+---
+
+## Common Pitfalls and Lessons Learned
+
+### Historical Bugs (Fixed)
+
+1. **Metadata disappeared on switch** - `getAnnotation()` was merging data from multiple sources instead of just returning `workingAnnotation`.
+
+2. **"Load:" prefix corrupted names** - History action descriptions contained annotation names. When used as fallback, corrupted the name. Fix: use generic descriptions only.
+
+3. **Rename didn't update UI** - Rename only updated one place, but undo/redo didn't restore metadata. Fix: undo/redo now restores full Annotation including metadata.
+
+4. **Save overwrote original** - ID wasn't changed when saving modified annotation. Fix: `cloneWithNewId()` creates new entry.
+
+### Coding Guidelines
+
+**Object Spread Order**: Put authoritative values LAST:
+```javascript
+const metadata = {
+    ...(cloudData.metadata || {}),  // Spread first
+    name: cleanName,                 // Override with clean value
+};
+```
+
+**Save vs. Update Semantics**: Decide if it's a new entry or update:
+```javascript
+if (this.library.has(annotation.id)) {
+    annotation = annotation.cloneWithNewId();  // New entry
+}
+this.library.save(annotation);
+```
+
+**Generic Display Text**: Never embed data in display strings:
+```javascript
+// BAD: Data in description can leak back into data
+startDrawOperation('library-load', `Load: ${annotation.name}`);
+
+// GOOD: Generic description, data stays in metadata
+startDrawOperation('library-load');
+```
+
+### Summary
+
+1. **`workingAnnotation` is the source of truth** for current state
+2. **All storage is equivalent**: Library, Cloud, History, Filesystem store complete Annotation snapshots
+3. **Load = copy to workingAnnotation**: Any load operation copies the full snapshot
+4. **Save = clone from workingAnnotation**: Any save operation clones the current state
 
 ---
 

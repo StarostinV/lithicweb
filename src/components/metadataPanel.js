@@ -25,6 +25,7 @@
  * Subscribes to:
  * - `Events.MESH_LOADED` - Updates UI when a mesh is loaded (clears old metadata display)
  * - `Events.HISTORY_CHANGED` - Updates annotation metadata display when history changes
+ * - `Events.ANNOTATION_ACTIVE_CHANGED` - Refreshes metadata when annotation is loaded from library/cloud/file
  * 
  * Provides a visual interface to:
  * - View mesh metadata (persisted across all states)
@@ -83,6 +84,12 @@ export class MetadataPanel {
         
         // Subscribe to history changes to update annotation metadata display
         eventBus.on(Events.HISTORY_CHANGED, () => {
+            this.updateStateMetadataUI();
+        }, 'metadataPanel');
+        
+        // Subscribe to annotation changes to refresh metadata when annotations are loaded
+        // This handles: loading from library, loading from cloud, loading annotated PLY
+        eventBus.on(Events.ANNOTATION_ACTIVE_CHANGED, () => {
             this.updateStateMetadataUI();
         }, 'metadataPanel');
     }

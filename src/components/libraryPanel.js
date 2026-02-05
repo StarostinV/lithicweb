@@ -219,11 +219,15 @@ export class LibraryPanel {
     /**
      * Save the current annotation to the library.
      * 
-     * After saving, this updates the workingAnnotation to link it to the library
+     * This always creates a NEW library entry, even if the current annotation
+     * was originally loaded from the library. This is "Save As" semantics -
+     * the user is explicitly saving their current work as a new entry.
+     * 
+     * After saving, this updates the workingAnnotation to link it to the new library
      * entry and emits ANNOTATION_ACTIVE_CHANGED so the UI label reflects the new name.
      */
     saveCurrentAnnotation() {
-        const annotation = this.meshView.getAnnotation();
+        let annotation = this.meshView.getAnnotation();
         if (annotation.isEmpty()) {
             alert('Cannot save an empty annotation.');
             return;
@@ -235,10 +239,20 @@ export class LibraryPanel {
         if (name === null) return; // Cancelled
         
         const finalName = name.trim() || currentName;
+        
+        // IMPORTANT: If this annotation ID already exists in the library, we want to
+        // create a NEW entry rather than update the existing one. This is "Save As"
+        // semantics - the user has modified the annotation and wants to save their
+        // current work as a new entry, not overwrite the original.
+        if (this.library.has(annotation.id)) {
+            // Generate a new ID by cloning with new ID
+            annotation = annotation.cloneWithNewId();
+        }
+        
         annotation.name = finalName;
         const id = this.library.save(annotation);
         
-        // Update workingAnnotation to link to the library entry
+        // Update workingAnnotation to link to the (possibly new) library entry
         // This ensures subsequent renames of this library entry affect the current annotation
         if (this.meshView.workingAnnotation) {
             this.meshView.workingAnnotation.id = id;
@@ -260,6 +274,12 @@ export class LibraryPanel {
 
     /**
      * Load an annotation from the library into the view.
+     * 
+     * Architecture:
+     * - workingAnnotation is THE source of truth for current state
+     * - Library is just storage (we load FROM it into workingAnnotation)
+     * - History stores snapshots for undo/redo
+     * 
      * @param {string} id - Annotation ID
      */
     loadAnnotation(id) {
@@ -269,20 +289,15 @@ export class LibraryPanel {
             return;
         }
         
-        // Start a library-load operation in history
-        this.meshView.startDrawOperation('library-load', `Load: ${annotation.name}`);
-        
-        // Apply the annotation state
-        this.meshView._restoreEdgeState(annotation.edgeIndices);
-        
-        // Update workingAnnotation metadata to reflect the loaded annotation
-        // This ensures getAnnotation() returns the correct name, source, etc.
+        // Update workingAnnotation (THE source of truth)
         if (this.meshView.workingAnnotation) {
-            this.meshView.workingAnnotation.metadata = { ...annotation.metadata };
             this.meshView.workingAnnotation.id = annotation.id;
+            this.meshView.workingAnnotation.metadata = { ...annotation.metadata };
         }
         
-        // Finish the operation
+        // Record to history for undo/redo
+        this.meshView.startDrawOperation('library-load');
+        this.meshView._restoreEdgeState(annotation.edgeIndices);
         this.meshView.finishDrawOperation();
         
         // Update segments
@@ -291,8 +306,7 @@ export class LibraryPanel {
             this.meshView.updateSegments();
         }
         
-        // Emit ANNOTATION_ACTIVE_CHANGED to update UI (label, etc.)
-        // Note: We do NOT emit ANNOTATION_IMPORTED since this is already in the library
+        // Emit event to update UI
         eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
             name: annotation.name,
             source: 'library'
@@ -466,14 +480,19 @@ export class LibraryPanel {
             e.stopPropagation();
             const newName = prompt('Enter new name:', annotation.name);
             if (newName !== null && newName.trim()) {
-                this.library.rename(id, newName.trim());
+                const trimmedName = newName.trim();
                 
-                // If renaming the currently loaded annotation, update workingAnnotation too
+                // Update library (persistent storage)
+                this.library.rename(id, trimmedName);
+                
+                // If renaming the currently loaded annotation, update workingAnnotation
+                // (THE source of truth for current state)
                 if (this.meshView.workingAnnotation?.id === id) {
-                    this.meshView.workingAnnotation.metadata.name = newName.trim();
+                    this.meshView.workingAnnotation.metadata.name = trimmedName;
+                    
                     // Emit event to update the annotation label
                     eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
-                        name: newName.trim(),
+                        name: trimmedName,
                         source: 'library'
                     });
                 }

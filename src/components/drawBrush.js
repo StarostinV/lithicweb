@@ -89,6 +89,9 @@ export default class DrawBrush {
         // Show/hide ridge controls based on mode
         eventBus.on(Events.MODE_CHANGED, (data) => {
             this._updateRidgeControlsVisibility(data.mode);
+            if (data.mode === MODES.RIDGE) {
+                this._ensureAnglesComputed();
+            }
         }, 'DrawBrush');
         
         // Reset when mesh changes
