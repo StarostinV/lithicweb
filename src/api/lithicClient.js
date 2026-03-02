@@ -406,6 +406,7 @@ export const DEFAULT_INFERENCE_CONFIG = {
     max_steps: 5000,
     gamma: 0.95,
     edge_threshold: 0.5,
+    min_segment_size: 50,
     thresholds: [0.5, 0.8],
     resolution: [512, 512],
     zoom: 1.0,
@@ -430,6 +431,14 @@ export const CONFIG_PARAMS = {
         max: 360,
         step: 1,
         description: 'Number of rotation angles for inference'
+    },
+    min_segment_size: {
+        label: 'Min Segment Size',
+        type: 'number',
+        min: 10,
+        max: 300,
+        step: 1,
+        description: 'Minimum number of faces per segment'
     },
     zoom: {
         label: 'Zoom',
