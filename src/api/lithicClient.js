@@ -410,7 +410,10 @@ export const DEFAULT_INFERENCE_CONFIG = {
     thresholds: [0.5, 0.8],
     resolution: [512, 512],
     zoom: 1.0,
-    norm: 'minmax'
+    norm: 'minmax',
+    union_find_max_merge_cost: 0.5,
+    union_find_max_segment_size: null,
+    union_find_merge_cost: 'max'
 };
 
 // Config parameter metadata for UI generation
@@ -447,6 +450,20 @@ export const CONFIG_PARAMS = {
         max: 2.0,
         step: 0.1,
         description: 'Zoom factor for rendering'
+    },
+    union_find_max_merge_cost: {
+        label: 'Max Merge Cost',
+        type: 'slider',
+        min: 0,
+        max: 1,
+        step: 0.01,
+        description: 'Cost threshold for merging segments (lower = fewer merges, more segments)'
+    },
+    union_find_merge_cost: {
+        label: 'Merge Cost Function',
+        type: 'select',
+        options: ['max', 'mean', 'min'],
+        description: 'How to compute merge cost between faces (max = conservative)'
     }
 };
 
