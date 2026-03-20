@@ -31,7 +31,12 @@ module.exports = (env, argv) => {
             }),
             new CopyPlugin({
                 patterns: [
-                    { from: 'docs', to: 'docs' }
+                    { from: 'docs', to: 'docs' },
+                    // Demo mesh: single source tests/fixtures, stable URL for dev + production
+                    {
+                        from: 'tests/fixtures/ply/test_annotated_mesh.ply',
+                        to: 'demo/showcase.ply',
+                    },
                 ]
             }),
         ],

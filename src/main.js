@@ -10,6 +10,12 @@ import { BasicMesh } from './geometry/BasicMesh.js';
 import Scene from './components/scene.js';
 import DrawLines from './components/drawLines.js';
 import MeshLoader from './loaders/meshLoader.js';
+import {
+    loadPlyFromUrl,
+    DEMO_SHOWCASE_PLY_URL,
+    DEMO_SHOWCASE_FILENAME,
+    shouldAutoloadDemoMesh,
+} from './loaders/loadPlyFromUrl.js';
 import DrawBrush from './components/drawBrush.js';
 import { HistoryPanel } from './components/historyPanel.js';
 import { LibraryPanel } from './components/libraryPanel.js';
@@ -394,6 +400,17 @@ annotationLabel.addEventListener('click', () => {
 
 // Initialize UI components (file input, modal, sidebar resize, annotation tabs)
 initUI();
+
+// Auto-load small annotated demo mesh (fixture → /demo/showcase.ply via webpack). Skip: ?demo=0 or ?demo=false
+function loadDemoMeshIfEnabled() {
+    if (!shouldAutoloadDemoMesh()) {
+        return;
+    }
+    loadPlyFromUrl(meshLoader, DEMO_SHOWCASE_PLY_URL, DEMO_SHOWCASE_FILENAME).catch((err) => {
+        console.warn('[demo] Could not load showcase mesh:', err.message);
+    });
+}
+loadDemoMeshIfEnabled();
 
 scene.animate();
 
