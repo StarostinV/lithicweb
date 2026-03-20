@@ -389,10 +389,14 @@ class LithicClient {
 
     /**
      * Run inference on session data
+     * @param {string} sessionId
+     * @param {Object} [options]
+     * @param {boolean} [options.returnModelOutput=false] - If true, return raw per-face predictions instead of vertex labels
      */
-    async runInference(sessionId) {
+    async runInference(sessionId, { returnModelOutput = false } = {}) {
         return this.request(`/inference/sessions/${encodeURIComponent(sessionId)}/run`, {
-            method: 'POST'
+            method: 'POST',
+            body: JSON.stringify({ return_model_output: returnModelOutput })
         });
     }
 }
@@ -405,7 +409,6 @@ export const DEFAULT_INFERENCE_CONFIG = {
     n_angles: 6,
     max_steps: 5000,
     gamma: 0.95,
-    edge_threshold: 0.5,
     min_segment_size: 50,
     thresholds: [0.5, 0.8],
     resolution: [512, 512],
@@ -417,31 +420,16 @@ export const DEFAULT_INFERENCE_CONFIG = {
 };
 
 // Config parameter metadata for UI generation
-// Only showing essential parameters; others use defaults
+// Parameters are categorized: 'nn' requires server round-trip, 'postprocess' can rerun locally
 export const CONFIG_PARAMS = {
-    edge_threshold: {
-        label: 'Edge Threshold',
-        type: 'slider',
-        min: 0,
-        max: 1,
-        step: 0.01,
-        description: 'Threshold for edge detection'
-    },
     n_angles: {
         label: 'Rotation Angles',
         type: 'number',
         min: 1,
         max: 360,
         step: 1,
-        description: 'Number of rotation angles for inference'
-    },
-    min_segment_size: {
-        label: 'Min Segment Size',
-        type: 'number',
-        min: 10,
-        max: 300,
-        step: 1,
-        description: 'Minimum number of faces per segment'
+        description: 'Number of rotation angles for inference',
+        category: 'nn'
     },
     zoom: {
         label: 'Zoom',
@@ -449,7 +437,8 @@ export const CONFIG_PARAMS = {
         min: 1.0,
         max: 2.0,
         step: 0.1,
-        description: 'Zoom factor for rendering'
+        description: 'Zoom factor for rendering',
+        category: 'nn'
     },
     union_find_max_merge_cost: {
         label: 'Max Merge Cost',
@@ -457,13 +446,24 @@ export const CONFIG_PARAMS = {
         min: 0,
         max: 1,
         step: 0.01,
-        description: 'Cost threshold for merging segments (lower = fewer merges, more segments)'
+        description: 'Cost threshold for merging segments (lower = fewer merges, more segments)',
+        category: 'postprocess'
+    },
+    min_segment_size: {
+        label: 'Min Segment Size',
+        type: 'number',
+        min: 10,
+        max: 300,
+        step: 1,
+        description: 'Minimum number of faces per segment',
+        category: 'postprocess'
     },
     union_find_merge_cost: {
         label: 'Merge Cost Function',
         type: 'select',
         options: ['max', 'mean', 'min'],
-        description: 'How to compute merge cost between faces (max = conservative)'
+        description: 'How to compute merge cost between faces (max = conservative)',
+        category: 'postprocess'
     }
 };
 

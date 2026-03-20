@@ -22,6 +22,11 @@
 import { lithicClient, DEFAULT_INFERENCE_CONFIG, CONFIG_PARAMS } from '../api/lithicClient.js';
 import { eventBus, Events } from '../utils/EventBus.js';
 import { Annotation } from '../geometry/Annotation.js';
+import {
+    unionFindSegmentation,
+    faceSegmentsToVertexEdges,
+    facePredictionsToVertexValues,
+} from '../geometry/faceUnionFind.js';
 
 export class ModelPanel {
     constructor(meshView, connectionManager = null) {
@@ -32,7 +37,13 @@ export class ModelPanel {
         this.currentSession = null;
         this.config = { ...DEFAULT_INFERENCE_CONFIG };
         this.isLoading = false;
-        
+
+        // Client-side postprocessing state
+        this.clientSidePostprocessing = false;
+        this.cachedModelOutput = null; // { edgePredictions: Float64Array, faceAdjacencyFlat: Int32Array, numFaces: number }
+        this.showingHeatmap = false;
+        this._postprocessDebounceTimer = null;
+
         this.setupUI();
         this.setupEventListeners();
         this._setupEventBusSubscriptions();
@@ -83,7 +94,11 @@ export class ModelPanel {
         this.runInferenceBtn = document.getElementById('runInferenceBtn');
         this.inferenceStatus = document.getElementById('inferenceStatus');
         this.configContainer = document.getElementById('configContainer');
-        
+
+        // Client-side postprocessing elements
+        this.postprocessToggle = document.getElementById('clientPostprocessToggle');
+        this.showModelOutputBtn = document.getElementById('showModelOutputBtn');
+
         // Build config UI
         this.buildConfigUI();
     }
@@ -136,6 +151,7 @@ export class ModelPanel {
                     const value = parseFloat(e.target.value);
                     valueDisplay.textContent = value;
                     this.config[key] = value;
+                    this._onConfigChanged(key, meta);
                 });
                 
                 wrapper.appendChild(slider);
@@ -159,6 +175,7 @@ export class ModelPanel {
                 
                 input.addEventListener('change', (e) => {
                     this.config[key] = parseInt(e.target.value);
+                    this._onConfigChanged(key, meta);
                 });
                 
                 wrapper.appendChild(input);
@@ -184,6 +201,7 @@ export class ModelPanel {
                 
                 select.addEventListener('change', (e) => {
                     this.config[key] = e.target.value;
+                    this._onConfigChanged(key, meta);
                 });
                 
                 wrapper.appendChild(select);
@@ -205,9 +223,29 @@ export class ModelPanel {
         if (this.uploadToServerBtn) {
             this.uploadToServerBtn.addEventListener('click', () => this.uploadCurrentMesh());
         }
-        
+
         if (this.runInferenceBtn) {
             this.runInferenceBtn.addEventListener('click', () => this.runInference());
+        }
+
+        // Client-side postprocessing toggle
+        if (this.postprocessToggle) {
+            this.postprocessToggle.addEventListener('change', (e) => {
+                this.clientSidePostprocessing = e.target.checked;
+                console.log('[ModelPanel] Client-side postprocessing:', this.clientSidePostprocessing);
+                // Clear cached model output when toggling off
+                if (!this.clientSidePostprocessing) {
+                    this.cachedModelOutput = null;
+                    this._updateHeatmapButton();
+                }
+            });
+        }
+
+        // Show Model Output heatmap button
+        if (this.showModelOutputBtn) {
+            this.showModelOutputBtn.addEventListener('click', () => {
+                this.toggleModelOutputHeatmap();
+            });
         }
     }
 
@@ -392,7 +430,7 @@ export class ModelPanel {
         }
 
         console.log('[ModelPanel] runInference called, session:', this.currentSession);
-        
+
         if (!this.currentSession || !this.currentSession.has_data) {
             console.warn('[ModelPanel] No session or no data:', {
                 hasSession: !!this.currentSession,
@@ -401,34 +439,205 @@ export class ModelPanel {
             this.setStatus('Please upload a mesh first', 'error');
             return;
         }
-        
+
         this.setLoading(true);
         this.setStatus('Running inference... This may take a while.', 'info');
-        
+
+        // Hide heatmap if showing
+        if (this.showingHeatmap) {
+            this._hideHeatmap();
+        }
+
         try {
             // Update config before running
             console.log('[ModelPanel] Updating config...');
             await lithicClient.updateSessionConfig(this.currentSession.session_id, this.config);
-            
-            // Run inference
-            console.log('[ModelPanel] Running inference on session:', this.currentSession.session_id);
-            const response = await lithicClient.runInference(this.currentSession.session_id);
-            console.log('[ModelPanel] Inference response:', response);
-            
-            // Automatically apply results
-            this.setStatus('Applying results to mesh...', 'info');
-            const appliedCount = this.applyResults(response.result);
-            
-            this.setStatus(`Done! Applied ${appliedCount} edge annotations.`, 'success');
+
+            // Run inference (request model output if client-side postprocessing is on)
+            const returnModelOutput = this.clientSidePostprocessing;
+            console.log('[ModelPanel] Running inference on session:', this.currentSession.session_id,
+                'returnModelOutput:', returnModelOutput);
+            const response = await lithicClient.runInference(
+                this.currentSession.session_id,
+                { returnModelOutput }
+            );
+            console.log('[ModelPanel] Inference response keys:', Object.keys(response.result || {}));
+
+            if (returnModelOutput) {
+                // Cache model output for local postprocessing
+                const result = response.result;
+                const numFaces = result.edge_predictions.length;
+                this.cachedModelOutput = {
+                    edgePredictions: new Float64Array(result.edge_predictions),
+                    faceAdjacencyFlat: new Int32Array(result.face_adjacency),
+                    numFaces,
+                };
+                this._updateHeatmapButton();
+                console.log(`[ModelPanel] Cached model output: ${numFaces} faces`);
+
+                // Run postprocessing locally
+                this.setStatus('Running postprocessing locally...', 'info');
+                this.rerunPostprocessingLocally();
+                this.setStatus(`Done! Model output cached. Adjust postprocessing params for instant updates.`, 'success');
+            } else {
+                // Classic server-side flow
+                this.setStatus('Applying results to mesh...', 'info');
+                const appliedCount = this.applyResults(response.result);
+                this.setStatus(`Done! Applied ${appliedCount} edge annotations.`, 'success');
+            }
         } catch (e) {
             console.error('[ModelPanel] Inference failed:', e);
-            // Clear session state if error indicates session is invalid
             if (e.message.includes('404') || e.message.includes('session') || e.message.includes('Session')) {
                 this.clearSession();
             }
             this.setStatus('Inference failed: ' + e.message, 'error');
         } finally {
             this.setLoading(false);
+        }
+    }
+
+    // ============== Client-Side Postprocessing ==============
+
+    /**
+     * Re-run postprocessing locally using cached model output.
+     * Called when postprocessing parameters change or after initial model output caching.
+     */
+    rerunPostprocessingLocally() {
+        if (!this.cachedModelOutput) {
+            this.setStatus('No model output cached. Run inference first.', 'error');
+            return;
+        }
+
+        console.time('[ModelPanel] Client postprocessing');
+
+        const { edgePredictions, faceAdjacencyFlat, numFaces } = this.cachedModelOutput;
+
+        // Run union-find segmentation
+        const faceSegments = unionFindSegmentation(
+            edgePredictions,
+            faceAdjacencyFlat,
+            numFaces,
+            {
+                maxMergeCost: this.config.union_find_max_merge_cost,
+                maxSegmentSize: this.config.union_find_max_segment_size,
+                minSegmentSize: this.config.min_segment_size,
+                mergeCost: this.config.union_find_merge_cost,
+            }
+        );
+
+        // Convert face segments to vertex edge labels
+        const indices = this.meshView.indices;
+        const numVertices = this.meshView.positions.length / 3;
+        const vertexLabels = faceSegmentsToVertexEdges(faceSegments, indices, numVertices);
+
+        // Apply via existing pathway
+        this.applyResults({ labels: Array.from(vertexLabels) });
+
+        console.timeEnd('[ModelPanel] Client postprocessing');
+    }
+
+    /**
+     * Handle config parameter changes. When client-side postprocessing is active
+     * and model output is cached, postprocessing-category params trigger a local rerun.
+     * @private
+     */
+    _onConfigChanged(key, meta) {
+        if (!this.clientSidePostprocessing || !this.cachedModelOutput) return;
+        if (meta.category !== 'postprocess') return;
+
+        // Debounce: wait 100ms after last change before rerunning
+        if (this._postprocessDebounceTimer) {
+            clearTimeout(this._postprocessDebounceTimer);
+        }
+        this._postprocessDebounceTimer = setTimeout(() => {
+            this._postprocessDebounceTimer = null;
+            // Hide heatmap if showing (user is adjusting segmentation params)
+            if (this.showingHeatmap) {
+                this._hideHeatmap();
+            }
+            this.rerunPostprocessingLocally();
+        }, 100);
+    }
+
+    // ============== Model Output Heatmap ==============
+
+    /**
+     * Toggle the model output heatmap visualization.
+     */
+    toggleModelOutputHeatmap() {
+        if (this.showingHeatmap) {
+            this._hideHeatmap();
+        } else {
+            this._showHeatmap();
+        }
+    }
+
+    /** @private */
+    _showHeatmap() {
+        if (!this.cachedModelOutput) return;
+
+        const { edgePredictions, numFaces } = this.cachedModelOutput;
+        const indices = this.meshView.indices;
+        const numVertices = this.meshView.positions.length / 3;
+
+        // Average face predictions to vertex predictions
+        const vertexPreds = facePredictionsToVertexValues(
+            edgePredictions, indices, numFaces, numVertices
+        );
+
+        // Apply blue-to-red heatmap coloring
+        const THREE = this.meshView.objectColor?.constructor; // Get THREE.Color constructor
+        for (let v = 0; v < numVertices; v++) {
+            const t = vertexPreds[v]; // 0..1
+            // Blue (hue=0.667) → Red (hue=0) interpolation
+            const hue = (1 - t) * 0.667;
+            const color = this.meshView.objectColor.clone().setHSL(hue, 1.0, 0.5);
+            this.meshView.colorVertex(v, color);
+        }
+
+        // Force buffer update
+        const colorAttr = this.meshView._threeMesh?.geometry?.attributes?.color;
+        if (colorAttr) colorAttr.needsUpdate = true;
+
+        this.showingHeatmap = true;
+        if (this.showModelOutputBtn) {
+            this.showModelOutputBtn.innerHTML = '<i class="fas fa-fire"></i> Hide Model Output';
+        }
+    }
+
+    /** @private */
+    _hideHeatmap() {
+        if (!this.showingHeatmap) return;
+
+        // Restore normal edge/segment coloring by re-applying current edge state
+        const numVertices = this.meshView.positions.length / 3;
+        for (let v = 0; v < numVertices; v++) {
+            if (this.meshView.currentEdgeIndices.has(v)) {
+                this.meshView.colorVertex(v, this.meshView.edgeColor);
+            } else {
+                this.meshView.colorVertex(v, this.meshView.objectColor);
+            }
+        }
+
+        // Re-apply segment colors if segments are active
+        if (document.getElementById('auto-segments')?.checked) {
+            this.meshView.updateSegments();
+        }
+
+        // Force buffer update
+        const colorAttr = this.meshView._threeMesh?.geometry?.attributes?.color;
+        if (colorAttr) colorAttr.needsUpdate = true;
+
+        this.showingHeatmap = false;
+        if (this.showModelOutputBtn) {
+            this.showModelOutputBtn.innerHTML = '<i class="fas fa-fire"></i> Show Model Output';
+        }
+    }
+
+    /** @private */
+    _updateHeatmapButton() {
+        if (this.showModelOutputBtn) {
+            this.showModelOutputBtn.disabled = !this.cachedModelOutput;
         }
     }
 
@@ -493,7 +702,14 @@ export class ModelPanel {
                 inferredAt: Date.now(),
                 config: { ...this.config },
                 sessionId: this.currentSession?.session_id,
-                edgeCount: edgeIndices.size
+                edgeCount: edgeIndices.size,
+                clientSidePostprocessing: this.clientSidePostprocessing,
+                postprocessingParams: this.clientSidePostprocessing ? {
+                    union_find_max_merge_cost: this.config.union_find_max_merge_cost,
+                    union_find_merge_cost: this.config.union_find_merge_cost,
+                    min_segment_size: this.config.min_segment_size,
+                    union_find_max_segment_size: this.config.union_find_max_segment_size,
+                } : null,
             }
         };
         this.meshView.setCurrentStateMetadata('inference', inferenceMetadata);

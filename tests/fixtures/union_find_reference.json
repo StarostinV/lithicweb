@@ -1,0 +1,63 @@
+[
+  {
+    "name": "tetrahedron_all_merge",
+    "description": "All 4 faces with low predictions should merge into 1 segment",
+    "numFaces": 4,
+    "numVertices": 4,
+    "edgePredictions": [0.1, 0.05, 0.15, 0.08],
+    "faceAdjacencyFlat": [3, 2, 1, 3, 2, 0, 3, 1, 0, 2, 1, 0],
+    "indicesFlat": [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
+    "params": {
+      "max_merge_cost": 0.5,
+      "max_segment_size": null,
+      "min_segment_size": 1,
+      "merge_cost": "max"
+    },
+    "expectedLabels": [1, 1, 1, 1],
+    "expectedVertexEdges": [0, 0, 0, 0]
+  },
+  {
+    "name": "tetrahedron_no_merge",
+    "description": "All faces high predictions with low threshold = 4 separate segments",
+    "numFaces": 4,
+    "numVertices": 4,
+    "edgePredictions": [0.9, 0.85, 0.95, 0.88],
+    "faceAdjacencyFlat": [3, 2, 1, 3, 2, 0, 3, 1, 0, 2, 1, 0],
+    "indicesFlat": [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
+    "params": {
+      "max_merge_cost": 0.1,
+      "max_segment_size": null,
+      "min_segment_size": 1,
+      "merge_cost": "max"
+    },
+    "expectedNumSegments": 4,
+    "expectedVertexEdgesAllOnes": true
+  },
+  {
+    "name": "six_face_strip_split",
+    "description": "Strip of 6 faces, high boundary between faces 2 and 3",
+    "numFaces": 6,
+    "numVertices": 8,
+    "edgePredictions": [0.05, 0.05, 0.45, 0.45, 0.05, 0.05],
+    "faceAdjacencyFlat": [1, -1, -1, 2, -1, 0, 3, -1, 1, 4, -1, 2, 5, -1, 3, -1, -1, 4],
+    "indicesFlat": [0, 1, 2, 1, 2, 3, 2, 3, 4, 3, 4, 5, 4, 5, 6, 5, 6, 7],
+    "params": {
+      "max_merge_cost": 0.3,
+      "max_segment_size": null,
+      "min_segment_size": 1,
+      "merge_cost": "max"
+    },
+    "expectedGrouping": {
+      "description": "f0,f1 same segment; f4,f5 same segment; f2,f3 may be isolated or grouped with sides",
+      "f0_f1_same": true,
+      "f4_f5_same": true,
+      "f0_f4_different": true
+    }
+  },
+  {
+    "name": "remap_by_frequency_reference",
+    "description": "Matches Python docstring: remap_integers_by_frequency([3,1,3,2,3,1,5,5])",
+    "input": [3, 1, 3, 2, 3, 1, 5, 5],
+    "expected": [1, 2, 1, 4, 1, 2, 3, 3]
+  }
+]
