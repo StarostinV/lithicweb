@@ -414,7 +414,7 @@ export const DEFAULT_INFERENCE_CONFIG = {
     resolution: [512, 512],
     zoom: 1.0,
     norm: 'minmax',
-    union_find_max_merge_cost: 0.5,
+    union_find_max_merge_cost: 0.45,
     union_find_max_segment_size: null,
     union_find_merge_cost: 'max'
 };

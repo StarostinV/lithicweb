@@ -307,7 +307,7 @@ export function remapByFrequency(arr) {
  * @param {Int32Array} faceAdjacencyFlat - (numFaces * 3,) flat neighbor indices (-1 = no neighbor)
  * @param {number} numFaces
  * @param {Object} params
- * @param {number} params.maxMergeCost - Never merge edges with cost > this (default 0.5)
+ * @param {number} params.maxMergeCost - Never merge edges with cost > this (default 0.45)
  * @param {number|null} params.maxSegmentSize - Don't merge if result exceeds this (null/0 = no limit)
  * @param {number} params.minSegmentSize - Cleanup threshold (default 50)
  * @param {string} params.mergeCost - 'max', 'mean', or 'min' (default 'max')
@@ -315,7 +315,7 @@ export function remapByFrequency(arr) {
  */
 export function unionFindSegmentation(edgePredictions, faceAdjacencyFlat, numFaces, params = {}) {
     const {
-        maxMergeCost = 0.5,
+        maxMergeCost = 0.45,
         maxSegmentSize = null,
         minSegmentSize = 50,
         mergeCost = 'max',
