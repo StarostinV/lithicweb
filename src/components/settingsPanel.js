@@ -14,6 +14,7 @@
  */
 
 import { eventBus, Events } from '../utils/EventBus.js';
+import { normalizeLightingPreset } from '../utils/lightingPresets.js';
 
 export class SettingsPanel {
     /**
@@ -136,7 +137,7 @@ export class SettingsPanel {
             lightingSummaryEl.innerHTML = `
                 <div class="settings-item">
                     <span class="settings-item-key">Preset</span>
-                    <span class="settings-item-value">${lightingConfig.currentLightingPreset}</span>
+                    <span class="settings-item-value">${normalizeLightingPreset(lightingConfig.currentLightingPreset || 'default')}</span>
                 </div>
                 <div class="settings-item">
                     <span class="settings-item-key">Key Light</span>

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { eventBus, Events } from '../utils/EventBus.js';
+import { normalizeLightingPreset } from '../utils/lightingPresets.js';
 import { DUAL_VIEW_MODES } from './DualViewManager.js';
 
 /**
@@ -102,7 +103,9 @@ export class RenderingPanel {
         this.ambientLightIntensity = lightingConfig.ambientLightIntensity ?? 0.3;
         this.keyLightColor = lightingConfig.keyLightColor || '#ffffff';
         this.lightFollowsCamera = lightingConfig.lightFollowsCamera || false;
-        this.currentLightingPreset = lightingConfig.currentLightingPreset || 'default';
+        this.currentLightingPreset = normalizeLightingPreset(
+            lightingConfig.currentLightingPreset || 'default'
+        );
         
         // Environment map
         this.envMap = null;
@@ -980,7 +983,9 @@ export class RenderingPanel {
         this.ambientLightIntensity = lightingConfig.ambientLightIntensity ?? 0.3;
         this.keyLightColor = lightingConfig.keyLightColor || '#ffffff';
         this.lightFollowsCamera = lightingConfig.lightFollowsCamera || false;
-        this.currentLightingPreset = lightingConfig.currentLightingPreset || 'default';
+        this.currentLightingPreset = normalizeLightingPreset(
+            lightingConfig.currentLightingPreset || 'default'
+        );
         
         // Update all UI elements
         this.syncUIFromState();

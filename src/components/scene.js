@@ -214,48 +214,8 @@ export default class Scene {
      */
     applyLightingPreset(presetName) {
         switch (presetName) {
-            case 'studio':
-                // Classic studio lighting
-                this.setKeyLightIntensity(2.5);
-                this.setFillLightIntensity(0.8);
-                this.setAmbientLightIntensity(0.3);
-                this.setKeyLightColor(0xffffff);
-                this.setFillLightColors(0xf0f0ff, 0x404040);
-                this.setKeyLightDirection(1, 1, 1);
-                break;
-                
-            case 'warm':
-                // Warm, golden lighting
-                this.setKeyLightIntensity(2.0);
-                this.setFillLightIntensity(0.6);
-                this.setAmbientLightIntensity(0.4);
-                this.setKeyLightColor(0xfff4e0);
-                this.setFillLightColors(0xffeedd, 0x443322);
-                this.setKeyLightDirection(1, 0.8, 0.5);
-                break;
-                
-            case 'cool':
-                // Cool, blue lighting
-                this.setKeyLightIntensity(2.0);
-                this.setFillLightIntensity(0.7);
-                this.setAmbientLightIntensity(0.3);
-                this.setKeyLightColor(0xe8f0ff);
-                this.setFillLightColors(0xd0e0ff, 0x303040);
-                this.setKeyLightDirection(0.5, 1, 1);
-                break;
-                
-            case 'dramatic':
-                // High contrast dramatic lighting
-                this.setKeyLightIntensity(3.5);
-                this.setFillLightIntensity(0.3);
-                this.setAmbientLightIntensity(0.1);
-                this.setKeyLightColor(0xffffff);
-                this.setFillLightColors(0x808080, 0x202020);
-                this.setKeyLightDirection(1, 0.5, 0);
-                break;
-                
-            case 'flat':
-                // Flat, even lighting (good for documentation)
+            case 'even':
+                // Uniform illumination — useful for comparing colors and labels
                 this.setKeyLightIntensity(1.5);
                 this.setFillLightIntensity(1.5);
                 this.setAmbientLightIntensity(0.8);
@@ -263,10 +223,19 @@ export default class Scene {
                 this.setFillLightColors(0xffffff, 0x808080);
                 this.setKeyLightDirection(0, 1, 0);
                 break;
-                
+
+            case 'relief':
+                // Directional key — emphasizes depth and surface detail
+                this.setKeyLightIntensity(3.5);
+                this.setFillLightIntensity(0.3);
+                this.setAmbientLightIntensity(0.1);
+                this.setKeyLightColor(0xffffff);
+                this.setFillLightColors(0x808080, 0x202020);
+                this.setKeyLightDirection(1, 0.5, 0);
+                break;
+
             case 'default':
             default:
-                // Default balanced lighting
                 this.setKeyLightIntensity(2.0);
                 this.setFillLightIntensity(1.0);
                 this.setAmbientLightIntensity(0.3);
