@@ -45,7 +45,7 @@ coverage/
 !.vscode/tasks.json
 
 # macOS Finder metadata
-**/*/.DS_Store
+.DS_Store
 
 # -----------------------------------------------------------------------------
 # Mesh Data Files
