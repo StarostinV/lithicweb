@@ -2,7 +2,7 @@
 
 ## 3D mesh annotation tool for lithic artifacts
 
-The web page is deployed at [neurolithic.org](https://neurolithic.org/).
+The web page is deployed at [neurolithic.org](https://www.neurolithic.org/).
 
 ![Webpage](readme/webpage-readme.png)
 
