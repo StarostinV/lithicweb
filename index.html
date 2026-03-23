@@ -75,6 +75,10 @@
                         <i class="fas fa-chart-bar"></i>
                         <span>Evaluation</span>
                     </button>
+                    <button id="scarOrderPanelBtn" class="nav-btn" title="Scar Temporal Ordering">
+                        <i class="fas fa-sort-numeric-down"></i>
+                        <span>Order</span>
+                    </button>
                 </div>
             </div>
             <div class="nav-group">
@@ -188,6 +192,9 @@
     <!-- Main Canvas Area -->
     <div class="canvas-container">
         <canvas id="renderCanvas"></canvas>
+        <div id="scarLabelsOverlay" class="scar-labels-overlay">
+            <svg id="scarLabelsSvg" class="scar-labels-svg"></svg>
+        </div>
         <!-- Annotation Label (single-view mode - hidden in dual-view) -->
         <div id="annotationLabel" class="annotation-label" title="Click to open Annotation Library">
             <i class="fas fa-tag"></i> <span id="annotationLabelText">Untitled</span>
@@ -207,6 +214,11 @@
     <!-- Erase Toggle Indicator (visible in draw modes, toggles draw/erase) -->
     <div id="eraseToggleIndicator" class="erase-toggle-indicator" title="Switch to Erase mode">
         <i class="fas fa-arrow-right switch-arrow"></i><i class="fas fa-eraser"></i> Erase
+    </div>
+
+    <!-- Scar Order Toggle Indicator (visible in scar order / view mode when panel active) -->
+    <div id="scarOrderToggleIndicator" class="scar-order-toggle-indicator" title="Switch mode">
+        <i class="fas fa-arrow-right switch-arrow"></i><i class="fas fa-eye"></i> View
     </div>
 
     <!-- Floating Undo/Redo buttons for tablet users -->
@@ -600,6 +612,104 @@
             </div>
         </div>
         
+        <!-- ===== SCAR ORDER PANEL ===== -->
+        <div id="scarOrderPanel" class="panel hidden">
+            <div class="panel-header">
+                <div class="panel-header-icon scar-order-icon"><i class="fas fa-sort-numeric-down"></i></div>
+                <div class="panel-header-text">
+                    <h2>Scar Order</h2>
+                    <span class="panel-subtitle">Temporal ordering of scars</span>
+                </div>
+            </div>
+
+            <div class="panel-content">
+                <!-- Quick Tips -->
+                <div class="quick-tips">
+                    <div class="tip-item"><i class="fas fa-mouse-pointer"></i> Click the younger scar first</div>
+                    <div class="tip-item"><i class="fas fa-hand-pointer"></i> Then click the older scar</div>
+                </div>
+
+                <!-- Actions -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-play-circle"></i>
+                        <span>Actions</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="scar-order-actions">
+                            <button id="scarOrderInit" class="btn btn-primary" title="Build scar graph from current segmentation">
+                                <i class="fas fa-project-diagram"></i> Initialize
+                            </button>
+                            <button id="scarOrderPreseed" class="btn btn-secondary" disabled title="Auto-fill using size heuristic">
+                                <i class="fas fa-magic"></i> Preseed
+                            </button>
+                            <button id="scarOrderClearPreseed" class="btn btn-secondary" disabled title="Remove auto-filled comparisons">
+                                <i class="fas fa-undo"></i> Clear Preseed
+                            </button>
+                            <button id="scarOrderSave" class="btn btn-secondary" disabled title="Save ordering to annotation metadata">
+                                <i class="fas fa-save"></i> Save
+                            </button>
+                        </div>
+                        <div class="scar-order-colormap-row">
+                            <label class="scar-order-toggle">
+                                <input type="checkbox" id="scarOrderColormap" checked>
+                                <span>Order colors</span>
+                            </label>
+                            <select id="scarOrderColormapSelect" class="scar-order-select" title="Choose colormap">
+                                <option value="blueRed">Blue → Red</option>
+                                <option value="viridis">Viridis</option>
+                                <option value="plasma">Plasma</option>
+                                <option value="coolwarm">Cool-Warm</option>
+                                <option value="turbo">Turbo</option>
+                            </select>
+                        </div>
+                        <div id="scarColormapLegend" class="colormap-legend" style="display: none;">
+                            <span class="colormap-legend-label">Older</span>
+                            <div class="colormap-legend-bar" id="colormapLegendBar"></div>
+                            <span class="colormap-legend-label">Younger</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Indicator -->
+                <div class="panel-section">
+                    <div class="section-content">
+                        <div id="scarOrderStatus" class="scar-order-status">
+                            <i id="scarOrderStatusIcon" class="fas fa-info-circle"></i>
+                            <span id="scarOrderStatusText">Click Initialize to begin</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scars List -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-puzzle-piece"></i>
+                        <span>Scars <span id="scarCount" class="section-badge">0</span></span>
+                    </div>
+                    <div class="section-content">
+                        <div id="scarList" class="scar-list">
+                            <p class="empty-state">Click Initialize to build scar graph</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comparisons -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>Comparisons <span id="comparisonCount" class="section-badge">0/0</span></span>
+                    </div>
+                    <div class="section-content">
+                        <div id="comparisonList" class="comparison-list">
+                            <p class="empty-state">No adjacency edges yet</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
         <!-- ===== HISTORY PANEL ===== -->
         <div id="historyPanel" class="panel hidden">
             <div class="panel-header">

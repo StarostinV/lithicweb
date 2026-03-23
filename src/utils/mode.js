@@ -7,7 +7,8 @@ export const MODES = Object.freeze({
     ARROW: 'arrow',
     DELETEARROWS: 'deleteArrows',
     DRAWLINES: 'drawLines',
-    RIDGE: 'ridge'
+    RIDGE: 'ridge',
+    SCAR_ORDER: 'scarOrder'
 });
 
 /**
@@ -31,7 +32,8 @@ const MODE_LABELS = {
     [MODES.ARROW]: { label: 'Arrows', icon: 'fa-arrow-right', color: '#10b981' },
     [MODES.DELETEARROWS]: { label: 'Delete Arrows', icon: 'fa-trash-alt', color: '#ef4444' },
     [MODES.DRAWLINES]: { label: 'Lines', icon: 'fa-project-diagram', color: '#8b5cf6' },
-    [MODES.RIDGE]: { label: 'Ridge', icon: 'fa-mountain', color: '#14b8a6' }
+    [MODES.RIDGE]: { label: 'Ridge', icon: 'fa-mountain', color: '#14b8a6' },
+    [MODES.SCAR_ORDER]: { label: 'Order', icon: 'fa-sort-numeric-down', color: '#8b5cf6' }
 };
 
 /**

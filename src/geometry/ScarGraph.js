@@ -7,9 +7,9 @@
  * downstream analysis.
  *
  * Pipeline:
- * 1. Erode fat annotation edges to true segment boundaries
+ * 1. Erode annotation edges — assign every edge vertex to a neighboring segment
  * 2. Identify scars from connected vertex labels
- * 3. Build adjacency from remaining boundary vertices
+ * 3. Build adjacency by finding vertices whose neighbors have different labels
  * 4. Compute boundary roughness from dihedral angles
  *
  * No THREE.js dependencies. Uses typed arrays for performance on large meshes.
@@ -23,17 +23,17 @@ import { edgeKey } from './edgeAngles.js';
 // ============== Edge Erosion ==============
 
 /**
- * Erode "fat" annotation edges by iteratively peeling edge vertices
- * that touch only one segment. Remaining edge vertices touch 2+ segments
- * (true boundaries) or none.
+ * Fully erode annotation edges by iteratively assigning each edge vertex
+ * to the most common neighboring segment label. Continues until no edge
+ * vertices (label 0) remain, or no further progress can be made.
  *
  * @param {Array|Int32Array} faceLabels - Per-vertex segment labels (1-indexed, 0 = edge vertex)
  * @param {Set<number>} edgeIndices - Vertex indices marked as edges
  * @param {Map<number, Set<number>>} adjacencyGraph - Vertex adjacency (vertexIndex -> Set of neighbor vertices)
  * @param {number} vertexCount - Total number of vertices
  * @returns {{workingLabels: Int32Array, remainingEdges: Set<number>}}
- *   - workingLabels: Updated per-vertex labels with eroded edges assigned to segments
- *   - remainingEdges: Remaining true boundary vertices
+ *   - workingLabels: Updated per-vertex labels with all edges assigned to segments
+ *   - remainingEdges: Any vertices that could not be assigned (pathological cases only)
  */
 export function erodeEdges(faceLabels, edgeIndices, adjacencyGraph, vertexCount) {
     const workingLabels = new Int32Array(vertexCount);
@@ -43,26 +43,35 @@ export function erodeEdges(faceLabels, edgeIndices, adjacencyGraph, vertexCount)
 
     const remainingEdges = new Set(edgeIndices);
 
-    while (true) {
+    while (remainingEdges.size > 0) {
         const toAssign = [];
 
         for (const v of remainingEdges) {
-            const neighborSegments = new Set();
+            // Count how many non-edge neighbors have each label
+            const neighborCounts = new Map();
             const neighbors = adjacencyGraph.get(v);
             if (neighbors) {
                 for (const n of neighbors) {
                     if (!remainingEdges.has(n) && workingLabels[n] > 0) {
-                        neighborSegments.add(workingLabels[n]);
+                        neighborCounts.set(workingLabels[n], (neighborCounts.get(workingLabels[n]) || 0) + 1);
                     }
                 }
             }
-            if (neighborSegments.size === 1) {
-                const label = neighborSegments.values().next().value;
-                toAssign.push({ vertex: v, label });
+
+            if (neighborCounts.size >= 1) {
+                // Pick the most common neighbor label
+                let bestLabel = 0, bestCount = 0;
+                for (const [label, count] of neighborCounts) {
+                    if (count > bestCount) {
+                        bestCount = count;
+                        bestLabel = label;
+                    }
+                }
+                toAssign.push({ vertex: v, label: bestLabel });
             }
         }
 
-        if (toAssign.length === 0) break;
+        if (toAssign.length === 0) break; // no progress — stop
 
         for (const { vertex, label } of toAssign) {
             workingLabels[vertex] = label;
@@ -80,12 +89,11 @@ export function erodeEdges(faceLabels, edgeIndices, adjacencyGraph, vertexCount)
  * Group vertices by their working labels and assign sequential scar IDs.
  * Scars are sorted by minimum vertex index ascending.
  *
- * @param {Int32Array} workingLabels - Per-vertex segment labels (0 = boundary)
+ * @param {Int32Array} workingLabels - Per-vertex segment labels (0 = unassigned)
  * @param {number} vertexCount - Total number of vertices
  * @returns {Array<{scarId: number, representativeVertex: number, vertexCount: number, originalLabel: number}>}
  */
 function identifyScars(workingLabels, vertexCount) {
-    // Group vertices by label
     const labelGroups = new Map();
     for (let v = 0; v < vertexCount; v++) {
         const label = workingLabels[v];
@@ -100,11 +108,10 @@ function identifyScars(workingLabels, vertexCount) {
         group.count++;
     }
 
-    // Sort by minVertex ascending
     const groups = Array.from(labelGroups.values());
-    groups.sort((a, b) => a.minVertex - b.minVertex);
+    // Sort by size descending (largest scar = scarId 0), tie-break by minVertex
+    groups.sort((a, b) => b.count - a.count || a.minVertex - b.minVertex);
 
-    // Assign sequential scarIds
     return groups.map((g, idx) => ({
         scarId: idx,
         representativeVertex: g.minVertex,
@@ -117,57 +124,58 @@ function identifyScars(workingLabels, vertexCount) {
 // ============== Scar Adjacency ==============
 
 /**
- * Build adjacency edges between scars from remaining boundary vertices.
- * A boundary vertex that touches 2+ different scars creates edges between
- * each pair.
+ * Build adjacency edges between scars by finding vertices whose neighbors
+ * have different labels. Also identifies boundary vertices for roughness
+ * computation.
  *
- * @param {Set<number>} remainingEdges - True boundary vertex indices
- * @param {Int32Array} workingLabels - Per-vertex segment labels
+ * @param {Int32Array} workingLabels - Per-vertex segment labels (fully assigned)
  * @param {Map<number, Set<number>>} adjacencyGraph - Vertex adjacency
  * @param {Array<{scarId: number, originalLabel: number}>} scars - Scar definitions
- * @returns {Array<{scarA: number, scarB: number, boundaryVertices: Set<number>}>}
+ * @param {number} vertexCount - Total number of vertices
+ * @returns {{adjacency: Array<{scarA: number, scarB: number, boundaryVertices: Set<number>}>, boundaryVertices: Set<number>}}
  */
-function buildScarAdjacency(remainingEdges, workingLabels, adjacencyGraph, scars) {
-    // Build label → scarId lookup
+function buildScarAdjacency(workingLabels, adjacencyGraph, scars, vertexCount) {
     const labelToScarId = new Map();
     for (const scar of scars) {
         labelToScarId.set(scar.originalLabel, scar.scarId);
     }
 
-    // Collect boundary pairs
-    const pairMap = new Map(); // "scarA_scarB" -> { scarA, scarB, boundaryVertices }
+    const pairMap = new Map();
+    const allBoundaryVertices = new Set();
 
-    for (const v of remainingEdges) {
-        const neighborScarIds = new Set();
+    for (let v = 0; v < vertexCount; v++) {
+        const labelV = workingLabels[v];
+        if (labelV === 0) continue;
+        const scarIdV = labelToScarId.get(labelV);
+        if (scarIdV === undefined) continue;
+
         const neighbors = adjacencyGraph.get(v);
-        if (neighbors) {
-            for (const n of neighbors) {
-                if (!remainingEdges.has(n)) {
-                    const label = workingLabels[n];
-                    if (label > 0 && labelToScarId.has(label)) {
-                        neighborScarIds.add(labelToScarId.get(label));
-                    }
-                }
-            }
-        }
+        if (!neighbors) continue;
 
-        if (neighborScarIds.size >= 2) {
-            const ids = Array.from(neighborScarIds).sort((a, b) => a - b);
-            for (let i = 0; i < ids.length; i++) {
-                for (let j = i + 1; j < ids.length; j++) {
-                    const a = ids[i];
-                    const b = ids[j];
-                    const key = `${a}_${b}`;
-                    if (!pairMap.has(key)) {
-                        pairMap.set(key, { scarA: a, scarB: b, boundaryVertices: new Set() });
-                    }
-                    pairMap.get(key).boundaryVertices.add(v);
+        let isBoundary = false;
+        for (const n of neighbors) {
+            const labelN = workingLabels[n];
+            if (labelN > 0 && labelN !== labelV) {
+                isBoundary = true;
+                const scarIdN = labelToScarId.get(labelN);
+                if (scarIdN === undefined) continue;
+
+                const a = Math.min(scarIdV, scarIdN);
+                const b = Math.max(scarIdV, scarIdN);
+                const key = `${a}_${b}`;
+                if (!pairMap.has(key)) {
+                    pairMap.set(key, { scarA: a, scarB: b, boundaryVertices: new Set() });
                 }
+                pairMap.get(key).boundaryVertices.add(v);
             }
         }
+        if (isBoundary) allBoundaryVertices.add(v);
     }
 
-    return Array.from(pairMap.values());
+    return {
+        adjacency: Array.from(pairMap.values()),
+        boundaryVertices: allBoundaryVertices,
+    };
 }
 
 
@@ -175,12 +183,6 @@ function buildScarAdjacency(remainingEdges, workingLabels, adjacencyGraph, scars
 
 /**
  * Compute the unit normal of a triangle face.
- *
- * @param {Float32Array|number[]} positions - Flat vertex positions [x0,y0,z0, x1,y1,z1, ...]
- * @param {number} v0 - First vertex index
- * @param {number} v1 - Second vertex index
- * @param {number} v2 - Third vertex index
- * @returns {number[]} Unit normal [nx, ny, nz], or [0,0,0] for degenerate triangles
  */
 function computeFaceNormal(positions, v0, v1, v2) {
     const ax = positions[v0 * 3], ay = positions[v0 * 3 + 1], az = positions[v0 * 3 + 2];
@@ -199,20 +201,12 @@ function computeFaceNormal(positions, v0, v1, v2) {
 
 /**
  * Classify a face by majority vote of its 3 vertices' working labels.
- * Only non-zero labels are counted.
- *
- * @param {Int32Array} workingLabels - Per-vertex segment labels
- * @param {number} v0 - First vertex index
- * @param {number} v1 - Second vertex index
- * @param {number} v2 - Third vertex index
- * @returns {number} The most common non-zero label, or 0 if all are zero
  */
 function majorityLabel(workingLabels, v0, v1, v2) {
     const a = workingLabels[v0];
     const b = workingLabels[v1];
     const c = workingLabels[v2];
 
-    // Count occurrences of each non-zero label
     const counts = new Map();
     if (a > 0) counts.set(a, (counts.get(a) || 0) + 1);
     if (b > 0) counts.set(b, (counts.get(b) || 0) + 1);
@@ -234,16 +228,10 @@ function majorityLabel(workingLabels, v0, v1, v2) {
 /**
  * Compute dihedral angle statistics along each scar adjacency boundary.
  * Mutates the edges array in place to add sharpness, roughness, and boundarySize.
- *
- * @param {Array<{scarA: number, scarB: number, boundaryVertices: Set<number>}>} edges - Adjacency edges
- * @param {Int32Array} workingLabels - Per-vertex segment labels
- * @param {Float32Array|number[]} positions - Flat vertex positions
- * @param {Uint32Array|number[]} indices - Flat triangle indices
  */
 function computeBoundaryRoughness(edges, workingLabels, positions, indices) {
     const faceCount = indices.length / 3;
 
-    // Step 1: Collect all boundary vertices across all edges
     const allBoundaryVertices = new Set();
     for (const edge of edges) {
         for (const v of edge.boundaryVertices) {
@@ -260,8 +248,6 @@ function computeBoundaryRoughness(edges, workingLabels, positions, indices) {
         return;
     }
 
-    // Step 2: Build vertex→faces map for vertices incident to boundary vertices
-    // A face is relevant if any of its 3 vertices is a boundary vertex
     const vertexToFaces = new Map();
     const faceClassifications = new Int32Array(faceCount);
 
@@ -276,7 +262,6 @@ function computeBoundaryRoughness(edges, workingLabels, positions, indices) {
                           allBoundaryVertices.has(v2);
 
         if (incident) {
-            // Register this face for all three vertices
             const verts = [v0, v1, v2];
             for (const v of verts) {
                 if (!vertexToFaces.has(v)) {
@@ -286,13 +271,10 @@ function computeBoundaryRoughness(edges, workingLabels, positions, indices) {
             }
         }
 
-        // Step 3: Classify every face by majority vote
         faceClassifications[f] = majorityLabel(workingLabels, v0, v1, v2);
     }
 
-    // Step 4: For each adjacency edge, compute dihedral angle statistics
     for (const edge of edges) {
-        // 4a: Collect candidate faces (incident to any boundary vertex of this edge)
         const candidateFaces = new Set();
         for (const v of edge.boundaryVertices) {
             const faces = vertexToFaces.get(v);
@@ -303,7 +285,6 @@ function computeBoundaryRoughness(edges, workingLabels, positions, indices) {
             }
         }
 
-        // 4b-c: Build local mesh edge → [face1, face2] map for candidate faces
         const meshEdgeToFaces = new Map();
         for (const f of candidateFaces) {
             const base = f * 3;
@@ -326,7 +307,6 @@ function computeBoundaryRoughness(edges, workingLabels, positions, indices) {
             }
         }
 
-        // Find cross-boundary mesh edges: two incident faces belong to different segments
         const dihedralAngles = [];
 
         for (const [, faces] of meshEdgeToFaces) {
@@ -338,7 +318,6 @@ function computeBoundaryRoughness(edges, workingLabels, positions, indices) {
 
             if (seg1 === seg2 || seg1 === 0 || seg2 === 0) continue;
 
-            // 4d: Compute dihedral angle from face normals
             const base1 = f1 * 3;
             const n1 = computeFaceNormal(positions, indices[base1], indices[base1 + 1], indices[base1 + 2]);
             const base2 = f2 * 3;
@@ -350,7 +329,6 @@ function computeBoundaryRoughness(edges, workingLabels, positions, indices) {
             dihedralAngles.push(angle);
         }
 
-        // Step 5: Compute statistics
         if (dihedralAngles.length > 0) {
             let sum = 0;
             for (let i = 0; i < dihedralAngles.length; i++) {
@@ -399,14 +377,16 @@ function computeBoundaryRoughness(edges, workingLabels, positions, indices) {
  * }}
  */
 export function buildScarGraph(faceLabels, edgeIndices, adjacencyGraph, vertexCount, positions, indices) {
-    // Step 1: Erode fat annotation edges
+    // Step 1: Fully erode annotation edges
     const { workingLabels, remainingEdges } = erodeEdges(faceLabels, edgeIndices, adjacencyGraph, vertexCount);
 
     // Step 2: Identify scars from working labels
     const scars = identifyScars(workingLabels, vertexCount);
 
-    // Step 3: Build adjacency between scars
-    const edges = buildScarAdjacency(remainingEdges, workingLabels, adjacencyGraph, scars);
+    // Step 3: Build adjacency by scanning for label boundaries
+    const { adjacency: edges, boundaryVertices } = buildScarAdjacency(
+        workingLabels, adjacencyGraph, scars, vertexCount
+    );
 
     // Step 4: Compute boundary roughness statistics
     computeBoundaryRoughness(edges, workingLabels, positions, indices);
@@ -426,6 +406,6 @@ export function buildScarGraph(faceLabels, edgeIndices, adjacencyGraph, vertexCo
             boundarySize,
         })),
         workingLabels,
-        boundaryVertices: remainingEdges,
+        boundaryVertices,
     };
 }

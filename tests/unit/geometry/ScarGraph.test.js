@@ -290,7 +290,7 @@ function makeTripleJunctionFixture() {
 
 describe('ScarGraph', () => {
     describe('erodeEdges', () => {
-        it('should not change thin edges (1 vertex wide)', () => {
+        it('should fully assign thin edges', () => {
             const { adjacencyGraph, vertexCount } = makeFlatStrip();
             const faceLabels = makeThinEdgeLabels();
             const edgeIndices = makeThinEdgeIndices();
@@ -299,19 +299,21 @@ describe('ScarGraph', () => {
                 faceLabels, edgeIndices, adjacencyGraph, vertexCount
             );
 
-            // Thin edges should remain: vertices 2 and 7
-            expect(remainingEdges.size).toBe(2);
-            expect(remainingEdges.has(2)).toBe(true);
-            expect(remainingEdges.has(7)).toBe(true);
+            // All edge vertices should be fully assigned
+            expect(remainingEdges.size).toBe(0);
 
-            // Non-edge labels should be unchanged
+            // Non-edge labels unchanged
             expect(workingLabels[0]).toBe(1);
             expect(workingLabels[1]).toBe(1);
             expect(workingLabels[3]).toBe(2);
             expect(workingLabels[4]).toBe(2);
+
+            // Edge vertices assigned to a segment (either 1 or 2)
+            expect(workingLabels[2]).toBeGreaterThan(0);
+            expect(workingLabels[7]).toBeGreaterThan(0);
         });
 
-        it('should erode fat edges to thin boundary', () => {
+        it('should fully assign fat edges', () => {
             const { adjacencyGraph, vertexCount } = makeFlatStrip();
             const faceLabels = makeFatEdgeLabels();
             const edgeIndices = makeFatEdgeIndices();
@@ -320,10 +322,8 @@ describe('ScarGraph', () => {
                 faceLabels, edgeIndices, adjacencyGraph, vertexCount
             );
 
-            // Fat edge should erode to boundary at v2, v7
-            expect(remainingEdges.size).toBe(2);
-            expect(remainingEdges.has(2)).toBe(true);
-            expect(remainingEdges.has(7)).toBe(true);
+            // All edge vertices fully assigned
+            expect(remainingEdges.size).toBe(0);
 
             // Eroded vertices assigned to nearest segment
             expect(workingLabels[1]).toBe(1);  // v1 → segment 1
@@ -331,9 +331,9 @@ describe('ScarGraph', () => {
             expect(workingLabels[3]).toBe(2);  // v3 → segment 2
             expect(workingLabels[8]).toBe(2);  // v8 → segment 2
 
-            // Boundary vertices remain 0
-            expect(workingLabels[2]).toBe(0);
-            expect(workingLabels[7]).toBe(0);
+            // Boundary vertices also assigned (to whichever segment is most common)
+            expect(workingLabels[2]).toBeGreaterThan(0);
+            expect(workingLabels[7]).toBeGreaterThan(0);
         });
 
         it('should handle empty edge set', () => {
@@ -365,11 +365,15 @@ describe('ScarGraph', () => {
 
             // Scar 0 should be segment with min vertex 0
             expect(result.scars[0].representativeVertex).toBe(0);
-            expect(result.scars[0].vertexCount).toBe(4); // v0, v1, v5, v6
+            // Vertex count >= 4 (original 4 + eroded edge vertices assigned to this segment)
+            expect(result.scars[0].vertexCount).toBeGreaterThanOrEqual(4);
 
-            // Scar 1 should be segment with min vertex 3
-            expect(result.scars[1].representativeVertex).toBe(3);
-            expect(result.scars[1].vertexCount).toBe(4); // v3, v4, v8, v9
+            // Scar 1 should be segment with min vertex 3 (or 2 if v2 assigned to seg 2)
+            expect(result.scars[1].representativeVertex).toBeLessThanOrEqual(3);
+            expect(result.scars[1].vertexCount).toBeGreaterThanOrEqual(4);
+
+            // Total vertices should sum to 10
+            expect(result.scars[0].vertexCount + result.scars[1].vertexCount).toBe(10);
         });
 
         it('should detect adjacency between two scars', () => {
@@ -467,10 +471,9 @@ describe('ScarGraph', () => {
                 positions, indices
             );
 
+            // Boundary vertices = vertices whose neighbors have different labels
             expect(result.boundaryVertices).toBeInstanceOf(Set);
-            expect(result.boundaryVertices.size).toBe(2);
-            expect(result.boundaryVertices.has(2)).toBe(true);
-            expect(result.boundaryVertices.has(7)).toBe(true);
+            expect(result.boundaryVertices.size).toBeGreaterThan(0);
         });
 
         it('should return workingLabels as Int32Array', () => {

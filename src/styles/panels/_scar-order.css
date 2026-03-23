@@ -1,0 +1,424 @@
+/**
+ * Scar Order Panel Styles
+ * =======================
+ * Temporal ordering of lithic scars.
+ */
+
+/* Panel header icon gradient */
+.panel-header-icon.scar-order-icon {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+}
+
+/* Action buttons row */
+.scar-order-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.scar-order-actions .btn {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    font-size: 12px;
+    padding: 8px 10px;
+}
+
+.scar-order-actions .btn i {
+    margin-right: 4px;
+}
+
+/* Colormap controls */
+.scar-order-colormap-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color, rgba(0,0,0,0.08));
+}
+
+.scar-order-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.scar-order-toggle input[type="checkbox"] {
+    accent-color: #8b5cf6;
+}
+
+.scar-order-select {
+    flex: 1;
+    font-size: 11px;
+    padding: 4px 6px;
+    border: 1px solid var(--border-color, rgba(0,0,0,0.15));
+    border-radius: 4px;
+    background: var(--bg-primary, white);
+    color: var(--text-primary);
+    cursor: pointer;
+    min-width: 0;
+}
+
+/* Colormap legend bar */
+.colormap-legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.colormap-legend-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+}
+
+.colormap-legend-bar {
+    flex: 1;
+    height: 10px;
+    border-radius: 5px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Status indicator */
+.scar-order-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+}
+
+.scar-order-status i {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.scar-order-status.status-ready {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+}
+
+.scar-order-status.status-selecting {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+}
+
+.scar-order-status.status-success {
+    background: rgba(34, 197, 94, 0.15);
+    color: #16a34a;
+}
+
+.scar-order-status.status-warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+}
+
+.scar-order-status.status-error {
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
+}
+
+/* Section legend (small explanation text) */
+.section-legend {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Scar color dot */
+.scar-color-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    flex-shrink: 0;
+}
+
+/* Scar list */
+.scar-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.scar-list-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.scar-list-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.scar-list-item.selected {
+    background: rgba(34, 197, 94, 0.15);
+    outline: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.scar-list-item .scar-rank {
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    min-width: 16px;
+    text-align: right;
+}
+
+.scar-list-item .scar-name {
+    font-weight: 500;
+    flex: 1;
+}
+
+.scar-list-item .scar-info {
+    color: var(--text-tertiary);
+    font-size: 11px;
+}
+
+/* Comparison list */
+.comparison-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.comparison-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.comparison-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.comparison-item.done {
+    color: var(--text-primary);
+}
+
+.comparison-item.done .comparison-icon {
+    color: #22c55e;
+}
+
+.comparison-item.pending {
+    color: var(--text-tertiary);
+}
+
+.comparison-item.pending .comparison-icon {
+    color: var(--text-tertiary);
+}
+
+.comparison-item .comparison-arrow {
+    color: var(--text-tertiary);
+    font-size: 10px;
+}
+
+.comparison-item .comparison-source {
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    margin-left: auto;
+}
+
+.comparison-item .comparison-source.source-preseed {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
+}
+
+.comparison-item .comparison-delete {
+    opacity: 0;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 2px;
+    transition: opacity 0.15s;
+}
+
+.comparison-item:hover .comparison-delete {
+    opacity: 1;
+}
+
+.comparison-item .comparison-delete:hover {
+    color: #dc2626;
+}
+
+/* Order result list */
+.scar-order-result {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.scar-order-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.scar-order-item .order-rank {
+    font-weight: 600;
+    color: var(--text-tertiary);
+    min-width: 20px;
+    text-align: right;
+}
+
+.scar-order-item .order-label {
+    color: var(--text-secondary);
+    font-size: 11px;
+    margin-left: auto;
+}
+
+/* Empty state text */
+.empty-state {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-style: italic;
+    text-align: center;
+    padding: 12px 0;
+}
+
+/* Section badge (count) */
+.section-badge {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    margin-left: 4px;
+}
+
+/* ========================================
+   3D Canvas Label Overlay
+   ======================================== */
+
+.scar-labels-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 100;
+    overflow: hidden;
+}
+
+.scar-labels-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.scar-labels-svg line {
+    stroke-width: 1.5;
+    stroke-opacity: 0.6;
+}
+
+.scar-label {
+    position: absolute;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+}
+
+/* Scar Order Toggle Indicator (bottom-left, next to mode indicator) */
+.scar-order-toggle-indicator {
+    --toggle-color: #8b5cf6;
+    position: fixed;
+    bottom: 24px;
+    left: 140px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid var(--toggle-color);
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--toggle-color);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(8px);
+    z-index: 50;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    user-select: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-10px);
+}
+
+.scar-order-toggle-indicator.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+}
+
+.scar-order-toggle-indicator:hover,
+.scar-order-toggle-indicator.visible:hover {
+    transform: scale(1.05);
+}
+
+.scar-order-toggle-indicator:active {
+    transform: scale(0.98);
+}
+
+.scar-order-toggle-indicator i {
+    font-size: 14px;
+}
+
+.scar-order-toggle-indicator .switch-arrow {
+    font-size: 10px;
+    opacity: 0.6;
+    margin-right: 4px;
+}
+
+.scar-order-toggle-indicator.view-mode {
+    --toggle-color: #6366f1;
+}
+
+.scar-label-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: white;
+    padding: 0 5px;
+    border-radius: 11px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.6);
+}
