@@ -53,9 +53,14 @@ export { PathFinder } from './PathFinder.js';
 export { IntersectFinder } from './intersections.js';
 
 // Edge angle computation for segmentation
-export { 
-    computeEdgeAngles, 
+export {
+    computeEdgeAngles,
     computeVertexMaxAngles,
     getSharpVertices,
-    radiansToDegrees 
+    radiansToDegrees,
+    edgeKey
 } from './edgeAngles.js';
+
+// Scar order annotation
+export { buildScarGraph, erodeEdges } from './ScarGraph.js';
+export { ScarOrdering } from './ScarOrdering.js';

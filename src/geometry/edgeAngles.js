@@ -21,7 +21,7 @@
  * @param {number} v2 - Second vertex index
  * @returns {string} Canonical edge key
  */
-function edgeKey(v1, v2) {
+export function edgeKey(v1, v2) {
     return v1 < v2 ? `${v1}_${v2}` : `${v2}_${v1}`;
 }
 

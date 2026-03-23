@@ -117,6 +117,11 @@ document.getElementById('resetRenderingBtn').addEventListener('click', () => {
     renderingPanel.resetToDefaults();
 });
 
+// Invert normals button
+document.getElementById('invertNormals').addEventListener('click', () => {
+    meshView.invertMeshNormals();
+});
+
 document.getElementById('exportAnnotations').addEventListener('click', () => {
     // Include current state's metadata under the 'state-metadata' key
     const stateMetadata = meshView.getCurrentStateMetadata();

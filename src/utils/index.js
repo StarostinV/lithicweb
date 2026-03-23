@@ -17,5 +17,4 @@ export { logger } from './logger.js';
 export { default as DynamicTypedArray } from './DynamicTypedArray.js';
 export { default as UserConfig } from './UserConfig.js';
 export { buildAdjacencyGraph, computeCentroid, computeBoundingBox } from './graphUtils.js';
-export { createThreeMesh } from './meshUtils.js';
 export { sanitize } from './sanitize.js';
