@@ -50,6 +50,7 @@ export class MeshView {
         this.basicMesh = mesh;                   // Geometry container (BasicMesh)
         this._threeMesh = null;
         this._meshColors = null;
+        this.annotationLibrary = null;           // Set externally for auto-sync
         this.intersectFinder = new IntersectFinder(scene);
         this.pathFinder = new PathFinder(this);
         
@@ -272,8 +273,8 @@ export class MeshView {
      * @returns {Annotation} New Annotation with current state
      */
     getAnnotation() {
-        const metadata = this.workingAnnotation?.metadata 
-            ? { ...this.workingAnnotation.metadata }
+        const metadata = this.workingAnnotation?.metadata
+            ? JSON.parse(JSON.stringify(this.workingAnnotation.metadata))
             : {};
         metadata.modifiedAt = Date.now();
         
@@ -426,18 +427,12 @@ export class MeshView {
         
         // Only save if there were actual changes
         if (!this._setsEqual(this.pendingAction.previousState, currentState)) {
-            // Snapshot current metadata from workingAnnotation (source of truth)
-            const metadata = this.workingAnnotation?.metadata 
-                ? { ...this.workingAnnotation.metadata } 
-                : {};
-            
-            // Create history snapshot
+            // Create history snapshot (edges + arrows only, no metadata)
             const action = this.history.createAction({
                 edgeIndices: currentState,
                 arrows: this._getArrowData(),
                 type: this.pendingAction.type,
                 description: this.pendingAction.description,
-                metadata: metadata,
             });
             
             // Store previous state for undo compatibility
@@ -667,13 +662,7 @@ export class MeshView {
                     : this.history.getStateAtIndex(currentIndex);
             }
             this._restoreEdgeState(stateToRestore);
-            
-            // Restore metadata from history snapshot to workingAnnotation
-            const metadata = this.history.getStateMetadata(currentIndex);
-            if (this.workingAnnotation && metadata) {
-                this.workingAnnotation.metadata = { ...metadata };
-            }
-            
+
             const autoSegments = document.getElementById('auto-segments');
             if (autoSegments?.checked) {
                 this.updateSegments();
@@ -682,10 +671,10 @@ export class MeshView {
         }
         return false;
     }
-    
+
     /**
      * Redo the last undone action.
-     * 
+     *
      * History is storage - when you redo, you load the next snapshot
      * into workingAnnotation (edges AND metadata).
      * 
@@ -704,12 +693,7 @@ export class MeshView {
             
             if (stateToRestore) {
                 this._restoreEdgeState(stateToRestore);
-                
-                // Restore metadata from the action's annotation to workingAnnotation
-                if (this.workingAnnotation && action.annotation?.metadata) {
-                    this.workingAnnotation.metadata = { ...action.annotation.metadata };
-                }
-                
+
                 const autoSegments = document.getElementById('auto-segments');
                 if (autoSegments?.checked) {
                     this.updateSegments();
@@ -746,13 +730,7 @@ export class MeshView {
         if (targetState) {
             this.history.jumpToViewState(targetIndex);
             this._restoreEdgeState(targetState);
-            
-            // Restore metadata from history snapshot to workingAnnotation
-            const metadata = this.history.getStateMetadata(targetIndex);
-            if (this.workingAnnotation && metadata) {
-                this.workingAnnotation.metadata = { ...metadata };
-            }
-            
+
             const autoSegments = document.getElementById('auto-segments');
             if (autoSegments?.checked) {
                 this.updateSegments();
@@ -1361,7 +1339,8 @@ export class MeshView {
      * @returns {Object}
      */
     getCurrentStateMetadata() {
-        return this.history.getStateMetadata(this.getCurrentStateIndex());
+        // Read from workingAnnotation (source of truth), not history
+        return this.workingAnnotation?.metadata || {};
     }
     
     /**
@@ -1386,9 +1365,10 @@ export class MeshView {
         if (this.workingAnnotation) {
             this.workingAnnotation.metadata[key] = value;
             this.workingAnnotation.metadata.modifiedAt = Date.now();
+            this._syncMetadataToLibrary();
         }
     }
-    
+
     /**
      * Update multiple metadata keys for the current annotation.
      * @param {Object} updates - Key-value pairs to update
@@ -1397,6 +1377,7 @@ export class MeshView {
         if (this.workingAnnotation) {
             Object.assign(this.workingAnnotation.metadata, updates);
             this.workingAnnotation.metadata.modifiedAt = Date.now();
+            this._syncMetadataToLibrary();
         }
     }
 
@@ -1409,8 +1390,21 @@ export class MeshView {
         if (this.workingAnnotation && key in this.workingAnnotation.metadata) {
             delete this.workingAnnotation.metadata[key];
             this.workingAnnotation.metadata.modifiedAt = Date.now();
+            this._syncMetadataToLibrary();
             return true;
         }
         return false;
+    }
+
+    /**
+     * Sync current annotation metadata to the library entry (if one exists).
+     * @private
+     */
+    _syncMetadataToLibrary() {
+        if (!this.annotationLibrary || !this.workingAnnotation) return;
+        const id = this.workingAnnotation.id;
+        if (this.annotationLibrary.has(id)) {
+            this.annotationLibrary.update(id, this.getAnnotation());
+        }
     }
 }

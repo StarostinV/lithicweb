@@ -623,12 +623,6 @@
             </div>
 
             <div class="panel-content">
-                <!-- Quick Tips -->
-                <div class="quick-tips">
-                    <div class="tip-item"><i class="fas fa-mouse-pointer"></i> Click the younger scar first</div>
-                    <div class="tip-item"><i class="fas fa-hand-pointer"></i> Then click the older scar</div>
-                </div>
-
                 <!-- Actions -->
                 <div class="panel-section">
                     <div class="section-header">
@@ -637,9 +631,6 @@
                     </div>
                     <div class="section-content">
                         <div class="scar-order-actions">
-                            <button id="scarOrderInit" class="btn btn-primary" title="Build scar graph from current segmentation">
-                                <i class="fas fa-project-diagram"></i> Initialize
-                            </button>
                             <button id="scarOrderPreseed" class="btn btn-secondary" disabled title="Auto-fill using size heuristic">
                                 <i class="fas fa-magic"></i> Preseed
                             </button>
@@ -651,10 +642,13 @@
                             </button>
                         </div>
                         <div class="scar-order-colormap-row">
-                            <label class="scar-order-toggle">
-                                <input type="checkbox" id="scarOrderColormap" checked>
+                            <div class="toggle-row">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="scarOrderColormap" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
                                 <span>Order colors</span>
-                            </label>
+                            </div>
                             <select id="scarOrderColormapSelect" class="scar-order-select" title="Choose colormap">
                                 <option value="blueRed">Blue → Red</option>
                                 <option value="viridis">Viridis</option>
@@ -671,13 +665,21 @@
                     </div>
                 </div>
 
-                <!-- Status Indicator -->
+                <!-- Pairwise Compare Mode -->
                 <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span>Pairwise Compare</span>
+                    </div>
                     <div class="section-content">
                         <div id="scarOrderStatus" class="scar-order-status">
                             <i id="scarOrderStatusIcon" class="fas fa-info-circle"></i>
-                            <span id="scarOrderStatusText">Click Initialize to begin</span>
+                            <span id="scarOrderStatusText">Initialize first</span>
                         </div>
+                        <button id="scarOrderStartCompare" class="btn btn-secondary btn-full" disabled style="margin-top: 8px;" title="Enter pairwise comparison mode">
+                            <i class="fas fa-hand-pointer"></i> Start Pairwise Compare
+                        </button>
+                        <p class="section-legend" style="margin-top: 6px;">Click the <strong>younger</strong> scar on the mesh, then click the adjacent <strong>older</strong> scar.</p>
                     </div>
                 </div>
 
@@ -688,8 +690,26 @@
                         <span>Scars <span id="scarCount" class="section-badge">0</span></span>
                     </div>
                     <div class="section-content">
+                        <div class="scar-order-actions" style="margin-bottom: 8px;">
+                            <button id="scarOrderRearrange" class="btn btn-secondary btn-full" disabled title="Drag to reorder scars globally">
+                                <i class="fas fa-arrows-alt-v"></i> Rearrange
+                            </button>
+                            <button id="scarOrderApply" class="btn btn-primary" style="display:none" title="Apply the new order">
+                                <i class="fas fa-check"></i> Apply
+                            </button>
+                            <button id="scarOrderCancelRearrange" class="btn btn-secondary" style="display:none" title="Cancel rearrange">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                        <div class="toggle-row" style="margin-bottom: 8px;">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="scarShowOnSelect">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>Auto-rotate to selected</span>
+                        </div>
                         <div id="scarList" class="scar-list">
-                            <p class="empty-state">Click Initialize to build scar graph</p>
+                            <p class="empty-state">Draw edges to create segments</p>
                         </div>
                     </div>
                 </div>

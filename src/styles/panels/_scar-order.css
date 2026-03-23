@@ -184,6 +184,26 @@
     text-align: right;
 }
 
+.scar-list-item .scar-drag-handle {
+    color: var(--text-tertiary);
+    font-size: 10px;
+    cursor: grab;
+    padding: 0 2px;
+}
+
+.scar-list-item .scar-drag-handle:active {
+    cursor: grabbing;
+}
+
+.scar-list-item.dragging {
+    opacity: 0.4;
+}
+
+.scar-list-item.drag-over {
+    border-top: 2px solid #8b5cf6;
+    margin-top: -2px;
+}
+
 .scar-list-item .scar-name {
     font-weight: 500;
     flex: 1;

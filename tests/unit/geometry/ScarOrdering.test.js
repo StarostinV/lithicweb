@@ -317,6 +317,55 @@ describe('ScarOrdering', () => {
         });
     });
 
+    describe('setGlobalOrder', () => {
+        it('should replace all comparisons from a linear order', () => {
+            const graph = makeScarGraph(3);
+            // edges: 0-1, 1-2
+            const ordering = new ScarOrdering(graph);
+            ordering.addComparison(0, 1, 'preseed');
+
+            // Set global order: 0=oldest, 1, 2=youngest
+            ordering.setGlobalOrder([0, 1, 2]);
+
+            // All old comparisons cleared, new ones added as expert
+            expect(ordering.comparisons.every(c => c.source === 'expert')).toBe(true);
+            // Adjacency edges 0-1 and 1-2: younger → older
+            // rank 1 > rank 0, so scar 1 younger than 0: comparison(1, 0)
+            // rank 2 > rank 1, so scar 2 younger than 1: comparison(2, 1)
+            expect(ordering.comparisons.length).toBe(2);
+        });
+
+        it('should produce valid topological order matching input', () => {
+            const graph = makeScarGraph(4);
+            // edges: 0-1, 1-2, 2-3
+            const ordering = new ScarOrdering(graph);
+
+            ordering.setGlobalOrder([2, 0, 3, 1]); // oldest=2, youngest=1
+
+            const topo = ordering.getTopologicalOrder(); // youngest first
+            // youngest=1 should be first
+            expect(topo[0]).toBe(1);
+        });
+
+        it('should be cycle-free', () => {
+            const graph = {
+                scars: [
+                    { scarId: 0, representativeVertex: 0, vertexCount: 100 },
+                    { scarId: 1, representativeVertex: 100, vertexCount: 90 },
+                    { scarId: 2, representativeVertex: 200, vertexCount: 80 },
+                ],
+                edges: [
+                    { scarA: 0, scarB: 1 },
+                    { scarA: 1, scarB: 2 },
+                    { scarA: 0, scarB: 2 },
+                ],
+            };
+            const ordering = new ScarOrdering(graph);
+            ordering.setGlobalOrder([0, 1, 2]);
+            expect(ordering.isFullyOrdered()).toBe(true);
+        });
+    });
+
     describe('clearPreseedComparisons', () => {
         it('should remove only preseed comparisons', () => {
             const ordering = new ScarOrdering();

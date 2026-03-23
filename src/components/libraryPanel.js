@@ -155,7 +155,7 @@ export class LibraryPanel {
         // Save the annotation to library
         // The library will clone it internally to prevent mutation
         const id = this.library.save(annotation);
-        
+
         // If loaded from cloud, track the cloud link
         if (source === 'cloud' && cloudInfo?.stateId) {
             this.library.setCloudLink(id, cloudInfo.stateId);
@@ -251,25 +251,21 @@ export class LibraryPanel {
         
         annotation.name = finalName;
         const id = this.library.save(annotation);
-        
-        // Update workingAnnotation to link to the (possibly new) library entry
-        // This ensures subsequent renames of this library entry affect the current annotation
+
+        // Link workingAnnotation to the library entry
         if (this.meshView.workingAnnotation) {
             this.meshView.workingAnnotation.id = id;
             this.meshView.workingAnnotation.metadata.name = finalName;
         }
-        
+
+        // Clear history — clean slate for new edits on this saved annotation
+        this.meshView.history.clear();
+
         // Emit ANNOTATION_ACTIVE_CHANGED to update the UI label
         eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
             name: finalName,
             source: 'library'
         });
-        
-        // Link to current history state if applicable
-        const currentIndex = this.meshView.history.getCurrentIndex();
-        if (currentIndex > 0) {
-            this.meshView.history.setLibraryLink(currentIndex, id);
-        }
     }
 
     /**

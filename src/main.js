@@ -59,6 +59,7 @@ const meshLoader = new MeshLoader(meshView, arrowDrawer);
 
 // Annotation library (stores saved annotations)
 const annotationLibrary = new AnnotationLibrary();
+meshView.annotationLibrary = annotationLibrary;
 
 // Evaluation manager (must be created before panels that depend on it)
 const evaluationManager = new EvaluationManager(meshView);

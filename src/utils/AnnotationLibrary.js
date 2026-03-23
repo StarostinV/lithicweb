@@ -81,21 +81,26 @@ export class AnnotationLibrary {
      * @param {Annotation} annotation - Annotation to save
      * @returns {string} The annotation's ID
      */
+    /**
+     * Save an annotation to the library.
+     * Stores a clone to prevent external mutation.
+     *
+     * @param {Annotation} annotation - Annotation to save
+     * @returns {string} The annotation's ID
+     */
     save(annotation) {
         const saved = annotation.clone();
         saved.metadata.modifiedAt = Date.now();
-        
-        // If annotation with this ID already exists, preserve some fields
+
         if (this.annotations.has(saved.id)) {
             const existing = this.annotations.get(saved.id);
-            // Preserve cloud link if it exists
             if (existing.metadata.cloudStateId) {
                 saved.metadata.cloudStateId = existing.metadata.cloudStateId;
             }
         }
-        
+
         this.annotations.set(saved.id, saved);
-        
+
         this._emitChange('save', saved.id, saved);
         return saved.id;
     }
@@ -103,7 +108,7 @@ export class AnnotationLibrary {
     /**
      * Load an annotation from the library.
      * Returns a clone to prevent mutation of the stored annotation.
-     * 
+     *
      * @param {string} id - Annotation ID
      * @returns {Annotation|null} Clone of the annotation, or null if not found
      */

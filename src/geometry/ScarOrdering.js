@@ -48,6 +48,15 @@ export class ScarOrdering {
          * @private
          */
         this._reverse = new Map();
+
+        /**
+         * Explicit total order set by setGlobalOrder, oldest first.
+         * Used for display when available, since topological sort tiebreaking
+         * can't preserve order between non-adjacent scars.
+         * @type {Array<number>|null}
+         * @private
+         */
+        this._explicitOrder = null;
     }
 
     /**
@@ -105,6 +114,7 @@ export class ScarOrdering {
         }
 
         // No cycle — add the comparison
+        this._explicitOrder = null;
         this.comparisons.push({ younger, older, source });
 
         if (!this._adjacency.has(younger)) {
@@ -128,6 +138,7 @@ export class ScarOrdering {
      * @returns {boolean} True if the comparison was found and removed
      */
     removeComparison(younger, older) {
+        this._explicitOrder = null;
         const index = this.comparisons.findIndex(
             c => c.younger === younger && c.older === older
         );
@@ -313,6 +324,23 @@ export class ScarOrdering {
     }
 
     /**
+     * Get the best known scar order, oldest first.
+     *
+     * Returns the explicit total order from setGlobalOrder if available,
+     * otherwise falls back to topological sort (reversed to oldest-first).
+     *
+     * @returns {Array<number>|null} Scar IDs oldest first, or null if no ordering exists
+     */
+    getOldestFirstOrder() {
+        if (this._explicitOrder) {
+            return [...this._explicitOrder];
+        }
+        const order = this.getTopologicalOrder();
+        if (order.length === 0) return null;
+        return [...order].reverse();
+    }
+
+    /**
      * Get a copy of all comparisons.
      *
      * @returns {Array<{younger: number, older: number, source: string}>} Copy of the comparisons array
@@ -403,6 +431,7 @@ export class ScarOrdering {
         const expertComparisons = this.comparisons.filter(c => c.source !== 'preseed');
 
         // Reset state
+        this._explicitOrder = null;
         this.comparisons = [];
         this._adjacency = new Map();
         this._reverse = new Map();
@@ -411,6 +440,45 @@ export class ScarOrdering {
         for (const comp of expertComparisons) {
             this.addComparison(comp.younger, comp.older, comp.source);
         }
+    }
+
+    /**
+     * Replace all comparisons with a total linear order.
+     *
+     * Takes an array of scar IDs ordered from oldest (index 0) to youngest
+     * (last index). For each adjacency edge in the scar graph, derives the
+     * comparison direction from the rank order. All comparisons are marked
+     * as 'expert'. Guaranteed cycle-free because it derives from a total order.
+     *
+     * @param {Array<number>} orderedScarIds - Scar IDs from oldest to youngest
+     */
+    setGlobalOrder(orderedScarIds) {
+        this.comparisons = [];
+        this._adjacency = new Map();
+        this._reverse = new Map();
+        this._explicitOrder = null;
+
+        const rankMap = new Map();
+        for (let i = 0; i < orderedScarIds.length; i++) {
+            rankMap.set(orderedScarIds[i], i); // 0 = oldest
+        }
+
+        if (this.scarGraph?.edges) {
+            for (const edge of this.scarGraph.edges) {
+                const rankA = rankMap.get(edge.scarA);
+                const rankB = rankMap.get(edge.scarB);
+                if (rankA === undefined || rankB === undefined) continue;
+                // Higher rank = younger (created later)
+                if (rankA > rankB) {
+                    this.addComparison(edge.scarA, edge.scarB, 'expert');
+                } else if (rankB > rankA) {
+                    this.addComparison(edge.scarB, edge.scarA, 'expert');
+                }
+            }
+        }
+
+        // Set after addComparison calls (which clear _explicitOrder)
+        this._explicitOrder = [...orderedScarIds];
     }
 
     /**
@@ -437,7 +505,8 @@ export class ScarOrdering {
                 younger: c.younger,
                 older: c.older,
                 source: c.source
-            }))
+            })),
+            explicitOrder: this._explicitOrder ? [...this._explicitOrder] : null
         };
     }
 
@@ -454,6 +523,9 @@ export class ScarOrdering {
         const ordering = new ScarOrdering(scarGraph || { scars: data.scars, edges: data.edges });
         for (const comp of data.comparisons) {
             ordering.addComparison(comp.younger, comp.older, comp.source);
+        }
+        if (data.explicitOrder) {
+            ordering._explicitOrder = [...data.explicitOrder];
         }
         return ordering;
     }

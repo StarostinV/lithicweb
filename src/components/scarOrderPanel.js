@@ -39,6 +39,11 @@ export class ScarOrderPanel {
         this._colormapEnabled = true;
         this._colormapName = 'blueRed';
 
+        // Rearrange state
+        this._rearrangeMode = false;
+        this._rearrangeOrder = null; // Array<scarId> during rearrange
+        this._showOnSelect = false;
+
         // Label overlay state
         this._scarSurfaceData = new Map(); // scarId → { position: Vector3, normal: Vector3 }
         this._labelElements = new Map();
@@ -55,7 +60,6 @@ export class ScarOrderPanel {
         this._scarCountEl = document.getElementById('scarCount');
         this._compListEl = document.getElementById('comparisonList');
         this._compCountEl = document.getElementById('comparisonCount');
-        this._initBtn = document.getElementById('scarOrderInit');
         this._preseedBtn = document.getElementById('scarOrderPreseed');
         this._clearPreseedBtn = document.getElementById('scarOrderClearPreseed');
         this._saveBtn = document.getElementById('scarOrderSave');
@@ -64,6 +68,11 @@ export class ScarOrderPanel {
         this._colormapLegendEl = document.getElementById('scarColormapLegend');
         this._colormapLegendBarEl = document.getElementById('colormapLegendBar');
         this._modeToggleEl = document.getElementById('scarOrderToggleIndicator');
+        this._rearrangeBtn = document.getElementById('scarOrderRearrange');
+        this._applyBtn = document.getElementById('scarOrderApply');
+        this._cancelRearrangeBtn = document.getElementById('scarOrderCancelRearrange');
+        this._showOnSelectCheckbox = document.getElementById('scarShowOnSelect');
+        this._startCompareBtn = document.getElementById('scarOrderStartCompare');
 
         this._setupEventListeners();
         this._setupEventBusSubscriptions();
@@ -75,7 +84,6 @@ export class ScarOrderPanel {
     // ========================================
 
     _setupEventListeners() {
-        this._initBtn?.addEventListener('click', () => this._initializeGraph());
         this._preseedBtn?.addEventListener('click', () => this._preseed());
         this._clearPreseedBtn?.addEventListener('click', () => this._clearPreseed());
         this._saveBtn?.addEventListener('click', () => this._save());
@@ -98,6 +106,21 @@ export class ScarOrderPanel {
             this._updateUI();
         });
 
+        this._rearrangeBtn?.addEventListener('click', () => this._enterRearrangeMode());
+        this._applyBtn?.addEventListener('click', () => this._applyRearrange());
+        this._cancelRearrangeBtn?.addEventListener('click', () => this._cancelRearrange());
+        this._startCompareBtn?.addEventListener('click', () => {
+            if (this.mode.currentMode === MODES.SCAR_ORDER) {
+                this.mode.setMode(MODES.VIEW, true);
+            } else {
+                this.mode.setMode(MODES.SCAR_ORDER, true);
+                this._setStatus('Click the YOUNGER scar first', 'ready');
+            }
+        });
+        this._showOnSelectCheckbox?.addEventListener('change', () => {
+            this._showOnSelect = this._showOnSelectCheckbox.checked;
+        });
+
         // Mode toggle click handler
         this._modeToggleEl?.addEventListener('click', () => {
             if (this.mode.currentMode === MODES.SCAR_ORDER) {
@@ -110,12 +133,13 @@ export class ScarOrderPanel {
 
     _setupEventBusSubscriptions() {
         eventBus.on(Events.MESH_LOADED, () => this._clearState(), 'scarOrderPanel');
-        eventBus.on(Events.STATE_CHANGED, () => this._clearState(), 'scarOrderPanel');
+        eventBus.on(Events.ANNOTATION_ACTIVE_CHANGED, () => this._clearState(), 'scarOrderPanel');
         eventBus.on(Events.MODE_CHANGED, (data) => {
             if (data.previousMode === MODES.SCAR_ORDER && data.mode !== MODES.SCAR_ORDER) {
                 this._cancelSelection();
             }
             this._updateModeToggle();
+            this._updateCompareButton();
         }, 'scarOrderPanel');
     }
 
@@ -149,25 +173,24 @@ export class ScarOrderPanel {
     _updateModeToggle() {
         if (!this._modeToggleEl) return;
 
-        if (!this._panelActive || !this.scarGraph) {
-            this._modeToggleEl.classList.remove('visible');
-            return;
-        }
-
-        if (this.mode.currentMode === MODES.SCAR_ORDER) {
-            // In order mode → show "→ View"
+        // Only show the toggle when in SCAR_ORDER mode (to offer "→ View").
+        // In VIEW mode, the main mode indicator click already toggles back,
+        // and the transform indicator ("Rotate") handles the secondary slot.
+        if (this._panelActive && this.scarGraph && this.mode.currentMode === MODES.SCAR_ORDER) {
             this._modeToggleEl.innerHTML = '<i class="fas fa-arrow-right switch-arrow"></i><i class="fas fa-eye"></i> View';
             this._modeToggleEl.title = 'Switch to View mode';
-            this._modeToggleEl.classList.add('view-mode');
-            this._modeToggleEl.classList.add('visible');
-        } else if (this.mode.currentMode === MODES.VIEW) {
-            // In view mode → show "→ Order"
-            this._modeToggleEl.innerHTML = '<i class="fas fa-arrow-right switch-arrow"></i><i class="fas fa-sort-numeric-down"></i> Order';
-            this._modeToggleEl.title = 'Switch to Order mode';
-            this._modeToggleEl.classList.remove('view-mode');
             this._modeToggleEl.classList.add('visible');
         } else {
             this._modeToggleEl.classList.remove('visible');
+        }
+    }
+
+    _updateCompareButton() {
+        if (!this._startCompareBtn) return;
+        if (this.mode.currentMode === MODES.SCAR_ORDER) {
+            this._startCompareBtn.innerHTML = '<i class="fas fa-stop"></i> Stop Pairwise Compare';
+        } else {
+            this._startCompareBtn.innerHTML = '<i class="fas fa-hand-pointer"></i> Start Pairwise Compare';
         }
     }
 
@@ -178,10 +201,13 @@ export class ScarOrderPanel {
     onShow() {
         this._panelActive = true;
         if (this.scarGraph) {
-            this.mode.setMode(MODES.SCAR_ORDER, true);
+            // Already initialized — restore visuals
             if (this._colormapEnabled) this._applyOrderColormap();
             this._createLabelElements();
             this._startLabelLoop();
+        } else if (this.meshView.segments.length >= 2) {
+            // Auto-initialize if we have segments (loads saved ordering from metadata if valid)
+            this._initializeGraph();
         }
         this._updateModeToggle();
     }
@@ -191,7 +217,7 @@ export class ScarOrderPanel {
         this._cancelSelection();
         this._stopLabelLoop();
         this._removeLabelElements();
-        this._restoreOriginalColors();
+        this._restoreNormalView();
         this._updateModeToggle();
         if (this.mode.currentMode === MODES.SCAR_ORDER) {
             this.mode.setMode(MODES.VIEW, true);
@@ -243,19 +269,27 @@ export class ScarOrderPanel {
 
         this.ordering = new ScarOrdering(this.scarGraph);
 
+        // Load saved ordering only if scars match current segmentation
         const existing = this.meshView.workingAnnotation?.getMetadata('scarOrder');
-        if (existing && existing.version === 1) {
-            this.ordering = ScarOrdering.fromMetadata(existing, this.scarGraph);
+        if (existing && existing.version === 1 && existing.scars) {
+            const savedVerts = new Set(existing.scars.map(s => s.representativeVertex));
+            const currentVerts = new Set(this.scarGraph.scars.map(s => s.representativeVertex));
+            const match = savedVerts.size === currentVerts.size &&
+                          [...savedVerts].every(v => currentVerts.has(v));
+            if (match) {
+                this.ordering = ScarOrdering.fromMetadata(existing, this.scarGraph);
+            }
         }
 
         this._preseedBtn.disabled = false;
         this._clearPreseedBtn.disabled = false;
         this._saveBtn.disabled = false;
-        this.mode.setMode(MODES.SCAR_ORDER, true);
+        if (this._rearrangeBtn) this._rearrangeBtn.disabled = false;
+        if (this._startCompareBtn) this._startCompareBtn.disabled = false;
 
         this._computeSurfacePoints();
         this._recolorAllScars(); // show eroded edges with segment colors
-        this._setStatus('Click the YOUNGER scar first', 'ready');
+        this._setStatus('Graph built. Use Pairwise Compare or Rearrange.', 'success');
         this._updateColormapLegend();
         this._updateUI();
         this._createLabelElements();
@@ -268,7 +302,7 @@ export class ScarOrderPanel {
     // ========================================
 
     _handleMeshClick(event) {
-        if (!this.scarGraph || !this.ordering) return;
+        if (!this.scarGraph || !this.ordering || this._rearrangeMode) return;
 
         const vertexIndex = this.meshView.getClosestVertexIndex(event);
         if (vertexIndex === -1 || vertexIndex === undefined) return;
@@ -412,6 +446,110 @@ export class ScarOrderPanel {
         this._setStatus('Preseed comparisons added (size heuristic)', 'success');
     }
 
+    // ========================================
+    // Rearrange mode
+    // ========================================
+
+    _enterRearrangeMode() {
+        if (!this.scarGraph || !this.ordering) return;
+        this._rearrangeMode = true;
+
+        // Build current order: use topological order if available, otherwise by scarId
+        const orderedScars = this._getOrderedScars();
+        if (orderedScars) {
+            this._rearrangeOrder = orderedScars.map(o => o.scarId);
+        } else {
+            this._rearrangeOrder = this.scarGraph.scars.map(s => s.scarId);
+        }
+
+        // Switch to VIEW so the user can rotate the mesh
+        this.mode.setMode(MODES.VIEW);
+
+        // Toggle button visibility
+        if (this._rearrangeBtn) this._rearrangeBtn.style.display = 'none';
+        if (this._applyBtn) this._applyBtn.style.display = '';
+        if (this._cancelRearrangeBtn) this._cancelRearrangeBtn.style.display = '';
+
+        this._setStatus('Drag scars to reorder — oldest at top, youngest at bottom', 'selecting');
+        this._renderScarList();
+        this._applyRearrangePreview();
+    }
+
+    _applyRearrange() {
+        if (!this._rearrangeMode || !this._rearrangeOrder || !this.ordering) return;
+
+        this.ordering.setGlobalOrder(this._rearrangeOrder);
+        this._rearrangeMode = false;
+        this._rearrangeOrder = null;
+
+        // Restore button visibility
+        if (this._rearrangeBtn) this._rearrangeBtn.style.display = '';
+        if (this._applyBtn) this._applyBtn.style.display = 'none';
+        if (this._cancelRearrangeBtn) this._cancelRearrangeBtn.style.display = 'none';
+
+        this._setStatus('Global order applied.', 'success');
+        this._updateUI();
+    }
+
+    /**
+     * Preview the rearrange order on the 3D canvas: recolor scars and
+     * recreate labels using _rearrangeOrder as the ordering basis.
+     */
+    _applyRearrangePreview() {
+        if (!this._rearrangeOrder || !this.scarGraph) return;
+        const order = this._rearrangeOrder; // oldest first
+
+        // Recolor mesh using rearrange order
+        if (this._colormapEnabled) {
+            for (let i = 0; i < order.length; i++) {
+                const t = order.length > 1 ? i / (order.length - 1) : 0.5;
+                const [r, g, b] = sampleColormap(this._colormapName, t);
+                const vertices = this._scarIdToVertices.get(order[i]);
+                if (vertices) this.meshView.colorVertices(vertices, new THREE.Color(r, g, b));
+            }
+        }
+
+        // Recreate labels using rearrange order
+        this._removeLabelElements();
+        if (this._overlayEl && this._svgEl) {
+            for (let i = 0; i < order.length; i++) {
+                const scarId = order[i];
+                if (!this._scarSurfaceData.has(scarId)) continue;
+                const rank = i + 1;
+                const t = order.length > 1 ? i / (order.length - 1) : 0.5;
+                const [r, g, b] = sampleColormap(this._colormapName, t);
+                const toHex = (c) => Math.round(c * 255).toString(16).padStart(2, '0');
+                const bgColor = this._colormapEnabled ? `#${toHex(r)}${toHex(g)}${toHex(b)}` : '#666';
+
+                const el = document.createElement('div');
+                el.className = 'scar-label';
+                el.innerHTML = `<span class="scar-label-badge" style="background:${bgColor}">${rank}</span>`;
+                el.style.display = 'none';
+                this._overlayEl.appendChild(el);
+                this._labelElements.set(scarId, el);
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('stroke', bgColor);
+                line.style.display = 'none';
+                this._svgEl.appendChild(line);
+                this._lineElements.set(scarId, line);
+            }
+        }
+    }
+
+    _cancelRearrange() {
+        if (!this._rearrangeMode) return;
+        this._rearrangeMode = false;
+        this._rearrangeOrder = null;
+
+        if (this._rearrangeBtn) this._rearrangeBtn.style.display = '';
+        if (this._applyBtn) this._applyBtn.style.display = 'none';
+        if (this._cancelRearrangeBtn) this._cancelRearrangeBtn.style.display = 'none';
+
+        this._setStatus('Click the YOUNGER scar first', 'ready');
+        this._updateUI(); // restores colors and labels from actual ordering
+    }
+
     _clearPreseed() {
         if (!this.ordering) return;
         this.ordering.clearPreseedComparisons();
@@ -421,10 +559,17 @@ export class ScarOrderPanel {
 
     _save() {
         if (!this.ordering) return;
-        const annotation = this.meshView.workingAnnotation;
-        if (!annotation) return;
-        annotation.setMetadata('scarOrder', this.ordering.toMetadata());
-        this._setStatus('Ordering saved to annotation metadata', 'success');
+        // Use MeshView's setter so it auto-syncs to library
+        this.meshView.setCurrentStateMetadata('scarOrder', this.ordering.toMetadata());
+
+        const name = this.meshView.workingAnnotation?.metadata?.name;
+        const lib = this.meshView.annotationLibrary;
+        const inLib = lib && this.meshView.workingAnnotation && lib.has(this.meshView.workingAnnotation.id);
+        if (inLib) {
+            this._setStatus(`Saved & updated in '${name}'`, 'success');
+        } else {
+            this._setStatus('Saved. Use Library to persist.', 'success');
+        }
     }
 
     // ========================================
@@ -435,7 +580,9 @@ export class ScarOrderPanel {
         this._cancelSelection();
         this._stopLabelLoop();
         this._removeLabelElements();
-        this._restoreOriginalColors();
+        // Don't call _restoreOriginalColors here — this is triggered by
+        // MESH_LOADED / ANNOTATION_ACTIVE_CHANGED, where MeshView has already
+        // applied correct colors. Painting old scar vertices would corrupt the display.
         this.scarGraph = null;
         this.ordering = null;
         this._labelToScarId.clear();
@@ -446,15 +593,18 @@ export class ScarOrderPanel {
         if (this._preseedBtn) this._preseedBtn.disabled = true;
         if (this._clearPreseedBtn) this._clearPreseedBtn.disabled = true;
         if (this._saveBtn) this._saveBtn.disabled = true;
+        if (this._rearrangeBtn) this._rearrangeBtn.disabled = true;
+        if (this._startCompareBtn) this._startCompareBtn.disabled = true;
+        this._cancelRearrange();
         if (this._colormapLegendEl) this._colormapLegendEl.style.display = 'none';
 
-        this._setStatus('Click Initialize to begin', '');
+        this._setStatus('Initialize first', '');
         this._renderEmpty();
         this._updateModeToggle();
     }
 
     _renderEmpty() {
-        if (this._scarListEl) this._scarListEl.innerHTML = '<p class="empty-state">Click Initialize to build scar graph</p>';
+        if (this._scarListEl) this._scarListEl.innerHTML = '<p class="empty-state">Draw edges to create segments</p>';
         if (this._scarCountEl) this._scarCountEl.textContent = '0';
         if (this._compListEl) this._compListEl.innerHTML = '<p class="empty-state">No adjacency edges yet</p>';
         if (this._compCountEl) this._compCountEl.textContent = '0/0';
@@ -476,6 +626,16 @@ export class ScarOrderPanel {
 
     _getScarDisplayColor(scarId) {
         if (this._colormapEnabled) {
+            // In rearrange mode, derive color from rearrange order
+            if (this._rearrangeMode && this._rearrangeOrder) {
+                const idx = this._rearrangeOrder.indexOf(scarId);
+                if (idx !== -1) {
+                    const t = this._rearrangeOrder.length > 1 ? idx / (this._rearrangeOrder.length - 1) : 0.5;
+                    const [r, g, b] = sampleColormap(this._colormapName, t);
+                    const toHex = (c) => Math.round(c * 255).toString(16).padStart(2, '0');
+                    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+                }
+            }
             const hex = this._getColormapHex(scarId);
             if (hex !== '#888') return hex;
         }
@@ -497,11 +657,10 @@ export class ScarOrderPanel {
 
     _getOrderedScars() {
         if (!this.ordering) return null;
-        const order = this.ordering.getTopologicalOrder();
-        if (order.length === 0) return null;
-        const reversed = [...order].reverse(); // oldest first
-        return reversed.map((scarId, idx) => ({
-            scarId, rank: idx + 1, total: reversed.length,
+        const oldestFirst = this.ordering.getOldestFirstOrder();
+        if (!oldestFirst || oldestFirst.length === 0) return null;
+        return oldestFirst.map((scarId, idx) => ({
+            scarId, rank: idx + 1, total: oldestFirst.length,
         }));
     }
 
@@ -516,30 +675,42 @@ export class ScarOrderPanel {
             return;
         }
 
-        const orderedScars = this._getOrderedScars();
-        const rankMap = new Map();
-        if (orderedScars) {
-            for (const { scarId, rank } of orderedScars) {
-                rankMap.set(scarId, rank);
+        // In rearrange mode, use the rearrange order; otherwise topological order
+        let displayOrder;
+        if (this._rearrangeMode && this._rearrangeOrder) {
+            displayOrder = this._rearrangeOrder.map((scarId, idx) => ({ scarId, rank: idx + 1 }));
+        } else {
+            const orderedScars = this._getOrderedScars();
+            const rankMap = new Map();
+            if (orderedScars) {
+                for (const { scarId, rank } of orderedScars) {
+                    rankMap.set(scarId, rank);
+                }
             }
+            displayOrder = [...scars].sort((a, b) => {
+                const ra = rankMap.get(a.scarId);
+                const rb = rankMap.get(b.scarId);
+                if (ra !== undefined && rb !== undefined) return ra - rb;
+                if (ra !== undefined) return -1;
+                if (rb !== undefined) return 1;
+                return a.scarId - b.scarId;
+            }).map(scar => ({
+                scarId: scar.scarId,
+                rank: rankMap.get(scar.scarId),
+            }));
         }
 
-        const sortedScars = [...scars].sort((a, b) => {
-            const ra = rankMap.get(a.scarId);
-            const rb = rankMap.get(b.scarId);
-            if (ra !== undefined && rb !== undefined) return ra - rb;
-            if (ra !== undefined) return -1;
-            if (rb !== undefined) return 1;
-            return a.scarId - b.scarId;
-        });
-
+        const draggable = this._rearrangeMode;
         let html = '<div class="section-legend">Ordered oldest (1) → youngest</div>';
-        html += sortedScars.map(scar => {
-            const color = this._getScarDisplayColor(scar.scarId);
-            const selected = this._selectedYoungerScarId === scar.scarId ? ' selected' : '';
-            const rank = rankMap.get(scar.scarId);
+        html += displayOrder.map(({ scarId, rank }) => {
+            const scar = this.scarGraph.scars[scarId];
+            if (!scar) return '';
+            const color = this._getScarDisplayColor(scarId);
+            const selected = !draggable && this._selectedYoungerScarId === scarId ? ' selected' : '';
             const rankStr = rank !== undefined ? `${rank}.` : '–';
-            return `<div class="scar-list-item${selected}" data-scar-id="${scar.scarId}">
+            const dragHandle = draggable ? '<span class="scar-drag-handle"><i class="fas fa-grip-vertical"></i></span>' : '';
+            return `<div class="scar-list-item${selected}" data-scar-id="${scarId}" ${draggable ? 'draggable="true"' : ''}>
+                ${dragHandle}
                 <span class="scar-rank">${rankStr}</span>
                 <span class="scar-color-dot" style="background: ${color}"></span>
                 <span class="scar-name">${scar.vertexCount} vertices</span>
@@ -548,14 +719,109 @@ export class ScarOrderPanel {
 
         this._scarListEl.innerHTML = html;
 
+        // Click-to-highlight + camera focus (works in both modes)
         this._scarListEl.querySelectorAll('.scar-list-item').forEach(el => {
             el.addEventListener('click', () => {
                 const scarId = parseInt(el.dataset.scarId, 10);
                 this._restoreAllHighlights();
                 this._highlightScar(scarId, YOUNGER_COLOR);
-                this._selectedYoungerScarId = scarId;
-                this._setStatus('Selected as younger. Now click the OLDER scar.', 'selecting');
+                if (this._showOnSelect) {
+                    this._focusCameraOnScar(scarId);
+                }
+            });
+        });
+
+        if (draggable) {
+            this._setupDragAndDrop();
+        } else {
+            // In normal mode, clicking also sets the scar as "younger" for comparison
+            this._scarListEl.querySelectorAll('.scar-list-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const scarId = parseInt(el.dataset.scarId, 10);
+                    this._selectedYoungerScarId = scarId;
+                    this._setStatus('Selected as younger. Now click the OLDER scar.', 'selecting');
+                    this._renderScarList();
+                });
+            });
+        }
+    }
+
+    /**
+     * Rotate the camera so that the selected scar faces the viewer.
+     * Keeps the orbit center and distance unchanged — only repositions
+     * the camera along the scar's outward surface normal.
+     */
+    _focusCameraOnScar(scarId) {
+        const data = this._scarSurfaceData.get(scarId);
+        const mesh = this.meshView.threeMesh;
+        if (!data || !mesh) return;
+
+        const camera = this.meshView.scene.camera;
+        const controls = this.meshView.scene.controls;
+
+        // Surface normal in world space (direction the scar faces)
+        const worldNormal = data.normal.clone().transformDirection(mesh.matrixWorld).normalize();
+
+        // Keep current orbit center and camera distance
+        const target = controls.target.clone();
+        const dist = camera.position.distanceTo(target);
+
+        // Place camera along the normal direction from the orbit center
+        camera.position.copy(target).addScaledVector(worldNormal, dist);
+        controls.update();
+    }
+
+    _setupDragAndDrop() {
+        let draggedScarId = null;
+
+        this._scarListEl.querySelectorAll('.scar-list-item').forEach(el => {
+            el.addEventListener('dragstart', (e) => {
+                draggedScarId = parseInt(el.dataset.scarId, 10);
+                el.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            el.addEventListener('dragend', () => {
+                el.classList.remove('dragging');
+                draggedScarId = null;
+                // Clear all drag-over indicators
+                this._scarListEl.querySelectorAll('.drag-over').forEach(
+                    el2 => el2.classList.remove('drag-over')
+                );
+            });
+
+            el.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                // Show insertion indicator
+                this._scarListEl.querySelectorAll('.drag-over').forEach(
+                    el2 => el2.classList.remove('drag-over')
+                );
+                el.classList.add('drag-over');
+            });
+
+            el.addEventListener('dragleave', () => {
+                el.classList.remove('drag-over');
+            });
+
+            el.addEventListener('drop', (e) => {
+                e.preventDefault();
+                el.classList.remove('drag-over');
+                const targetScarId = parseInt(el.dataset.scarId, 10);
+                if (draggedScarId === null || draggedScarId === targetScarId) return;
+
+                // Reorder: remove dragged, insert before target
+                const order = this._rearrangeOrder;
+                const fromIdx = order.indexOf(draggedScarId);
+                const toIdx = order.indexOf(targetScarId);
+                if (fromIdx === -1 || toIdx === -1) return;
+
+                order.splice(fromIdx, 1);
+                const newToIdx = order.indexOf(targetScarId);
+                order.splice(newToIdx, 0, draggedScarId);
+
                 this._renderScarList();
+                this._applyRearrangePreview();
             });
         });
     }
@@ -640,12 +906,11 @@ export class ScarOrderPanel {
 
     _getOrderMap() {
         if (!this.ordering) return null;
-        const order = this.ordering.getTopologicalOrder();
-        if (order.length === 0) return null;
-        const reversed = [...order].reverse();
+        const oldestFirst = this.ordering.getOldestFirstOrder();
+        if (!oldestFirst || oldestFirst.length === 0) return null;
         const map = new Map();
-        for (let i = 0; i < reversed.length; i++) {
-            map.set(reversed[i], reversed.length > 1 ? i / (reversed.length - 1) : 0.5);
+        for (let i = 0; i < oldestFirst.length; i++) {
+            map.set(oldestFirst[i], oldestFirst.length > 1 ? i / (oldestFirst.length - 1) : 0.5);
         }
         return map;
     }
@@ -686,6 +951,29 @@ export class ScarOrderPanel {
             const color = this.meshView.faceColors.get(label);
             const vertices = this._scarIdToVertices.get(scar.scarId);
             if (color && vertices) this.meshView.colorVertices(vertices, color);
+        }
+    }
+
+    /**
+     * Restore the normal MeshView coloring: segment colors + edge colors.
+     * Called when leaving the order panel to bring back the drawn edges.
+     */
+    _restoreNormalView() {
+        if (!this.meshView.showSegments) {
+            this.meshView.setShowSegments(false);
+        } else {
+            // Re-apply segment colors for interior vertices
+            this.meshView.segments.forEach((segment, index) => {
+                const segmentId = index + 1;
+                const color = this.meshView.faceColors.get(segmentId) || this.meshView.objectColor;
+                segment.forEach(vertexIndex => {
+                    this.meshView.colorVertex(vertexIndex, color);
+                });
+            });
+        }
+        // Re-apply edge colors
+        for (const index of this.meshView.currentEdgeIndices) {
+            this.meshView.colorVertex(index, this.meshView.edgeColor);
         }
     }
 
