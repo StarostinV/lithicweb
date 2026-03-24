@@ -393,10 +393,11 @@ export function buildScarGraph(faceLabels, edgeIndices, adjacencyGraph, vertexCo
 
     // Step 5: Strip internal fields from output
     return {
-        scars: scars.map(({ scarId, representativeVertex, vertexCount }) => ({
+        scars: scars.map(({ scarId, representativeVertex, vertexCount, originalLabel }) => ({
             scarId,
             representativeVertex,
             vertexCount,
+            originalLabel,
         })),
         edges: edges.map(({ scarA, scarB, sharpness, roughness, boundarySize }) => ({
             scarA,

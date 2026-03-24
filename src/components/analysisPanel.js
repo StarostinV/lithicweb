@@ -1,18 +1,14 @@
 /**
- * AnalysisPanel - Displays mesh, annotation, and scar statistics.
+ * AnalysisPanel - Displays mesh, annotation, and segment statistics.
  *
- * Sections:
- * - Mesh Information: vertex/face count, bounding box
- * - Annotation Summary: edge vertex count, arrow count
- * - Scar Statistics: count, size distribution, bar chart, attribute table, CSV export
+ * Uses MeshView.segments and faceLabels directly (no scar graph dependency).
  *
  * @module AnalysisPanel
  */
 
 import { eventBus, Events } from '../utils/EventBus.js';
-import { buildScarGraph } from '../geometry/ScarGraph.js';
-import { getEffectiveUnit, getSourceUnit, formatDistance, formatDistanceConverted, formatAreaConverted, UNIT_DEFINITIONS } from '../utils/units.js';
-import { computeScarMetrics } from '../geometry/scarMetrics.js';
+import { getEffectiveUnit, getSourceUnit, formatDistanceConverted, formatAreaConverted, UNIT_DEFINITIONS } from '../utils/units.js';
+import { computeSegmentMetrics } from '../geometry/scarMetrics.js';
 
 export class AnalysisPanel {
     /**
@@ -25,10 +21,9 @@ export class AnalysisPanel {
         this.meshLoader = meshLoader;
         this.userConfig = userConfig;
 
-        // Cached scar data
-        this._scarGraph = null;
-        this._scarMetrics = null;
-        this._scarStale = true;
+        // Cached segment metrics
+        this._segmentMetrics = null;
+        this._stale = true;
         this._debounceTimer = null;
 
         // DOM elements
@@ -51,19 +46,18 @@ export class AnalysisPanel {
 
     _setupEventBusSubscriptions() {
         eventBus.on(Events.MESH_LOADED, () => {
-            this._scarStale = true;
-            this._scarGraph = null;
-            this._scarMetrics = null;
+            this._stale = true;
+            this._segmentMetrics = null;
             this._updateIfVisible();
         }, 'analysisPanel');
 
         eventBus.on(Events.STATE_CHANGED, () => {
-            this._scarStale = true;
+            this._stale = true;
             this._debouncedUpdate();
         }, 'analysisPanel');
 
         eventBus.on(Events.ANNOTATION_ACTIVE_CHANGED, () => {
-            this._scarStale = true;
+            this._stale = true;
             this._updateIfVisible();
         }, 'analysisPanel');
 
@@ -73,7 +67,6 @@ export class AnalysisPanel {
             }
         }, 'analysisPanel');
 
-        // Re-render when colors change (colormap, rendering mode, etc.)
         eventBus.on(Events.RENDERING_CHANGED, () => {
             this._updateIfVisible();
         }, 'analysisPanel');
@@ -90,9 +83,6 @@ export class AnalysisPanel {
         if (this._debounceTimer) clearTimeout(this._debounceTimer);
     }
 
-    /**
-     * Called when panel becomes visible.
-     */
     onShow() {
         this.updateUI();
     }
@@ -112,7 +102,7 @@ export class AnalysisPanel {
     updateUI() {
         this._updateMeshInfo();
         this._updateAnnotationInfo();
-        this._updateScarInfo();
+        this._updateSegmentInfo();
     }
 
     // ── Mesh Information ──────────────────────────────────────────────
@@ -128,7 +118,6 @@ export class AnalysisPanel {
             this._faceCountEl.textContent = faceCount > 0 ? faceCount.toLocaleString() : '--';
         }
 
-        // Bounding box
         if (this._bboxValueEl) {
             if (vertexCount > 0) {
                 const bbox = this._computeBoundingBox();
@@ -143,7 +132,6 @@ export class AnalysisPanel {
             }
         }
 
-        // Unit display
         if (this._unitDisplayEl) {
             const displayUnit = getEffectiveUnit(this.meshView.metadata, this.userConfig);
             const def = UNIT_DEFINITIONS[displayUnit];
@@ -168,11 +156,7 @@ export class AnalysisPanel {
             if (z > maxZ) maxZ = z;
         }
 
-        return {
-            dx: maxX - minX,
-            dy: maxY - minY,
-            dz: maxZ - minZ
-        };
+        return { dx: maxX - minX, dy: maxY - minY, dz: maxZ - minZ };
     }
 
     // ── Annotation Summary ────────────────────────────────────────────
@@ -188,57 +172,51 @@ export class AnalysisPanel {
         }
     }
 
-    // ── Scar Statistics ───────────────────────────────────────────────
+    // ── Segment Statistics ────────────────────────────────────────────
 
-    _updateScarInfo() {
+    _updateSegmentInfo() {
+        const segments = this.meshView.segments;
+
         if (this.meshView.vertexCount === 0) {
-            this._showEmptyScarState('Load a mesh to see scar statistics');
+            this._showEmptyState('Load a mesh to see scar statistics');
             return;
         }
 
-        if (!this.meshView.currentEdgeIndices || this.meshView.currentEdgeIndices.size === 0) {
-            this._showEmptyScarState('Draw edges to segment the mesh into scars');
+        if (!segments || segments.length === 0) {
+            this._showEmptyState('Draw edges to segment the mesh into scars');
             return;
         }
 
-        // Recompute if stale
-        if (this._scarStale) {
-            this._recomputeScars();
+        // Recompute metrics if stale
+        if (this._stale) {
+            this._recomputeMetrics();
         }
 
-        if (!this._scarGraph || this._scarGraph.scars.length === 0) {
-            this._showEmptyScarState('No scars detected');
+        const metrics = this._segmentMetrics || [];
+        if (metrics.length === 0) {
+            this._showEmptyState('No scars detected');
             return;
         }
 
-        const scars = this._scarGraph.scars;
-        const metrics = this._scarMetrics || [];
         const vertexCount = this.meshView.vertexCount;
 
-        // Badge
         if (this._scarBadgeEl) {
-            this._scarBadgeEl.textContent = scars.length.toString();
+            this._scarBadgeEl.textContent = metrics.length.toString();
         }
 
-        // Summary
         if (this._scarSummaryEl) {
-            const totalVertices = scars.reduce((sum, s) => sum + s.vertexCount, 0);
+            const totalVertices = metrics.reduce((sum, m) => sum + m.vertexCount, 0);
             const coverage = ((totalVertices / vertexCount) * 100).toFixed(1);
-            this._scarSummaryEl.textContent = `${scars.length} scars covering ${coverage}% of mesh`;
+            this._scarSummaryEl.textContent = `${metrics.length} scars covering ${coverage}% of mesh`;
         }
 
-        // Distribution stats
-        const sizes = scars.map(s => s.vertexCount).sort((a, b) => a - b);
-        this._renderScarStats(sizes);
-
-        // Bar chart
-        this._renderScarChart(scars);
-
-        // Attribute table
-        this._renderScarTable(metrics);
+        const sizes = metrics.map(m => m.vertexCount).sort((a, b) => a - b);
+        this._renderStats(sizes);
+        this._renderChart(metrics);
+        this._renderTable(metrics);
     }
 
-    _showEmptyScarState(message) {
+    _showEmptyState(message) {
         if (this._scarBadgeEl) this._scarBadgeEl.textContent = '0';
         if (this._scarSummaryEl) this._scarSummaryEl.textContent = message;
         if (this._scarStatsEl) this._scarStatsEl.innerHTML = '';
@@ -246,31 +224,30 @@ export class AnalysisPanel {
         if (this._scarTableEl) this._scarTableEl.innerHTML = '';
     }
 
-    _recomputeScars() {
+    _recomputeMetrics() {
         try {
-            this._scarGraph = buildScarGraph(
+            this._segmentMetrics = computeSegmentMetrics(
+                this.meshView.segments,
                 this.meshView.faceLabels,
-                this.meshView.currentEdgeIndices,
-                this.meshView.adjacencyGraph,
-                this.meshView.vertexCount,
                 this.meshView.positions,
                 this.meshView.indices
             );
-            this._scarMetrics = computeScarMetrics(
-                this._scarGraph,
-                this.meshView.positions,
-                this.meshView.indices,
-                this._scarGraph.workingLabels
-            );
-            this._scarStale = false;
+            this._stale = false;
         } catch (e) {
-            console.error('[AnalysisPanel] Error computing scar graph:', e);
-            this._scarGraph = null;
-            this._scarMetrics = null;
+            console.error('[AnalysisPanel] Error computing segment metrics:', e);
+            this._segmentMetrics = null;
         }
     }
 
-    _renderScarStats(sizes) {
+    /**
+     * Get the color for a segment from MeshView.faceColors.
+     */
+    _getSegmentColor(segmentId) {
+        const color = this.meshView.faceColors?.get(segmentId);
+        return color ? `#${color.getHexString()}` : null;
+    }
+
+    _renderStats(sizes) {
         if (!this._scarStatsEl || sizes.length === 0) return;
 
         const min = sizes[0];
@@ -288,51 +265,34 @@ export class AnalysisPanel {
         `;
     }
 
-    /**
-     * Get the actual rendered color for a scar by reading its representative vertex
-     * from the mesh color buffer. This always matches the on-screen color regardless
-     * of colormap, ordering, or rendering mode changes.
-     */
-    _getScarColor(scar) {
-        const colors = this.meshView.meshColors;
-        if (!colors || scar.representativeVertex == null) return null;
-        const idx = scar.representativeVertex * 3;
-        if (idx + 2 >= colors.length) return null;
-        const r = Math.round(colors[idx] * 255);
-        const g = Math.round(colors[idx + 1] * 255);
-        const b = Math.round(colors[idx + 2] * 255);
-        return `rgb(${r},${g},${b})`;
-    }
-
-    _renderScarChart(scars) {
+    _renderChart(metrics) {
         if (!this._scarChartEl) return;
 
-        const maxSize = Math.max(...scars.map(s => s.vertexCount));
+        const maxSize = Math.max(...metrics.map(m => m.vertexCount));
 
-        this._scarChartEl.innerHTML = scars.map((scar, i) => {
-            const pct = ((scar.vertexCount / maxSize) * 100).toFixed(1);
-            const colorCss = this._getScarColor(scar) || 'var(--primary)';
+        this._scarChartEl.innerHTML = metrics.map((m, i) => {
+            const pct = ((m.vertexCount / maxSize) * 100).toFixed(1);
+            const colorCss = this._getSegmentColor(m.segmentId) || 'var(--primary)';
             return `
                 <div class="analysis-scar-bar-row">
                     <span class="analysis-scar-bar-label">${i + 1}</span>
                     <div class="analysis-scar-bar-track">
                         <div class="analysis-scar-bar-fill" style="width:${pct}%;background:${colorCss}"></div>
                     </div>
-                    <span class="analysis-scar-bar-value">${scar.vertexCount.toLocaleString()}</span>
+                    <span class="analysis-scar-bar-value">${m.vertexCount.toLocaleString()}</span>
                 </div>
             `;
         }).join('');
     }
 
-    _renderScarTable(metrics) {
-        if (!this._scarTableEl || !metrics || metrics.length === 0) return;
+    _renderTable(metrics) {
+        if (!this._scarTableEl || metrics.length === 0) return;
 
         const sourceUnit = getSourceUnit(this.meshView.metadata, this.userConfig);
         const displayUnit = getEffectiveUnit(this.meshView.metadata, this.userConfig);
         const unitDef = UNIT_DEFINITIONS[displayUnit];
         const unitSuffix = unitDef?.symbol ? ` (${unitDef.symbol})` : '';
         const areaSuffix = unitDef?.symbol ? ` (${unitDef.symbol}²)` : '';
-        const scars = this._scarGraph?.scars || [];
         const totalVertices = this.meshView.vertexCount;
 
         let html = `<table>
@@ -346,15 +306,13 @@ export class AnalysisPanel {
             <tbody>`;
 
         metrics.forEach((m, i) => {
-            const scar = scars.find(s => s.scarId === m.scarId);
-            const colorCss = scar ? this._getScarColor(scar) : null;
-            const colorHex = colorCss || '#999';
+            const colorCss = this._getSegmentColor(m.segmentId) || '#999';
             const area = formatAreaConverted(m.surfaceArea, sourceUnit, displayUnit);
             const maxDim = formatDistanceConverted(m.maxDimension, sourceUnit, displayUnit);
             const pct = ((m.vertexCount / totalVertices) * 100).toFixed(1);
 
             html += `<tr>
-                <td><span class="scar-color-swatch" style="background:${colorHex}"></span>${i + 1}</td>
+                <td><span class="scar-color-swatch" style="background:${colorCss}"></span>${i + 1}</td>
                 <td>${m.vertexCount.toLocaleString()}</td>
                 <td>${area}</td>
                 <td>${maxDim}</td>
@@ -369,7 +327,7 @@ export class AnalysisPanel {
     // ── CSV Export ────────────────────────────────────────────────────
 
     exportCsv() {
-        if (!this._scarMetrics || this._scarMetrics.length === 0) return;
+        if (!this._segmentMetrics || this._segmentMetrics.length === 0) return;
 
         const sourceUnit = getSourceUnit(this.meshView.metadata, this.userConfig);
         const displayUnit = getEffectiveUnit(this.meshView.metadata, this.userConfig);
@@ -388,10 +346,11 @@ export class AnalysisPanel {
             `centroid_z_${unitLabel}`
         ];
 
-        const rows = this._scarMetrics.map((m, i) => {
-            const from = UNIT_DEFINITIONS[sourceUnit] || UNIT_DEFINITIONS['raw'];
-            const to = UNIT_DEFINITIONS[displayUnit] || UNIT_DEFINITIONS['raw'];
-            const factor = from.factor / to.factor;
+        const from = UNIT_DEFINITIONS[sourceUnit] || UNIT_DEFINITIONS['raw'];
+        const to = UNIT_DEFINITIONS[displayUnit] || UNIT_DEFINITIONS['raw'];
+        const factor = from.factor / to.factor;
+
+        const rows = this._segmentMetrics.map((m, i) => {
             const area = m.surfaceArea * factor * factor;
             const maxDim = m.maxDimension * factor;
             const cx = m.centroid.x * factor;
