@@ -61,7 +61,7 @@ describe('matWriter', () => {
             }
         });
 
-        test('should round-trip a 3-vertex, 1-face mesh (v, f, GL)', () => {
+        test('should round-trip a 3-vertex, 1-face mesh (vertices, faces, GL)', () => {
             // Triangle: 3 vertices, 1 face
             const vertices = [
                 0, 0, 0,   // vertex 0
@@ -72,22 +72,22 @@ describe('matWriter', () => {
             const labels = [1];      // face label for the single face
 
             const buffer = writeMatFile([
-                { name: 'v', data: vertices, rows: 3, cols: 3, type: 'double' },
-                { name: 'f', data: faces, rows: 1, cols: 3, type: 'double' },
+                { name: 'vertices', data: vertices, rows: 3, cols: 3, type: 'double' },
+                { name: 'faces', data: faces, rows: 1, cols: 3, type: 'double' },
                 { name: 'GL', data: labels, rows: 1, cols: 1, type: 'uint16' },
             ]);
 
             const result = readmat(buffer);
 
-            // Verify v: 3x3 nested array
-            const v = result.data.v;
+            // Verify vertices: 3x3 nested array
+            const v = result.data.vertices;
             expect(v.length).toBe(3);
             expect(v[0]).toEqual([0, 0, 0]);
             expect(v[1]).toEqual([1, 0, 0]);
             expect(v[2]).toEqual([0, 1, 0]);
 
-            // Verify f: 1x3 — mat-for-js collapses 1xN to 1D
-            const f = result.data.f;
+            // Verify faces: 1x3 — mat-for-js collapses 1xN to 1D
+            const f = result.data.faces;
             expect(f.length).toBe(3);
             expect(f[0]).toBe(1);
             expect(f[1]).toBe(2);
@@ -167,15 +167,121 @@ describe('matWriter', () => {
 
         test('should handle multiple variables in one file', () => {
             const buffer = writeMatFile([
-                { name: 'v', data: [1, 2, 3, 4, 5, 6], rows: 2, cols: 3, type: 'double' },
-                { name: 'f', data: [1, 2, 3], rows: 1, cols: 3, type: 'double' },
+                { name: 'vertices', data: [1, 2, 3, 4, 5, 6], rows: 2, cols: 3, type: 'double' },
+                { name: 'faces', data: [1, 2, 3], rows: 1, cols: 3, type: 'double' },
                 { name: 'GL', data: [5], rows: 1, cols: 1, type: 'uint16' },
             ]);
 
             const result = readmat(buffer);
-            expect(result.data.v).toBeDefined();
-            expect(result.data.f).toBeDefined();
+            expect(result.data.vertices).toBeDefined();
+            expect(result.data.faces).toBeDefined();
             expect(result.data.GL).toBeDefined();
+        });
+
+        test('should round-trip Artifact3D variables (Tuzy, RTia, Vp1, Mm)', () => {
+            const eye3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+            const mm = [42.5, 1, 2, 3, 0.1, 0.2, 0.3, 10, 20, 30];
+
+            const buffer = writeMatFile([
+                { name: 'Tuzy', data: eye3, rows: 3, cols: 3, type: 'double' },
+                { name: 'RTia', data: eye3, rows: 3, cols: 3, type: 'double' },
+                { name: 'Vp1',  data: [42.5], rows: 1, cols: 1, type: 'double' },
+                { name: 'Mm',   data: mm, rows: 1, cols: 10, type: 'double' },
+            ]);
+
+            const result = readmat(buffer);
+
+            // Tuzy: 3x3 identity
+            const T = result.data.Tuzy;
+            expect(T.length).toBe(3);
+            expect(T[0]).toEqual([1, 0, 0]);
+            expect(T[1]).toEqual([0, 1, 0]);
+            expect(T[2]).toEqual([0, 0, 1]);
+
+            // RTia: same as Tuzy
+            expect(result.data.RTia).toEqual(T);
+
+            // Vp1: scalar (mat-for-js collapses 1x1)
+            const vp1 = result.data.Vp1;
+            const vp1Val = Array.isArray(vp1) ? vp1[0] : vp1;
+            expect(vp1Val).toBeCloseTo(42.5);
+
+            // Mm: 1x10 (mat-for-js collapses 1xN to 1D)
+            const Mm = result.data.Mm;
+            expect(Mm.length).toBe(10);
+            for (let i = 0; i < 10; i++) {
+                expect(Mm[i]).toBeCloseTo(mm[i]);
+            }
+        });
+    });
+
+    // =========================================================================
+    // LEGACY v/f NAMING BACKWARD COMPATIBILITY
+    // =========================================================================
+
+    describe('legacy v/f naming backward compatibility', () => {
+        /**
+         * Helper that mimics readMAT's fallback logic:
+         *   vertices || v,  faces || f
+         */
+        function readMeshVars(matData) {
+            const positions = (matData['vertices'] || matData['v'] || []).flat();
+            const indices = (matData['faces'] || matData['f'] || []).flat();
+            return { positions, indices };
+        }
+
+        test('should read old-format files with v and f', () => {
+            const buffer = writeMatFile([
+                { name: 'v', data: [0, 0, 0, 1, 0, 0, 0, 1, 0], rows: 3, cols: 3, type: 'double' },
+                { name: 'f', data: [1, 2, 3], rows: 1, cols: 3, type: 'double' },
+                { name: 'GL', data: [1], rows: 1, cols: 1, type: 'uint16' },
+            ]);
+
+            const result = readmat(buffer);
+            const { positions, indices } = readMeshVars(result.data);
+
+            expect(positions).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+            expect(indices).toEqual([1, 2, 3]);
+        });
+
+        test('should read new-format files with vertices and faces', () => {
+            const buffer = writeMatFile([
+                { name: 'vertices', data: [0, 0, 0, 1, 0, 0, 0, 1, 0], rows: 3, cols: 3, type: 'double' },
+                { name: 'faces', data: [1, 2, 3], rows: 1, cols: 3, type: 'double' },
+            ]);
+
+            const result = readmat(buffer);
+            const { positions, indices } = readMeshVars(result.data);
+
+            expect(positions).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+            expect(indices).toEqual([1, 2, 3]);
+        });
+
+        test('should prefer vertices/faces over v/f when both present', () => {
+            const buffer = writeMatFile([
+                { name: 'vertices', data: [10, 20, 30], rows: 1, cols: 3, type: 'double' },
+                { name: 'v',        data: [99, 99, 99], rows: 1, cols: 3, type: 'double' },
+                { name: 'faces',    data: [1, 2, 3],    rows: 1, cols: 3, type: 'double' },
+                { name: 'f',        data: [9, 9, 9],    rows: 1, cols: 3, type: 'double' },
+            ]);
+
+            const result = readmat(buffer);
+            const { positions, indices } = readMeshVars(result.data);
+
+            expect(positions).toEqual([10, 20, 30]);
+            expect(indices).toEqual([1, 2, 3]);
+        });
+
+        test('should handle file with only Artifact3D extras and no mesh', () => {
+            const buffer = writeMatFile([
+                { name: 'Tuzy', data: [1, 0, 0, 0, 1, 0, 0, 0, 1], rows: 3, cols: 3, type: 'double' },
+            ]);
+
+            const result = readmat(buffer);
+            const { positions, indices } = readMeshVars(result.data);
+
+            expect(positions).toEqual([]);
+            expect(indices).toEqual([]);
         });
     });
 

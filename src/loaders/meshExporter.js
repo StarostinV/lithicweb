@@ -1,5 +1,6 @@
 import { writeMatFile } from './matWriter.js';
 import { erodeEdges } from '../geometry/ScarGraph.js';
+import { computeMeshMoments } from '../geometry/meshMoments.js';
 
 /**
  * Metadata prefix used when writing metadata to PLY comments.
@@ -299,13 +300,13 @@ export function exportAnnotationsToMAT(mesh, meshView, arrowDrawer, meshLoader) 
     const vertexCount = positions.length / 3;
     const faceCount = indices.length / 3;
 
-    // v: Nx3 vertices as doubles (row-major flat — matWriter transposes to column-major)
+    // vertices: Nx3 doubles (Artifact3D naming convention)
     const vData = new Float64Array(positions.length);
     for (let i = 0; i < positions.length; i++) {
         vData[i] = positions[i];
     }
 
-    // f: Mx3 faces as doubles, converted from 0-indexed to 1-indexed
+    // faces: Mx3 doubles, converted from 0-indexed to 1-indexed
     const fData = new Float64Array(indices.length);
     for (let i = 0; i < indices.length; i++) {
         fData[i] = indices[i] + 1;
@@ -320,10 +321,20 @@ export function exportAnnotationsToMAT(mesh, meshView, arrowDrawer, meshLoader) 
         vertexCount
     );
 
+    // Artifact3D positioning matrices — identity (mesh is already in its native position)
+    const eye3 = new Float64Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+
+    // Volume and moments (Artifact3D requires these)
+    const { Vp1, Mm } = computeMeshMoments(positions, indices);
+
     const variables = [
-        { name: 'v', data: vData, rows: vertexCount, cols: 3, type: 'double' },
-        { name: 'f', data: fData, rows: faceCount, cols: 3, type: 'double' },
-        { name: 'GL', data: gl, rows: faceCount, cols: 1, type: 'uint16' },
+        { name: 'vertices', data: vData, rows: vertexCount, cols: 3, type: 'double' },
+        { name: 'faces',    data: fData, rows: faceCount,   cols: 3, type: 'double' },
+        { name: 'GL',       data: gl,    rows: faceCount,   cols: 1, type: 'uint16' },
+        { name: 'Tuzy',     data: eye3,                  rows: 3, cols: 3, type: 'double' },
+        { name: 'RTia',     data: eye3,                  rows: 3, cols: 3, type: 'double' },
+        { name: 'Vp1',      data: new Float64Array([Vp1]), rows: 1, cols: 1, type: 'double' },
+        { name: 'Mm',       data: Mm,                    rows: 1, cols: 10, type: 'double' },
     ];
 
     // Add arrows if present

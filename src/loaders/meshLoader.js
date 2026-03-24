@@ -379,8 +379,9 @@ export default class MeshLoader {
     readMAT(data) {
         const mat = readmat(data).data;
 
-        const positions = new Float32Array((mat['v'] || mat['vertices'] || []).flat());
-        const indices = (mat['f'] || mat['faces'] || []).flat();
+        // Support both naming conventions: Artifact3D (vertices/faces) and legacy (v/f)
+        const positions = new Float32Array((mat['vertices'] || mat['v'] || []).flat());
+        const indices = (mat['faces'] || mat['f'] || []).flat();
         const faceLabels = new Uint16Array((mat['GL'] || []).flat());
 
         if (indices.length !== 0) {
@@ -391,11 +392,23 @@ export default class MeshLoader {
 
         const labels = calculateVertexEdgeLabels(indices, faceLabels);
 
+        // Read arrows if present (Kx2, 1-indexed → convert to 0-indexed)
+        let arrows = [];
+        if (mat['arrows']) {
+            const rawArrows = mat['arrows'];
+            // mat-for-js returns Kx2 as nested array [[s1,e1],[s2,e2],…] or 1D for K=1
+            const flat = Array.isArray(rawArrows[0]) ? rawArrows : [rawArrows];
+            arrows = flat.map(row => ({
+                startIndex: row[0] - 1,
+                endIndex: row[1] - 1
+            }));
+        }
+
         debugGlobalVar['mat'] = {
             positions: positions,
             labels: labels,
             indices: indices,
-            arrows: [],
+            arrows: arrows,
             metadata: {},
             comments: []
         }
@@ -403,9 +416,9 @@ export default class MeshLoader {
             positions: positions,
             labels: labels,
             indices: indices,
-            arrows: [],
-            metadata: {},  // MAT files don't support metadata
-            comments: []   // MAT files don't support comments
+            arrows: arrows,
+            metadata: {},
+            comments: []
         }
     }
 }
