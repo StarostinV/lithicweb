@@ -40,7 +40,7 @@ export default class Scene {
 
     createCamera() {
         // Account for navbar height and sidebar width when calculating initial aspect ratio
-        const navbarHeight = 64; // Match CSS --navbar-height
+        const navbarHeight = 44; // Match CSS --navbar-height
         const sidebarWidth = 380; // Match CSS --sidebar-width
         const width = window.innerWidth - sidebarWidth;
         const height = window.innerHeight - navbarHeight;
@@ -116,7 +116,7 @@ export default class Scene {
         renderer.setPixelRatio(window.devicePixelRatio);
         
         // Account for navbar height and sidebar width when setting initial size
-        const navbarHeight = 64; // Match CSS --navbar-height
+        const navbarHeight = 44; // Match CSS --navbar-height
         const sidebarWidth = 380; // Match CSS --sidebar-width
         renderer.setClearColor(0x201944); // Set the background color of the canvas
         renderer.setSize(window.innerWidth - sidebarWidth, window.innerHeight - navbarHeight);

@@ -20,7 +20,7 @@
     align-items: center;
     justify-content: space-between;
     height: 100%;
-    padding: 0 16px;
+    padding: 0 12px;
     max-width: 100%;
 }
 
@@ -28,26 +28,26 @@
 .navbar-left {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 10px;
     flex-shrink: 0;
 }
 
 .navbar-brand {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .brand-icon {
-    width: 36px;
-    height: 36px;
+    width: 28px;
+    height: 28px;
     background: linear-gradient(135deg, var(--primary) 0%, var(--purple) 100%);
-    border-radius: 8px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 16px;
+    font-size: 13px;
 }
 
 .brand-text {
@@ -56,22 +56,19 @@
 }
 
 .brand-name {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
     color: white;
     letter-spacing: -0.5px;
 }
 
 .brand-subtitle {
-    font-size: 10px;
-    color: var(--gray-400);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    display: none;
 }
 
 .navbar-divider {
     width: 1px;
-    height: 32px;
+    height: 24px;
     background: var(--gray-700);
 }
 
@@ -79,22 +76,26 @@
 .file-section {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
 }
 
 .file-btn {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
+    gap: 5px;
+    padding: 5px 10px;
     background: var(--gray-700);
     color: var(--gray-200);
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s;
     border: 1px solid var(--gray-600);
+}
+
+.file-btn span {
+    display: none;
 }
 
 .file-btn:hover {
@@ -137,7 +138,7 @@
 .export-caret {
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
-    padding: 8px 8px;
+    padding: 5px 6px;
     min-width: 0;
 }
 
@@ -238,7 +239,7 @@
 .navbar-center {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     flex-shrink: 1;
     min-width: 0;
     overflow: hidden;
@@ -248,20 +249,16 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 4px 8px;
+    padding: 2px 4px;
 }
 
 .nav-group-label {
-    font-size: 9px;
-    color: var(--gray-500);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
+    display: none;
 }
 
 .nav-group-buttons {
     display: flex;
-    gap: 4px;
+    gap: 2px;
 }
 
 .nav-btn {
@@ -269,7 +266,7 @@
     flex-direction: column;
     align-items: center;
     gap: 2px;
-    padding: 8px 12px;
+    padding: 6px 8px;
     background: transparent;
     color: var(--gray-400);
     border: none;
@@ -278,11 +275,44 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s;
-    min-width: 64px;
+    min-width: 36px;
+    position: relative;
+}
+
+.nav-btn span {
+    display: none;
 }
 
 .nav-btn i {
-    font-size: 16px;
+    font-size: 15px;
+}
+
+/* CSS tooltips on hover */
+.nav-btn::after {
+    content: attr(title);
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--gray-900);
+    color: var(--gray-200);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    z-index: 200;
+    border: 1px solid var(--gray-600);
+}
+
+.nav-btn:hover::after {
+    opacity: 1;
+}
+
+.nav-btn.active::after {
+    display: none;
 }
 
 .nav-btn:hover {
@@ -313,7 +343,7 @@
 .navbar-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
 }
 
@@ -342,7 +372,7 @@
 .action-btn-help {
     background: transparent;
     color: var(--gray-400);
-    padding: 8px 10px;
+    padding: 5px 8px;
 }
 
 .action-btn-help:hover {
@@ -461,6 +491,7 @@
 }
 
 .navbar-mobile-menu .nav-group-label {
+    display: block;
     margin-bottom: 12px;
     text-align: left;
     font-size: 11px;
@@ -506,7 +537,12 @@
 }
 
 .navbar-mobile-menu .nav-btn span {
+    display: inline;
     flex: 1;
+}
+
+.navbar-mobile-menu .nav-btn::after {
+    display: none;
 }
 
 /* ==========================================================================
@@ -517,8 +553,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     background: var(--gray-700);
     border: 1px solid var(--gray-600);
     border-radius: 6px;
@@ -543,77 +579,9 @@
    ========================================================================== */
 
 @media (max-width: 1349px) and (min-width: 1025px) {
-    /* Icon-only nav buttons */
-    .nav-btn span {
-        display: none;
-    }
-
-    .nav-btn {
-        min-width: 40px;
-        padding: 8px 8px;
-        position: relative;
-    }
-
-    /* Hide group labels */
-    .nav-group-label {
-        display: none;
-    }
-
-    /* Tighten spacing */
-    .navbar-center {
-        gap: 4px;
-    }
-
-    .nav-group {
-        padding: 4px 4px;
-    }
-
-    /* Icon-only file buttons */
-    .file-btn span {
-        display: none;
-    }
-
-    .file-btn {
-        padding: 8px 10px;
-    }
-
-    /* Hide brand subtitle */
-    .brand-subtitle {
-        display: none;
-    }
-
-    /* Constrain filename */
+    /* Constrain filename on narrower desktops */
     .file-name-display {
         max-width: 80px;
-    }
-
-    /* CSS tooltips on hover */
-    .nav-btn::after {
-        content: attr(title);
-        position: absolute;
-        bottom: -28px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--gray-900);
-        color: var(--gray-200);
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 11px;
-        white-space: nowrap;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.15s;
-        z-index: 200;
-        border: 1px solid var(--gray-600);
-    }
-
-    .nav-btn:hover::after {
-        opacity: 1;
-    }
-
-    /* Don't show tooltip on active button (already clear which is selected) */
-    .nav-btn.active::after {
-        display: none;
     }
 }
 
@@ -625,49 +593,39 @@
     .navbar-hamburger {
         display: flex;
     }
-    
+
     .navbar-center {
         display: none;
     }
-    
+
     .navbar-left {
         flex: 1;
     }
-    
-    /* Hide text in file buttons on tablet, keep icons larger */
-    .file-btn span {
-        display: none;
-    }
-    
+
     .file-btn {
         padding: 10px 12px;
         font-size: 16px;
     }
-    
+
     .file-btn i {
         font-size: 16px;
     }
-    
-    /* Hide brand subtitle */
-    .brand-subtitle {
-        display: none;
-    }
-    
+
     .file-name-display {
         max-width: 100px;
         font-size: 11px;
     }
-    
+
     /* Larger sidebar toggle for touch */
     .sidebar-toggle {
         width: 40px;
         height: 40px;
     }
-    
+
     .sidebar-toggle i {
         font-size: 16px;
     }
-    
+
     /* Larger help button for touch */
     .action-btn-help {
         padding: 10px 12px;

@@ -514,7 +514,7 @@ function updateRendererSize() {
     // Read dimensions from actual DOM elements (with fallbacks)
     const navbar = document.querySelector('.navbar');
     const sidebar = document.getElementById('sideMenu');
-    const navbarHeight = navbar?.offsetHeight || 64;
+    const navbarHeight = navbar?.offsetHeight || 44;
     
     // Check if sidebar is collapsed - if so, use full width
     const isSidebarCollapsed = sidebar?.classList.contains('sidebar-collapsed');
