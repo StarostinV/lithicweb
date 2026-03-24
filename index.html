@@ -111,6 +111,10 @@
                         <i class="fas fa-bookmark"></i>
                         <span>Annotations</span>
                     </button>
+                    <button id="analysisPanelBtn" class="nav-btn" title="Mesh & Annotation Analysis">
+                        <i class="fas fa-chart-pie"></i>
+                        <span>Analysis</span>
+                    </button>
                     <button id="cloudStoragePanelBtn" class="nav-btn" title="Cloud Storage">
                         <i class="fas fa-cloud"></i>
                         <span>Cloud</span>
@@ -175,22 +179,26 @@
                 <i class="fas fa-chart-bar"></i>
                 <span>Evaluation</span>
             </button>
+            <button class="nav-btn mobile-nav-btn" data-panel="scarOrderPanel" title="Scar Temporal Ordering">
+                <i class="fas fa-sort-numeric-down"></i>
+                <span>Order</span>
+            </button>
         </div>
     </div>
     <div class="nav-group">
         <span class="nav-group-label">Data</span>
         <div class="nav-group-buttons">
-            <button class="nav-btn mobile-nav-btn" data-panel="historyPanel" title="Undo/Redo History">
-                <i class="fas fa-history"></i>
-                <span>History</span>
+            <button class="nav-btn mobile-nav-btn" data-panel="metadataPanel" title="View/Edit Metadata">
+                <i class="fas fa-tags"></i>
+                <span>Metadata</span>
             </button>
             <button class="nav-btn mobile-nav-btn" data-panel="libraryPanel" title="Saved Annotations Library">
                 <i class="fas fa-bookmark"></i>
                 <span>Annotations</span>
             </button>
-            <button class="nav-btn mobile-nav-btn" data-panel="metadataPanel" title="View/Edit Metadata">
-                <i class="fas fa-tags"></i>
-                <span>Metadata</span>
+            <button class="nav-btn mobile-nav-btn" data-panel="analysisPanel" title="Mesh & Annotation Analysis">
+                <i class="fas fa-chart-pie"></i>
+                <span>Analysis</span>
             </button>
             <button class="nav-btn mobile-nav-btn" data-panel="cloudStoragePanel" title="Cloud Storage">
                 <i class="fas fa-cloud"></i>
@@ -199,11 +207,15 @@
         </div>
     </div>
     <div class="nav-group">
-        <span class="nav-group-label">Config</span>
+        <span class="nav-group-label">General</span>
         <div class="nav-group-buttons">
             <button class="nav-btn mobile-nav-btn" data-panel="settingsPanel" title="Application Settings">
                 <i class="fas fa-cog"></i>
                 <span>Settings</span>
+            </button>
+            <button class="nav-btn mobile-nav-btn" data-panel="historyPanel" title="Undo/Redo History">
+                <i class="fas fa-history"></i>
+                <span>History</span>
             </button>
         </div>
     </div>
@@ -221,6 +233,10 @@
         <!-- Save button (bottom-right of canvas) -->
         <button id="floatingSaveBtn" class="floating-save-btn" title="Save to Library (Ctrl+S)">
             Save
+        </button>
+        <!-- Screenshot button (top-right of canvas) -->
+        <button id="screenshotBtn" class="canvas-action-btn" title="Save Screenshot">
+            <i class="fas fa-camera"></i>
         </button>
     </div>
 
@@ -1331,6 +1347,112 @@
             </div>
         </div>
         
+        <!-- ===== ANALYSIS PANEL ===== -->
+        <div id="analysisPanel" class="panel hidden">
+            <div class="panel-header">
+                <div class="panel-header-icon analysis-icon"><i class="fas fa-chart-pie"></i></div>
+                <div class="panel-header-text">
+                    <h2>Analysis</h2>
+                    <span class="panel-subtitle">Mesh & annotation statistics</span>
+                </div>
+            </div>
+            <div class="panel-content">
+                <!-- Mesh Information -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-cube"></i>
+                        <span>Mesh Information</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="analysis-stat-grid">
+                            <div class="analysis-stat">
+                                <span class="analysis-stat-value" id="analysisVertexCount">--</span>
+                                <span class="analysis-stat-label">Vertices</span>
+                            </div>
+                            <div class="analysis-stat">
+                                <span class="analysis-stat-value" id="analysisFaceCount">--</span>
+                                <span class="analysis-stat-label">Faces</span>
+                            </div>
+                        </div>
+                        <div id="analysisBbox" class="analysis-bbox">
+                            <span class="analysis-bbox-label">Bounding Box</span>
+                            <span class="analysis-bbox-value" id="analysisBboxValue">--</span>
+                        </div>
+                        <div id="analysisUnitDisplay" class="analysis-unit-hint">Unit: --</div>
+                    </div>
+                </div>
+
+                <!-- Annotation Summary -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-pen-fancy"></i>
+                        <span>Annotation Summary</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="analysis-stat-grid">
+                            <div class="analysis-stat">
+                                <span class="analysis-stat-value" id="analysisEdgeCount">--</span>
+                                <span class="analysis-stat-label">Edge Vertices</span>
+                            </div>
+                            <div class="analysis-stat">
+                                <span class="analysis-stat-value" id="analysisArrowCount">--</span>
+                                <span class="analysis-stat-label">Arrows</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scar Statistics -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-th-large"></i>
+                        <span>Scar Statistics</span>
+                        <span class="section-badge" id="analysisScarBadge">0</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="analysisScarSummary" class="analysis-scar-summary">No scars detected</div>
+                        <div id="analysisScarStats" class="analysis-scar-stats"></div>
+                        <div id="analysisScarChart" class="analysis-scar-chart"></div>
+                        <div id="analysisScarTable" class="analysis-scar-table"></div>
+                        <div class="analysis-export-row">
+                            <button id="analysisCsvExportBtn" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-file-csv"></i> Export CSV
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Measurement Tools -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-ruler-combined"></i>
+                        <span>Measurement Tools</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="measure-section">
+                            <div class="measure-btn-row">
+                                <button id="measureDistanceBtn" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-ruler"></i> Distance
+                                </button>
+                                <button id="measureAngleBtn" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-drafting-compass"></i> Angle
+                                </button>
+                            </div>
+                            <div id="measureResult" class="measure-result hidden">
+                                <div>
+                                    <span class="measure-result-label" id="measureResultLabel">Distance</span>
+                                    <span class="measure-result-value" id="measureResultValue">--</span>
+                                </div>
+                                <button id="measureClearBtn" class="measure-clear-btn" title="Clear measurement">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ===== CLOUD STORAGE PANEL ===== -->
         <div id="cloudStoragePanel" class="panel hidden">
             <div class="panel-header">
@@ -1429,6 +1551,40 @@
                             </label>
                             <input type="file" id="importSettingsInput" accept=".json" class="hidden-file-input">
                         </div>
+                    </div>
+                </div>
+
+                <!-- Units Section -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-ruler-combined"></i>
+                        <span>Units</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="control-row">
+                            <label for="displayUnitSelect">Display Unit</label>
+                            <select id="displayUnitSelect" class="control-select">
+                                <option value="auto">Auto (from mesh)</option>
+                                <option value="raw">Raw (unitless)</option>
+                                <option value="um">Micrometers (μm)</option>
+                                <option value="mm">Millimeters (mm)</option>
+                                <option value="cm">Centimeters (cm)</option>
+                                <option value="m">Meters (m)</option>
+                                <option value="in">Inches (in)</option>
+                            </select>
+                        </div>
+                        <div class="control-row">
+                            <label for="defaultSourceUnitSelect">Default Source Unit</label>
+                            <select id="defaultSourceUnitSelect" class="control-select">
+                                <option value="raw">Raw (unitless)</option>
+                                <option value="um">Micrometers (μm)</option>
+                                <option value="mm">Millimeters (mm)</option>
+                                <option value="cm">Centimeters (cm)</option>
+                                <option value="m">Meters (m)</option>
+                                <option value="in">Inches (in)</option>
+                            </select>
+                        </div>
+                        <p class="help-text">Display unit overrides the mesh's source unit. Default source unit is used when mesh has no unit metadata.</p>
                     </div>
                 </div>
 

@@ -75,9 +75,10 @@ export default class Scene {
     }
 
     createRenderer() {
-        const renderer = new THREE.WebGLRenderer({ 
+        const renderer = new THREE.WebGLRenderer({
             canvas: this.canvas,
-            antialias: true  // Enable antialiasing for smoother edges
+            antialias: true,  // Enable antialiasing for smoother edges
+            preserveDrawingBuffer: true  // Required for screenshot capture
         });
         
         // Use device pixel ratio for sharp rendering on high-DPI displays

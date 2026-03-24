@@ -62,6 +62,12 @@ const DEFAULT_CONFIG = {
         autoSegments: true,
     },
     
+    // Units settings
+    units: {
+        displayUnit: 'auto',       // 'auto' | 'raw' | 'um' | 'mm' | 'cm' | 'm' | 'in'
+        defaultSourceUnit: 'mm',   // Assumed source unit when mesh has no metadata
+    },
+
     // UI preferences
     ui: {
         sidebarWidth: 380,

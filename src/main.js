@@ -33,6 +33,9 @@ import { initUI } from './components/uiSetup.js';
 import { MeshView } from './components/MeshView.js';
 import { AnnotationLibrary } from './utils/AnnotationLibrary.js';
 import { ScarOrderPanel } from './components/scarOrderPanel.js';
+import { AnalysisPanel } from './components/analysisPanel.js';
+import { MeasureTool } from './components/measureTool.js';
+import { captureScreenshot } from './utils/screenshotExporter.js';
 
 
 // User configuration (persisted to localStorage)
@@ -118,6 +121,18 @@ const settingsPanel = new SettingsPanel(userConfig, renderingPanel);
 
 // Scar order panel (temporal ordering of scars)
 const scarOrderPanel = new ScarOrderPanel(meshView, mode);
+
+// Analysis panel (mesh & annotation statistics)
+const analysisPanel = new AnalysisPanel(meshView, meshLoader, userConfig);
+
+// Measure tool (distance & angle measurement)
+const measureTool = new MeasureTool(meshView, mode, userConfig, scene);
+
+// Screenshot button
+document.getElementById('screenshotBtn')?.addEventListener('click', () => {
+    const baseName = meshLoader.currentFileName || 'lithic';
+    captureScreenshot(scene, baseName);
+});
 
 // Reset rendering button
 document.getElementById('resetRenderingBtn').addEventListener('click', () => {
@@ -333,7 +348,8 @@ eventBus.on(Events.SWITCH_PANEL, (data) => {
         'evaluationPanel': { btnId: 'evaluationPanelBtn', onShow: null },
         'cloudStoragePanel': { btnId: 'cloudStoragePanelBtn', onShow: () => cloudStoragePanel.onShow() },
         'settingsPanel': { btnId: 'settingsPanelBtn', onShow: () => settingsPanel.onShow() },
-        'scarOrderPanel': { btnId: 'scarOrderPanelBtn', onShow: () => scarOrderPanel.onShow() }
+        'scarOrderPanel': { btnId: 'scarOrderPanelBtn', onShow: () => scarOrderPanel.onShow() },
+        'analysisPanel': { btnId: 'analysisPanelBtn', onShow: () => analysisPanel.onShow() }
     };
     
     const config = panelConfig[panelId];
@@ -404,6 +420,14 @@ document.getElementById('scarOrderPanelBtn').addEventListener('click', () => {
         onShow: () => scarOrderPanel.onShow()
     });
     setActiveNavBtn('scarOrderPanelBtn');
+});
+
+document.getElementById('analysisPanelBtn').addEventListener('click', () => {
+    showHidePanel('analysisPanel', {
+        onShow: () => analysisPanel.onShow()
+    });
+    setActiveNavBtn('analysisPanelBtn');
+    mode.setMode(MODES.VIEW, true);
 });
 
 // Keyboard shortcuts for undo/redo/save

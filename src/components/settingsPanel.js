@@ -57,6 +57,23 @@ export class SettingsPanel {
         if (clearBtn) {
             clearBtn.addEventListener('click', () => this.clearLocalStorage());
         }
+
+        // Units selectors
+        const displayUnitSelect = document.getElementById('displayUnitSelect');
+        if (displayUnitSelect) {
+            displayUnitSelect.value = this.userConfig.get('units.displayUnit') || 'auto';
+            displayUnitSelect.addEventListener('change', (e) => {
+                this.userConfig.set('units.displayUnit', e.target.value);
+            });
+        }
+
+        const defaultSourceUnitSelect = document.getElementById('defaultSourceUnitSelect');
+        if (defaultSourceUnitSelect) {
+            defaultSourceUnitSelect.value = this.userConfig.get('units.defaultSourceUnit') || 'mm';
+            defaultSourceUnitSelect.addEventListener('change', (e) => {
+                this.userConfig.set('units.defaultSourceUnit', e.target.value);
+            });
+        }
     }
     
     /**
@@ -228,5 +245,10 @@ export class SettingsPanel {
      */
     onShow() {
         this.updateSettingsSummary();
+        // Sync unit selectors with current config
+        const displayUnitSelect = document.getElementById('displayUnitSelect');
+        if (displayUnitSelect) displayUnitSelect.value = this.userConfig.get('units.displayUnit') || 'auto';
+        const defaultSourceUnitSelect = document.getElementById('defaultSourceUnitSelect');
+        if (defaultSourceUnitSelect) defaultSourceUnitSelect.value = this.userConfig.get('units.defaultSourceUnit') || 'mm';
     }
 }

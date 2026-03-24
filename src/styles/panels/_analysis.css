@@ -1,0 +1,272 @@
+/**
+ * Analysis Panel Styles
+ * ====================
+ * Uses the light sidebar theme (matching other panels).
+ */
+
+/* Stat grid - 2-column layout for metrics */
+.analysis-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.analysis-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 8px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+}
+
+.analysis-stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--gray-800);
+    letter-spacing: -0.5px;
+}
+
+.analysis-stat-label {
+    font-size: 10px;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+}
+
+/* Bounding box display */
+.analysis-bbox {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    margin-bottom: 4px;
+}
+
+.analysis-bbox-label {
+    font-size: 11px;
+    color: var(--gray-500);
+    font-weight: 500;
+}
+
+.analysis-bbox-value {
+    font-size: 12px;
+    color: var(--gray-700);
+    font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+/* Unit hint */
+.analysis-unit-hint {
+    font-size: 10px;
+    color: var(--gray-500);
+    text-align: right;
+    margin-top: 4px;
+}
+
+/* Scar summary text */
+.analysis-scar-summary {
+    font-size: 13px;
+    color: var(--gray-600);
+    margin-bottom: 8px;
+}
+
+/* Scar stats - min/max/mean/median in a row */
+.analysis-scar-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.analysis-scar-stats .stat-item {
+    text-align: center;
+    padding: 6px 4px;
+    background: var(--gray-50);
+    border-radius: 4px;
+    border: 1px solid var(--gray-200);
+}
+
+.analysis-scar-stats .stat-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-800);
+    display: block;
+}
+
+.analysis-scar-stats .stat-label {
+    font-size: 9px;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Horizontal bar chart */
+.analysis-scar-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 10px;
+}
+
+.analysis-scar-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.analysis-scar-bar-label {
+    font-size: 10px;
+    color: var(--gray-500);
+    min-width: 28px;
+    text-align: right;
+}
+
+.analysis-scar-bar-track {
+    flex: 1;
+    height: 14px;
+    background: var(--gray-100);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.analysis-scar-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.analysis-scar-bar-value {
+    font-size: 10px;
+    color: var(--gray-500);
+    min-width: 36px;
+}
+
+/* Scar attribute table */
+.analysis-scar-table {
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+}
+
+.analysis-scar-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.analysis-scar-table th {
+    position: sticky;
+    top: 0;
+    background: var(--gray-50);
+    color: var(--gray-500);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-size: 9px;
+    padding: 6px 6px;
+    text-align: left;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.analysis-scar-table td {
+    padding: 4px 6px;
+    color: var(--gray-700);
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.analysis-scar-table tr:hover td {
+    background: var(--gray-50);
+}
+
+.scar-color-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+/* Measure tool */
+.measure-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.measure-btn-row {
+    display: flex;
+    gap: 6px;
+}
+
+.measure-btn-row .btn {
+    flex: 1;
+}
+
+.measure-result {
+    padding: 8px 10px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.measure-result.hidden {
+    display: none;
+}
+
+.measure-result-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-800);
+    font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+.measure-result-label {
+    font-size: 10px;
+    color: var(--gray-500);
+    margin-right: 8px;
+}
+
+.measure-clear-btn {
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.measure-clear-btn:hover {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Export row */
+.analysis-export-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.analysis-export-row .btn {
+    flex: 1;
+}
+
+/* Empty state */
+.analysis-empty {
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 12px;
+    padding: 16px 8px;
+}
