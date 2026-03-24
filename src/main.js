@@ -123,7 +123,7 @@ const settingsPanel = new SettingsPanel(userConfig, renderingPanel);
 const scarOrderPanel = new ScarOrderPanel(meshView, mode);
 
 // Analysis panel (mesh & annotation statistics)
-const analysisPanel = new AnalysisPanel(meshView, meshLoader, userConfig);
+const analysisPanel = new AnalysisPanel(meshView, meshLoader, userConfig, mode);
 
 // Measure tool (distance & angle measurement)
 const measureTool = new MeasureTool(meshView, mode, userConfig, scene);
@@ -241,6 +241,9 @@ function showHidePanel(panelId, callbacks = {}) {
     // Handle leaving previous panel
     if (currentPanelId === 'scarOrderPanel' && panelId !== 'scarOrderPanel') {
         scarOrderPanel.onHide();
+    }
+    if (currentPanelId === 'analysisPanel' && panelId !== 'analysisPanel') {
+        analysisPanel.onHide();
     }
     if (currentPanelId === 'evaluationPanel' && panelId !== 'evaluationPanel') {
         // Exiting evaluation panel - restore normal state

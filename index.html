@@ -1443,10 +1443,72 @@
                         <span class="section-badge" id="analysisScarBadge">0</span>
                     </div>
                     <div class="section-content">
-                        <div id="analysisScarSummary" class="analysis-scar-summary">No scars detected</div>
+                        <div id="analysisScarEmpty" class="analysis-scar-summary">No scars detected</div>
+
+                        <!-- Controls row -->
+                        <div id="analysisScarControls" class="analysis-controls-row hidden">
+                            <div class="analysis-control-group">
+                                <label class="analysis-control-label" for="analysisMetricSelect">Metric</label>
+                                <select id="analysisMetricSelect" class="analysis-select"></select>
+                                <button id="analysisSortToggle" class="btn btn-icon btn-xs" title="Toggle sort direction">
+                                    <i class="fas fa-sort-amount-down"></i>
+                                </button>
+                            </div>
+                            <div class="analysis-control-group">
+                                <label class="analysis-control-inline">
+                                    <input type="checkbox" id="analysisColormapEnabled">
+                                    <span>Colormap</span>
+                                </label>
+                                <select id="analysisColormapSelect" class="analysis-select analysis-select-sm">
+                                    <option value="blueRed">Blue-Red</option>
+                                    <option value="viridis">Viridis</option>
+                                    <option value="plasma">Plasma</option>
+                                    <option value="coolwarm">Cool-Warm</option>
+                                    <option value="turbo">Turbo</option>
+                                </select>
+                            </div>
+                            <div class="analysis-control-group">
+                                <label class="analysis-control-inline">
+                                    <input type="checkbox" id="analysisLabelsEnabled">
+                                    <span>Labels</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Colormap legend -->
+                        <div id="analysisColormapLegend" class="analysis-colormap-legend hidden">
+                            <div id="analysisColormapLegendBar" class="analysis-colormap-bar"></div>
+                        </div>
+
+                        <!-- Summary stats -->
                         <div id="analysisScarStats" class="analysis-scar-stats"></div>
+
+                        <!-- Bar chart -->
                         <div id="analysisScarChart" class="analysis-scar-chart"></div>
+
+                        <!-- Table -->
                         <div id="analysisScarTable" class="analysis-scar-table"></div>
+
+                        <!-- Selected scar detail -->
+                        <div id="analysisSelectedScar" class="analysis-selected-detail hidden">
+                            <div class="analysis-selected-header">
+                                <span id="analysisSelectedTitle">Scar #--</span>
+                                <button id="analysisSelectedClose" class="btn btn-icon btn-xs" title="Deselect">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div id="analysisSelectedMetrics" class="analysis-selected-metrics"></div>
+                            <div class="analysis-selected-actions">
+                                <label class="analysis-control-inline">
+                                    <span>Color</span>
+                                    <input type="color" id="analysisSelectedColor" class="analysis-color-picker">
+                                </label>
+                                <button id="analysisSelectedFocus" class="btn btn-secondary btn-xs">
+                                    <i class="fas fa-crosshairs"></i> Focus
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="analysis-export-row">
                             <button id="analysisCsvExportBtn" class="btn btn-secondary btn-sm">
                                 <i class="fas fa-file-csv"></i> Export CSV

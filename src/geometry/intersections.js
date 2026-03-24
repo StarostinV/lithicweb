@@ -19,16 +19,44 @@ export class IntersectFinder {
         this.raycaster = new THREE.Raycaster();
         this.raycaster.firstHitOnly = true;
         this.mouse = new THREE.Vector2();
-        
+
         // Reusable objects to avoid allocations
         this._inverseMatrix = new THREE.Matrix4();
         this._localPoint = new THREE.Vector3();
+
+        // Viewport override for dual-view mode.
+        // When set, mouse positions are mapped to this sub-region of the canvas
+        // instead of the full canvas. Values are CSS-pixel fractions (0-1).
+        // { left, top, width, height } in normalized canvas coordinates.
+        this._viewport = null;
+    }
+
+    /**
+     * Set the active viewport region for mouse position mapping.
+     * @param {{ left: number, top: number, width: number, height: number }|null} viewport
+     *   Normalized (0-1) region of the canvas. null = full canvas.
+     */
+    setViewport(viewport) {
+        this._viewport = viewport;
     }
 
     getMousePosition(event) {
         const rect = this.canvas.getBoundingClientRect();
-        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        if (this._viewport) {
+            // Map mouse position relative to the viewport sub-region
+            const vp = this._viewport;
+            const vpLeft = rect.left + vp.left * rect.width;
+            const vpTop = rect.top + vp.top * rect.height;
+            const vpWidth = vp.width * rect.width;
+            const vpHeight = vp.height * rect.height;
+            this.mouse.x = ((event.clientX - vpLeft) / vpWidth) * 2 - 1;
+            this.mouse.y = -((event.clientY - vpTop) / vpHeight) * 2 + 1;
+        } else {
+            this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        }
+
         return this.mouse;
     }
 

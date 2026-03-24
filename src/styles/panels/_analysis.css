@@ -69,11 +69,81 @@
     margin-top: 4px;
 }
 
-/* Scar summary text */
+/* Scar summary / empty text */
 .analysis-scar-summary {
     font-size: 13px;
     color: var(--gray-600);
     margin-bottom: 8px;
+}
+
+/* Controls row */
+.analysis-controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.analysis-controls-row.hidden {
+    display: none;
+}
+
+.analysis-control-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.analysis-control-label {
+    font-size: 10px;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-weight: 600;
+}
+
+.analysis-control-inline {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--gray-600);
+    cursor: pointer;
+}
+
+.analysis-control-inline input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.analysis-select {
+    font-size: 11px;
+    padding: 2px 6px;
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    background: var(--gray-50);
+    color: var(--gray-700);
+    cursor: pointer;
+}
+
+.analysis-select-sm {
+    max-width: 80px;
+}
+
+/* Colormap legend */
+.analysis-colormap-legend {
+    margin-bottom: 8px;
+}
+
+.analysis-colormap-legend.hidden {
+    display: none;
+}
+
+.analysis-colormap-bar {
+    height: 8px;
+    border-radius: 4px;
+    width: 100%;
 }
 
 /* Scar stats - min/max/mean/median in a row */
@@ -175,6 +245,26 @@
     border-bottom: 1px solid var(--gray-200);
 }
 
+.analysis-scar-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.analysis-scar-table th.sortable:hover {
+    color: var(--gray-700);
+}
+
+.analysis-scar-table th .sort-indicator {
+    margin-left: 2px;
+    font-size: 8px;
+    opacity: 0.4;
+}
+
+.analysis-scar-table th.sorted .sort-indicator {
+    opacity: 1;
+    color: var(--primary);
+}
+
 .analysis-scar-table td {
     padding: 4px 6px;
     color: var(--gray-700);
@@ -183,6 +273,14 @@
 
 .analysis-scar-table tr:hover td {
     background: var(--gray-50);
+}
+
+.analysis-scar-table tr.selected td {
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.analysis-scar-table tbody tr {
+    cursor: pointer;
 }
 
 .scar-color-swatch {
@@ -250,6 +348,70 @@
 .measure-clear-btn:hover {
     color: var(--danger);
     background: rgba(239, 68, 68, 0.1);
+}
+
+/* Selected scar detail */
+.analysis-selected-detail {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 8px;
+}
+
+.analysis-selected-detail.hidden {
+    display: none;
+}
+
+.analysis-selected-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+.analysis-selected-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    margin-bottom: 8px;
+    font-size: 11px;
+}
+
+.analysis-selected-metric {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+}
+
+.analysis-selected-metric-label {
+    color: var(--gray-500);
+}
+
+.analysis-selected-metric-value {
+    color: var(--gray-800);
+    font-weight: 500;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    font-size: 10px;
+}
+
+.analysis-selected-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.analysis-color-picker {
+    width: 28px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    cursor: pointer;
+    background: none;
 }
 
 /* Export row */

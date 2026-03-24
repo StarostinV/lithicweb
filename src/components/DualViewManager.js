@@ -182,7 +182,11 @@ export class DualViewManager {
         // Add window resize handler and canvas click handler
         window.addEventListener('resize', this._onWindowResize);
         this.scene.canvas.addEventListener('click', this._onCanvasClick);
-        
+
+        // Set viewport on IntersectFinder and TransformControls so mouse
+        // positions are correctly mapped to the active half of the canvas
+        this._updateViewport();
+
         // Emit event
         eventBus.emit(Events.DUAL_VIEW_CHANGED, { enabled: true, mode: this.mode, activeView: this.activeView });
     }
@@ -259,10 +263,10 @@ export class DualViewManager {
         const renderer = this.scene.renderer;
         const size = new THREE.Vector2();
         renderer.getSize(size);
-        
+
         renderer.setScissorTest(false);
         renderer.setViewport(0, 0, size.x, size.y);
-        
+
         // Restore camera aspect ratio
         if (this._originalCameraAspect) {
             this.scene.camera.aspect = this._originalCameraAspect;
@@ -270,7 +274,10 @@ export class DualViewManager {
             this.scene.camera.aspect = size.x / size.y;
         }
         this.scene.camera.updateProjectionMatrix();
-        
+
+        // Clear viewport override on IntersectFinder and TransformControls
+        this._clearViewport();
+
         // Memory cleanup - release large buffers
         this._cleanupMemory();
         
@@ -360,7 +367,8 @@ export class DualViewManager {
         }
         
         this._updateActiveViewUI();
-        
+        this._updateViewport();
+
         // Emit event for other components
         eventBus.emit(Events.DUAL_VIEW_ACTIVE_CHANGED, { activeView: view });
     }
@@ -898,6 +906,63 @@ export class DualViewManager {
         }
     }
     
+    /**
+     * Update the viewport on IntersectFinder and TransformControls so that
+     * mouse positions are mapped to the active view's half of the canvas.
+     * @private
+     */
+    _updateViewport() {
+        const isLeft = this.activeView === 'left';
+        const vp = isLeft
+            ? { left: 0, top: 0, width: this.splitRatio, height: 1 }
+            : { left: this.splitRatio, top: 0, width: 1 - this.splitRatio, height: 1 };
+
+        // Update IntersectFinder (raycasting for drawing, picking, etc.)
+        const intersectFinder = this.meshView?.intersectFinder;
+        if (intersectFinder) {
+            intersectFinder.setViewport(vp);
+        }
+
+        // Patch TransformControls._getPointer so the gizmo tracks the mouse
+        // correctly within the active viewport half
+        const tc = this.scene.rotationController?.transformControls;
+        if (tc) {
+            if (!this._originalGetPointer) {
+                this._originalGetPointer = tc._getPointer;
+            }
+            const canvas = this.scene.canvas;
+            tc._getPointer = function(event) {
+                const rect = canvas.getBoundingClientRect();
+                const vpLeft = rect.left + vp.left * rect.width;
+                const vpTop = rect.top + vp.top * rect.height;
+                const vpWidth = vp.width * rect.width;
+                const vpHeight = vp.height * rect.height;
+                return {
+                    x: ((event.clientX - vpLeft) / vpWidth) * 2 - 1,
+                    y: -((event.clientY - vpTop) / vpHeight) * 2 + 1,
+                    button: event.button
+                };
+            };
+        }
+    }
+
+    /**
+     * Clear viewport overrides, restoring full-canvas mouse mapping.
+     * @private
+     */
+    _clearViewport() {
+        const intersectFinder = this.meshView?.intersectFinder;
+        if (intersectFinder) {
+            intersectFinder.setViewport(null);
+        }
+
+        const tc = this.scene.rotationController?.transformControls;
+        if (tc && this._originalGetPointer) {
+            tc._getPointer = this._originalGetPointer;
+            this._originalGetPointer = null;
+        }
+    }
+
     /**
      * Clean up memory by releasing large buffers.
      * Called when disabling dual view to free memory.

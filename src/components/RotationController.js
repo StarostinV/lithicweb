@@ -166,7 +166,7 @@ export default class RotationController {
     _createTransformControls() {
         const controls = new TransformControls(this.camera, this.canvas);
         const cfg = this.config.transform;
-        
+
         // Apply configuration
         controls.setMode(cfg.mode);
         controls.setSize(cfg.size);
@@ -174,12 +174,129 @@ export default class RotationController {
         controls.showX = cfg.showX;
         controls.showY = cfg.showY;
         controls.showZ = cfg.showZ;
-        
+
+        // Refine gizmo visuals: thinner lines, smoother rings
+        this._refineGizmoGeometry(controls);
+
         // Add to scene but keep invisible initially
         this.scene.add(controls);
         controls.visible = false;
-        
+
         return controls;
+    }
+
+    /**
+     * Replaces default gizmo geometries with thinner, higher-resolution versions.
+     *
+     * The stock Three.js setupGizmo() bakes ALL transforms (geometry-level rotations
+     * from CircleGeometry + per-entry object position/rotation/scale) into vertex data,
+     * then resets object transforms to identity. So we must replicate that full pipeline
+     * to produce correctly oriented replacement geometries.
+     * @private
+     */
+    _refineGizmoGeometry(controls) {
+        const TUBE = 0.003;          // Thinner tube (stock: 0.0075)
+        const RADIAL = 12;           // Smoother cross-section (stock: 3)
+        const TUBULAR = 128;         // Smoother ring (stock: 64)
+        const LINE_R = 0.003;        // Thinner translate lines (stock: 0.0075)
+        const LINE_RADIAL = 8;       // Smoother lines (stock: 3)
+
+        const gizmo = controls._gizmo;
+        if (!gizmo) return;
+
+        // --- helpers to mirror Three.js internals ---
+
+        // Replicates the stock CircleGeometry but with refined params
+        const makeCircle = (radius, arc) => {
+            const g = new THREE.TorusGeometry(radius, TUBE, RADIAL, TUBULAR, arc * Math.PI * 2);
+            g.rotateY(Math.PI / 2);
+            g.rotateX(Math.PI / 2);
+            return g;
+        };
+
+        // Replicates stock lineGeometry2 but thinner/smoother
+        const makeLine = () => {
+            const g = new THREE.CylinderGeometry(LINE_R, LINE_R, 0.5, LINE_RADIAL);
+            g.translate(0, 0.25, 0);
+            return g;
+        };
+
+        // Bake object-level transforms into geometry (same as setupGizmo lines 1115-1124)
+        const bakeTransform = (geom, position, rotation) => {
+            const obj = new THREE.Object3D();
+            if (position) obj.position.set(position[0], position[1], position[2]);
+            if (rotation) obj.rotation.set(rotation[0], rotation[1], rotation[2]);
+            obj.updateMatrix();
+            geom.applyMatrix4(obj.matrix);
+            return geom;
+        };
+
+        // --- Rotate gizmo: replace ring geometries ---
+        // Matches gizmoRotate definition from TransformControls source
+        const rotateGroup = gizmo.gizmo?.['rotate'];
+        if (rotateGroup) {
+            const rotateSpecs = {
+                'XYZE': { radius: 0.5, arc: 1, rotation: [0, Math.PI / 2, 0] },
+                'X':    { radius: 0.5, arc: 0.5, rotation: null },
+                'Y':    { radius: 0.5, arc: 0.5, rotation: [0, 0, -Math.PI / 2] },
+                'Z':    { radius: 0.5, arc: 0.5, rotation: [0, Math.PI / 2, 0] },
+                'E':    { radius: 0.75, arc: 1, rotation: [0, Math.PI / 2, 0] },
+            };
+            for (const child of rotateGroup.children) {
+                const spec = rotateSpecs[child.name];
+                if (!spec) continue;
+                const oldGeom = child.geometry;
+                const newGeom = makeCircle(spec.radius, spec.arc);
+                bakeTransform(newGeom, null, spec.rotation);
+                child.geometry = newGeom;
+                oldGeom.dispose();
+            }
+        }
+
+        // --- Translate gizmo: replace cylinder line geometries ---
+        // After setupGizmo bakes transforms, parameters reflect defaults (not original),
+        // so we identify line cylinders by vertex count: stock 3-segment cylinder has ~18
+        // vertices vs arrow's 12-segment cone with ~54.
+        const translateGroup = gizmo.gizmo?.['translate'];
+        if (translateGroup) {
+            const lineSpecs = {
+                'X': { position: [0, 0, 0], rotation: [0, 0, -Math.PI / 2] },
+                'Y': { position: null, rotation: null },
+                'Z': { position: null, rotation: [Math.PI / 2, 0, 0] },
+            };
+            for (const child of translateGroup.children) {
+                const spec = lineSpecs[child.name];
+                if (!spec) continue;
+                const posAttr = child.geometry?.getAttribute('position');
+                if (!posAttr || posAttr.count > 30) continue; // skip arrows (high vertex count)
+                const oldGeom = child.geometry;
+                const newGeom = makeLine();
+                bakeTransform(newGeom, spec.position, spec.rotation);
+                child.geometry = newGeom;
+                oldGeom.dispose();
+            }
+        }
+
+        // --- Scale gizmo: replace cylinder line geometries ---
+        const scaleGroup = gizmo.gizmo?.['scale'];
+        if (scaleGroup) {
+            const lineSpecs = {
+                'X': { position: null, rotation: [0, 0, -Math.PI / 2] },
+                'Y': { position: null, rotation: null },
+                'Z': { position: null, rotation: [Math.PI / 2, 0, 0] },
+            };
+            for (const child of scaleGroup.children) {
+                const spec = lineSpecs[child.name];
+                if (!spec) continue;
+                const posAttr = child.geometry?.getAttribute('position');
+                if (!posAttr || posAttr.count > 30) continue;
+                const oldGeom = child.geometry;
+                const newGeom = makeLine();
+                bakeTransform(newGeom, spec.position, spec.rotation);
+                child.geometry = newGeom;
+                oldGeom.dispose();
+            }
+        }
     }
     
     /**
