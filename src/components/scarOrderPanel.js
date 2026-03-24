@@ -62,7 +62,7 @@ export class ScarOrderPanel {
         this._compCountEl = document.getElementById('comparisonCount');
         this._preseedBtn = document.getElementById('scarOrderPreseed');
         this._clearPreseedBtn = document.getElementById('scarOrderClearPreseed');
-        this._saveBtn = document.getElementById('scarOrderSave');
+
         this._colormapCheckbox = document.getElementById('scarOrderColormap');
         this._colormapSelect = document.getElementById('scarOrderColormapSelect');
         this._colormapLegendEl = document.getElementById('scarColormapLegend');
@@ -86,7 +86,7 @@ export class ScarOrderPanel {
     _setupEventListeners() {
         this._preseedBtn?.addEventListener('click', () => this._preseed());
         this._clearPreseedBtn?.addEventListener('click', () => this._clearPreseed());
-        this._saveBtn?.addEventListener('click', () => this._save());
+
 
         this._colormapCheckbox?.addEventListener('change', () => {
             this._colormapEnabled = this._colormapCheckbox.checked;
@@ -283,7 +283,7 @@ export class ScarOrderPanel {
 
         this._preseedBtn.disabled = false;
         this._clearPreseedBtn.disabled = false;
-        this._saveBtn.disabled = false;
+
         if (this._rearrangeBtn) this._rearrangeBtn.disabled = false;
         if (this._startCompareBtn) this._startCompareBtn.disabled = false;
 
@@ -352,6 +352,7 @@ export class ScarOrderPanel {
             this._highlightScar(older, OLDER_COLOR);
             this._setStatus('Comparison recorded.', 'success');
             this._updateUI();
+            this._persistMetadata();
 
             setTimeout(() => {
                 this._restoreAllHighlights();
@@ -443,6 +444,7 @@ export class ScarOrderPanel {
         if (!this.ordering || !this.scarGraph) return;
         this.ordering.preseedFromGraph(this.scarGraph);
         this._updateUI();
+        this._persistMetadata();
         this._setStatus('Preseed comparisons added (size heuristic)', 'success');
     }
 
@@ -489,6 +491,7 @@ export class ScarOrderPanel {
 
         this._setStatus('Global order applied.', 'success');
         this._updateUI();
+        this._persistMetadata();
     }
 
     /**
@@ -554,22 +557,13 @@ export class ScarOrderPanel {
         if (!this.ordering) return;
         this.ordering.clearPreseedComparisons();
         this._updateUI();
+        this._persistMetadata();
         this._setStatus('Preseed comparisons removed', 'ready');
     }
 
-    _save() {
+    _persistMetadata() {
         if (!this.ordering) return;
-        // Use MeshView's setter so it auto-syncs to library
         this.meshView.setCurrentStateMetadata('scarOrder', this.ordering.toMetadata());
-
-        const name = this.meshView.workingAnnotation?.metadata?.name;
-        const lib = this.meshView.annotationLibrary;
-        const inLib = lib && this.meshView.workingAnnotation && lib.has(this.meshView.workingAnnotation.id);
-        if (inLib) {
-            this._setStatus(`Saved & updated in '${name}'`, 'success');
-        } else {
-            this._setStatus('Saved. Use Library to persist.', 'success');
-        }
     }
 
     // ========================================
@@ -592,7 +586,7 @@ export class ScarOrderPanel {
 
         if (this._preseedBtn) this._preseedBtn.disabled = true;
         if (this._clearPreseedBtn) this._clearPreseedBtn.disabled = true;
-        if (this._saveBtn) this._saveBtn.disabled = true;
+
         if (this._rearrangeBtn) this._rearrangeBtn.disabled = true;
         if (this._startCompareBtn) this._startCompareBtn.disabled = true;
         this._cancelRearrange();
@@ -888,6 +882,7 @@ export class ScarOrderPanel {
                     parseInt(el.dataset.older, 10)
                 );
                 this._updateUI();
+                this._persistMetadata();
             });
         });
 
