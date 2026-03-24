@@ -233,18 +233,9 @@ export class MeasureTool {
     // ── Three.js Objects ──────────────────────────────────────────────
 
     _getMarkerRadius() {
-        // Scale marker relative to mesh bounding box
-        const positions = this.meshView.positions;
-        if (!positions || positions.length === 0) return 0.04;
-
-        // Use a rough estimate from first 1000 vertices
-        let maxDist = 0;
-        const limit = Math.min(positions.length, 3000);
-        for (let i = 0; i < limit; i += 3) {
-            const d = positions[i] * positions[i] + positions[i + 1] * positions[i + 1] + positions[i + 2] * positions[i + 2];
-            if (d > maxDist) maxDist = d;
-        }
-        return Math.sqrt(maxDist) * 0.008;
+        const info = this.meshView.basicMesh?.computeBoundingInfo();
+        if (!info) return 0.04;
+        return info.diagonal * 0.003;
     }
 
     _createMarker(worldPos, color) {

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Annotation } from '../geometry/Annotation.js';
 import { IntersectFinder } from '../geometry/intersections.js';
 import { PathFinder } from '../geometry/PathFinder.js';
+import { normalizeEdges } from '../geometry/faceUnionFind.js';
 import { ActionHistory } from '../utils/ActionHistory.js';
 import { eventBus, Events } from '../utils/EventBus.js';
 import DynamicTypedArray from '../utils/DynamicTypedArray.js';
@@ -806,7 +807,54 @@ export class MeshView {
         this._computeSegments();
         this._updateSegmentColors(previousFaceLabels);
     }
-    
+
+    /**
+     * Normalize the current annotation edges: erode thick edges and
+     * reassign clean, thin boundaries at segment borders.
+     */
+    normalizeAnnotation() {
+        if (!this.currentEdgeIndices?.size || !this.adjacencyGraph) return;
+
+        // Ensure segments are computed so faceLabels has per-vertex segment IDs
+        if (this.segments.length === 0) {
+            this._computeSegments();
+            // Assign temporary labels for segments
+            this.faceLabels = new Array(this.vertexCount).fill(0);
+            this.segments.forEach((segment, index) => {
+                const segmentId = index + 1;
+                segment.forEach(v => { this.faceLabels[v] = segmentId; });
+            });
+        }
+
+        // Run the two-stage edge cleanup
+        const cleanEdgeLabels = normalizeEdges(
+            this.faceLabels, this.currentEdgeIndices,
+            this.adjacencyGraph, this.vertexCount, this.indices
+        );
+
+        // Record as history operation
+        this.startDrawOperation('normalize');
+
+        // Clear old edges
+        this.currentEdgeIndices.forEach(index => {
+            this.edgeLabels[index] = 0;
+            this.colorVertex(index, this.objectColor);
+        });
+        this.currentEdgeIndices.clear();
+
+        // Apply new clean edges
+        for (let v = 0; v < cleanEdgeLabels.length; v++) {
+            if (cleanEdgeLabels[v] === 1) {
+                this.edgeLabels[v] = 1;
+                this.colorVertex(v, this.edgeColor);
+                this.currentEdgeIndices.add(v);
+            }
+        }
+
+        this.finishDrawOperation();
+        this.updateSegments();
+    }
+
     /**
      * Compute segments from current edge state using flood-fill.
      * 

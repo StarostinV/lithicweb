@@ -58,8 +58,9 @@ export class LibraryPanel {
         this.gtStatus = document.getElementById('libraryGtStatus');
         this.predStatus = document.getElementById('libraryPredStatus');
 
-        // Floating save button
+        // Floating action buttons
         this.floatingSaveBtn = document.getElementById('floatingSaveBtn');
+        this.normalizeBtn = document.getElementById('normalizeBtn');
 
         // Save-to-library modal elements
         this.saveModal = document.getElementById('saveToLibraryModal');
@@ -236,6 +237,11 @@ export class LibraryPanel {
         // Floating save button
         this.floatingSaveBtn?.addEventListener('click', () => {
             this.saveCurrentAnnotation();
+        });
+
+        // Normalize button
+        this.normalizeBtn?.addEventListener('click', () => {
+            this.meshView.normalizeAnnotation();
         });
 
         // Clear library button
@@ -438,9 +444,12 @@ export class LibraryPanel {
      * @private
      */
     _updateFloatingSaveBtn() {
+        const hasContent = this.meshView.currentEdgeIndices?.size > 0;
         if (this.floatingSaveBtn) {
-            const hasContent = this.meshView.currentEdgeIndices?.size > 0;
             this.floatingSaveBtn.disabled = !hasContent;
+        }
+        if (this.normalizeBtn) {
+            this.normalizeBtn.disabled = !hasContent;
         }
     }
 

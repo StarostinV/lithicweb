@@ -82,7 +82,7 @@ function createArrowComponents(startPoint, endPoint, color, shaftRadius, headRad
     const distance = startPoint.distanceTo(endPoint);
 
     // Create the arrow shaft
-    const shaftGeometry = new THREE.CylinderGeometry(shaftRadius, shaftRadius, Math.max(distance - headLength, 0.01), 8);
+    const shaftGeometry = new THREE.CylinderGeometry(shaftRadius, shaftRadius, Math.max(distance - headLength, shaftRadius), 8);
     const shaftMaterial = new THREE.MeshBasicMaterial({ color: color });
     const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
 
@@ -111,7 +111,7 @@ export class ArrowDrawer {
         this.isDrawing = false;
         this.arrow = null;
         this.arrows = [];
-        this.offset = 0.2;
+        this.offset = this.meshView.arrowOffset || 0.2;
 
         // Bind event listeners to ensure 'this' context is correct
         this.leftClick = this.leftClick.bind(this);
@@ -154,7 +154,9 @@ export class ArrowDrawer {
         const endPoint = this.meshView.indexToVertex(endIndex);
         const endNormal = this.meshView.getVertexNormal(endIndex);
         const arrow = new Arrow(
-            startPoint, startNormal, startIndex, this.offset, 0xff0000, 0.02, 0.05, 0.2
+            startPoint, startNormal, startIndex, this.meshView.arrowOffset || this.offset,
+            0xff0000, this.meshView.arrowShaftRadius || 0.02,
+            this.meshView.arrowHeadRadius || 0.05, this.meshView.arrowHeadLength || 0.2
         )
         this.mesh().add(arrow.arrowGroup);
         arrow.updateArrow(endPoint, endNormal, endNormal);
@@ -191,7 +193,10 @@ export class ArrowDrawer {
         if (faceIndex === -1) return;
         this.isDrawing = true;
 
-        this.arrow = new Arrow(firstVertex, vertexNormal, closestVertexIndex, this.offset, 0xff0000, 0.02, 0.05, 0.2);
+        this.arrow = new Arrow(firstVertex, vertexNormal, closestVertexIndex,
+            this.meshView.arrowOffset || this.offset, 0xff0000,
+            this.meshView.arrowShaftRadius || 0.02, this.meshView.arrowHeadRadius || 0.05,
+            this.meshView.arrowHeadLength || 0.2);
 
         this.mesh().add(this.arrow.arrowGroup);
     }

@@ -11,6 +11,7 @@
  */
 
 
+
 // ============== Union-Find Primitives ==============
 
 /**
@@ -438,4 +439,265 @@ export function facePredictionsToVertexValues(edgePredictions, indicesFlat, numF
     }
 
     return result;
+}
+
+
+// ============== Edge Cleanup ==============
+
+/**
+ * Convert per-face segment IDs to per-vertex segment labels.
+ * Only needed in the postprocessing pipeline (Path B) where we start from per-face data.
+ *
+ * For each face with segment > 0, assigns that segment to its 3 vertices.
+ * If a vertex sees two different non-zero segment IDs → set to 0 (edge).
+ * Faces with segment 0 (e.g. small segments marked as edge) are skipped.
+ *
+ * @param {Int32Array} faceSegments - Per-face segment labels (0 = edge/small)
+ * @param {Uint32Array|Int32Array|Array} indicesFlat - Face vertex indices (numFaces * 3)
+ * @param {number} numVertices
+ * @returns {Int32Array} Per-vertex segment labels (0 = edge)
+ */
+export function faceSegmentsToVertexSegments(faceSegments, indicesFlat, numVertices) {
+    const vertexLabels = new Int32Array(numVertices); // all 0
+    const numFaces = faceSegments.length;
+
+    for (let f = 0; f < numFaces; f++) {
+        const seg = faceSegments[f];
+        if (seg === 0) continue; // skip edge faces
+
+        const base = f * 3;
+        for (let k = 0; k < 3; k++) {
+            const v = indicesFlat[base + k];
+            if (vertexLabels[v] === 0) {
+                // First non-zero assignment
+                vertexLabels[v] = seg;
+            } else if (vertexLabels[v] !== seg && vertexLabels[v] !== -1) {
+                // Conflict: vertex sees two different non-zero segments → edge
+                vertexLabels[v] = -1;
+            }
+        }
+    }
+
+    // Convert -1 (conflict) back to 0 (edge)
+    for (let v = 0; v < numVertices; v++) {
+        if (vertexLabels[v] === -1) vertexLabels[v] = 0;
+    }
+
+    return vertexLabels;
+}
+
+/**
+ * Assign clean, thin edges in a single pass over faces using lower-side marking.
+ *
+ * For each mesh edge (pair of adjacent vertices in a face) where the two
+ * vertices have different segment IDs, mark the vertex with the lower
+ * segment ID as edge. This consistently places edges on one side of
+ * the boundary, producing ~1-vertex-wide edges.
+ *
+ * For triple junctions (A,B,C), the two lower-segment vertices are marked.
+ *
+ * Airtight: every boundary face has at least one edge vertex on each
+ * cross-boundary mesh edge, so flood-fill cannot cross segments.
+ *
+ * @param {Int32Array} vertexLabels - Per-vertex segment labels (all non-zero, from erodeEdges)
+ * @param {Uint32Array|Int32Array|Array} indicesFlat - Face vertex indices (numFaces * 3)
+ * @param {number} numVertices
+ * @returns {Uint8Array} Per-vertex edge labels (0 or 1)
+ */
+function assignThinEdges(vertexLabels, indicesFlat, numVertices) {
+    const numFaces = indicesFlat.length / 3;
+    const edgeLabels = new Uint8Array(numVertices);
+
+    for (let f = 0; f < numFaces; f++) {
+        const base = f * 3;
+        const v0 = indicesFlat[base];
+        const v1 = indicesFlat[base + 1];
+        const v2 = indicesFlat[base + 2];
+        const s0 = vertexLabels[v0];
+        const s1 = vertexLabels[v1];
+        const s2 = vertexLabels[v2];
+
+        // Edge (v0, v1)
+        if (s0 !== s1) {
+            if (s0 < s1) edgeLabels[v0] = 1;
+            else edgeLabels[v1] = 1;
+        }
+        // Edge (v1, v2)
+        if (s1 !== s2) {
+            if (s1 < s2) edgeLabels[v1] = 1;
+            else edgeLabels[v2] = 1;
+        }
+        // Edge (v0, v2)
+        if (s0 !== s2) {
+            if (s0 < s2) edgeLabels[v0] = 1;
+            else edgeLabels[v2] = 1;
+        }
+    }
+
+    return edgeLabels;
+}
+
+
+/**
+ * Mark vertices of small segments as edge (label 0) in per-vertex segment labels.
+ * Uses flood-fill to find connected components of non-edge vertices,
+ * then marks components smaller than minSize as edge.
+ *
+ * @param {Int32Array} vertexLabels - Per-vertex segment labels (0 = edge), modified in place
+ * @param {Map<number, Set<number>>} adjacencyGraph - Vertex adjacency
+ * @param {number} vertexCount
+ * @param {number} minSize - Minimum segment size (vertex count)
+ * @returns {boolean} true if any segments were marked
+ */
+function markSmallVertexSegmentsAsEdge(vertexLabels, adjacencyGraph, vertexCount, minSize) {
+    const visited = new Uint8Array(vertexCount);
+    const smallVertices = [];
+
+    for (let v = 0; v < vertexCount; v++) {
+        if (visited[v] || vertexLabels[v] === 0) continue;
+
+        const segment = [];
+        const queue = [v];
+        visited[v] = 1;
+
+        while (queue.length > 0) {
+            const current = queue.pop();
+            segment.push(current);
+
+            const neighbors = adjacencyGraph.get(current);
+            if (neighbors) {
+                for (const n of neighbors) {
+                    if (!visited[n] && vertexLabels[n] !== 0) {
+                        visited[n] = 1;
+                        queue.push(n);
+                    }
+                }
+            }
+        }
+
+        if (segment.length < minSize) {
+            for (const sv of segment) smallVertices.push(sv);
+        }
+    }
+
+    if (smallVertices.length === 0) return false;
+
+    for (const v of smallVertices) vertexLabels[v] = 0;
+    return true;
+}
+
+/**
+ * Erode edge vertices by assigning each to the minimum segment ID among
+ * its non-edge neighbors. Iterates layer by layer until all edges are assigned.
+ *
+ * Uses min-assignment (not majority voting) to align with the lower-side
+ * convention in assignThinEdges, ensuring idempotent normalization.
+ *
+ * @param {Array|Int32Array} faceLabels - Per-vertex segment labels (0 = edge)
+ * @param {Set<number>} edgeIndices - Vertex indices marked as edges
+ * @param {Map<number, Set<number>>} adjacencyGraph - Vertex adjacency
+ * @param {number} vertexCount - Total number of vertices
+ * @returns {{workingLabels: Int32Array, remainingEdges: Set<number>}}
+ */
+function erodeEdgesToMin(faceLabels, edgeIndices, adjacencyGraph, vertexCount) {
+    const workingLabels = new Int32Array(vertexCount);
+    for (let i = 0; i < vertexCount; i++) {
+        workingLabels[i] = faceLabels[i];
+    }
+
+    const remainingEdges = new Set(edgeIndices);
+
+    while (remainingEdges.size > 0) {
+        const toAssign = [];
+
+        for (const v of remainingEdges) {
+            let minLabel = 0;
+            const neighbors = adjacencyGraph.get(v);
+            if (neighbors) {
+                for (const n of neighbors) {
+                    if (!remainingEdges.has(n) && workingLabels[n] > 0) {
+                        if (minLabel === 0 || workingLabels[n] < minLabel) {
+                            minLabel = workingLabels[n];
+                        }
+                    }
+                }
+            }
+
+            if (minLabel > 0) {
+                toAssign.push({ vertex: v, label: minLabel });
+            }
+        }
+
+        if (toAssign.length === 0) break;
+
+        for (const { vertex, label } of toAssign) {
+            workingLabels[vertex] = label;
+            remainingEdges.delete(vertex);
+        }
+    }
+
+    return { workingLabels, remainingEdges };
+}
+
+/**
+ * Two-stage edge cleanup: erode existing edges, then assign clean thin boundaries.
+ *
+ * Stage 1 (erodeEdgesToMin): Assigns each edge vertex (label 0) to the minimum
+ *   segment ID among its non-edge neighbors. This aligns with Stage 2's convention
+ *   that edges live on the lower-ID side, ensuring idempotent normalization.
+ *
+ * Stage 2 (assignThinEdges): For each mesh edge crossing a segment boundary,
+ *   marks the vertex with the lower segment ID. Produces thin, ~1-vertex-wide edges.
+ *
+ * @param {Array|Int32Array} vertexSegmentLabels - Per-vertex segment labels (0 = edge)
+ * @param {Set<number>} edgeIndices - Vertex indices marked as edges
+ * @param {Map<number, Set<number>>} adjacencyGraph - Vertex adjacency
+ * @param {number} vertexCount - Total vertex count
+ * @param {Uint32Array|Int32Array|Array} indicesFlat - Face vertex indices (numFaces * 3)
+ * @param {number} [minSegmentSize=1] - Remove vertex-level segments smaller than this
+ * @returns {Uint8Array} Per-vertex edge labels (0/1)
+ */
+export function normalizeEdges(vertexSegmentLabels, edgeIndices, adjacencyGraph, vertexCount, indicesFlat, minSegmentSize = 1) {
+    const MAX_ITERATIONS = 3;
+
+    // Copy input labels so we can mutate across iterations
+    const labels = new Int32Array(vertexCount);
+    for (let i = 0; i < vertexCount; i++) labels[i] = vertexSegmentLabels[i];
+
+    let edgeLabels;
+
+    for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+        // Step 1: Mark small vertex segments as edge
+        if (minSegmentSize > 1) {
+            markSmallVertexSegmentsAsEdge(labels, adjacencyGraph, vertexCount, minSegmentSize);
+        }
+
+        // Build edge set from current labels
+        const currentEdges = new Set();
+        for (let v = 0; v < vertexCount; v++) {
+            if (labels[v] === 0) currentEdges.add(v);
+        }
+
+        // Step 2: Erode edges — assign to min neighboring segment
+        const { workingLabels } = erodeEdgesToMin(labels, currentEdges, adjacencyGraph, vertexCount);
+
+        // Step 3: Assign thin edges (lower-side marking)
+        edgeLabels = assignThinEdges(workingLabels, indicesFlat, vertexCount);
+
+        // Check convergence: update labels for next iteration
+        let changed = false;
+        for (let v = 0; v < vertexCount; v++) {
+            const newLabel = edgeLabels[v] === 1 ? 0 : workingLabels[v];
+            if (newLabel !== labels[v]) changed = true;
+            labels[v] = newLabel;
+        }
+
+        if (!changed) break;
+
+        if (iter === MAX_ITERATIONS - 1) {
+            console.warn(`[normalizeEdges] Not fully converged after ${MAX_ITERATIONS} iterations`);
+        }
+    }
+
+    return edgeLabels;
 }

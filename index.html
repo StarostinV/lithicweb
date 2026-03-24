@@ -230,10 +230,15 @@
         <div id="annotationLabel" class="annotation-label" title="Click to open Annotation Library">
             <i class="fas fa-tag"></i> <span id="annotationLabelText">Untitled</span>
         </div>
-        <!-- Save button (bottom-right of canvas) -->
-        <button id="floatingSaveBtn" class="floating-save-btn" title="Save to Library (Ctrl+S)">
-            Save
-        </button>
+        <!-- Action buttons (bottom-right of canvas) -->
+        <div class="floating-btn-group">
+            <button id="normalizeBtn" class="floating-action-pill floating-normalize-btn" title="Normalize Edges">
+                Normalize
+            </button>
+            <button id="floatingSaveBtn" class="floating-action-pill floating-save-btn" title="Save to Library (Ctrl+S)">
+                Save
+            </button>
+        </div>
         <!-- Screenshot button (top-right of canvas) -->
         <button id="screenshotBtn" class="canvas-action-btn" title="Save Screenshot">
             <i class="fas fa-camera"></i>

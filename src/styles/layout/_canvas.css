@@ -244,42 +244,61 @@ body.sidebar-collapsed .floating-controls {
     cursor: not-allowed;
 }
 
-/* Floating Save Button - bottom-right of canvas, mirrors mode-indicator style */
-.floating-save-btn {
-    --save-color: var(--primary, #3b82f6);
+/* Floating button group - bottom-right of canvas */
+.floating-btn-group {
     position: absolute;
     bottom: 24px;
     right: 24px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    z-index: 10;
+}
+
+/* Shared pill style for floating action buttons */
+.floating-action-pill {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 10px 16px;
     background: rgba(255, 255, 255, 0.95);
-    border: 2px solid var(--save-color);
+    border: 2px solid;
     border-radius: 24px;
     font-size: 13px;
     font-weight: 600;
-    color: var(--save-color);
     box-shadow: var(--shadow-lg);
     backdrop-filter: blur(8px);
-    z-index: 10;
     transition: all 0.2s ease;
     cursor: pointer;
     user-select: none;
 }
 
-.floating-save-btn:hover:not(:disabled) {
+.floating-action-pill:hover:not(:disabled) {
     transform: scale(1.05);
     box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1));
 }
 
-.floating-save-btn:active:not(:disabled) {
+.floating-action-pill:active:not(:disabled) {
     transform: scale(0.98);
 }
 
-.floating-save-btn:disabled {
+.floating-action-pill:disabled {
     opacity: 0.3;
     cursor: not-allowed;
+}
+
+/* Save button color */
+.floating-save-btn {
+    --save-color: var(--primary, #3b82f6);
+    color: var(--save-color);
+    border-color: var(--save-color);
+}
+
+/* Normalize button color */
+.floating-normalize-btn {
+    --normalize-color: #8b5cf6;
+    color: var(--normalize-color);
+    border-color: var(--normalize-color);
 }
 
 .floating-action-btn {
@@ -389,9 +408,13 @@ body.sidebar-collapsed .floating-controls {
         font-size: 16px;
     }
 
-    .floating-save-btn {
+    .floating-btn-group {
         right: 12px;
         bottom: 16px;
+        gap: 8px;
+    }
+
+    .floating-action-pill {
         padding: 8px 12px;
         font-size: 12px;
     }

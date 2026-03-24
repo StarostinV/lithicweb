@@ -130,7 +130,12 @@ class LithicClient {
             let errorMessage = `HTTP ${response.status}`;
             try {
                 const errorData = await response.json();
-                errorMessage = errorData.detail || errorMessage;
+                const detail = errorData.detail;
+                if (typeof detail === 'string') {
+                    errorMessage = detail;
+                } else if (detail) {
+                    errorMessage = JSON.stringify(detail);
+                }
             } catch (e) {
                 // Ignore JSON parse errors
             }

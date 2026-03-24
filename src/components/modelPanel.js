@@ -25,7 +25,9 @@ import { Annotation } from '../geometry/Annotation.js';
 import {
     unionFindSegmentation,
     faceSegmentsToVertexEdges,
+    faceSegmentsToVertexSegments,
     facePredictionsToVertexValues,
+    normalizeEdges,
 } from '../geometry/faceUnionFind.js';
 
 export class ModelPanel {
@@ -523,10 +525,11 @@ export class ModelPanel {
             }
         } catch (e) {
             console.error('[ModelPanel] Inference failed:', e);
-            if (e.message.includes('404') || e.message.includes('session') || e.message.includes('Session')) {
+            const msg = e?.message || String(e);
+            if (msg.includes('404') || msg.includes('session') || msg.includes('Session')) {
                 this.clearSession();
             }
-            this.setStatus('Inference failed: ' + e.message, 'error');
+            this.setStatus('Inference failed: ' + msg, 'error');
         } finally {
             this.setLoading(false);
         }
@@ -547,8 +550,11 @@ export class ModelPanel {
         console.time('[ModelPanel] Client postprocessing');
 
         const { edgePredictions, faceAdjacencyFlat, numFaces } = this.cachedModelOutput;
+        const indices = this.meshView.indices;
+        const numVertices = this.meshView.positions.length / 3;
+        const adjacencyGraph = this.meshView.adjacencyGraph;
 
-        // Run union-find segmentation
+        // Step 1: Union-find segmentation (skip internal cleanup — normalizeEdges handles it)
         const faceSegments = unionFindSegmentation(
             edgePredictions,
             faceAdjacencyFlat,
@@ -556,18 +562,23 @@ export class ModelPanel {
             {
                 maxMergeCost: this.config.union_find_max_merge_cost,
                 maxSegmentSize: this.config.union_find_max_segment_size,
-                minSegmentSize: this.config.min_segment_size,
+                minSegmentSize: 1, // skip internal cleanupPass
                 mergeCost: this.config.union_find_merge_cost,
             }
         );
 
-        // Convert face segments to vertex edge labels
-        const indices = this.meshView.indices;
-        const numVertices = this.meshView.positions.length / 3;
-        const vertexLabels = faceSegmentsToVertexEdges(faceSegments, indices, numVertices);
+        // Step 2: Convert per-face → per-vertex segment labels (0 = edge)
+        const vertexSegLabels = faceSegmentsToVertexSegments(faceSegments, indices, numVertices);
+
+        // Step 3: Normalize edges (removes small segments, erodes, assigns thin edges)
+        const edgeIndices = new Set();
+        for (let v = 0; v < numVertices; v++) {
+            if (vertexSegLabels[v] === 0) edgeIndices.add(v);
+        }
+        const cleanEdgeLabels = normalizeEdges(vertexSegLabels, edgeIndices, adjacencyGraph, numVertices, indices, this.config.min_segment_size);
 
         // Apply via existing pathway
-        this.applyResults({ labels: Array.from(vertexLabels) });
+        this.applyResults({ labels: Array.from(cleanEdgeLabels) });
 
         console.timeEnd('[ModelPanel] Client postprocessing');
     }
