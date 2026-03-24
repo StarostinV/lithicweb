@@ -94,9 +94,10 @@ export default class DrawBrush {
             }
         }, 'DrawBrush');
         
-        // Reset when mesh changes
+        // Reset when mesh changes and scale brush to mesh size
         eventBus.on(Events.MESH_LOADED, () => {
             this._clearPreviewLines();
+            this._scaleBrushToMesh();
         }, 'DrawBrush');
     }
     
@@ -110,6 +111,23 @@ export default class DrawBrush {
         }
     }
     
+    /**
+     * Scale brush radius and slider range to match loaded mesh size.
+     * @private
+     */
+    _scaleBrushToMesh() {
+        const info = this.meshView.basicMesh?.computeBoundingInfo();
+        if (!info) return;
+        const d = info.diagonal;
+        this.brushRadius = d * 0.01;
+        if (this.slideBrush?.slider?.noUiSlider) {
+            this.slideBrush.slider.noUiSlider.updateOptions({
+                range: { min: d * 0.002, max: d * 0.06 },
+                start: [this.brushRadius]
+            });
+        }
+    }
+
     /**
      * Ensure angles are computed (on demand).
      * @private
@@ -324,7 +342,8 @@ export default class DrawBrush {
         
         // Convert vertex indices to world positions
         const points = [];
-        const offset = 0.03;  // Offset from mesh surface
+        const info = this.meshView.basicMesh?.computeBoundingInfo();
+        const offset = info ? info.diagonal * 0.0006 : 0.03;
         
         for (const vertexIndex of path) {
             const localPos = this.meshView.indexToVertex(vertexIndex);

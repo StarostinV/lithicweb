@@ -313,16 +313,30 @@ export default class RotationController {
     /**
      * Resets camera to default position looking at target.
      * @param {number} distance - Distance from target (default: 50)
+     * @param {THREE.Vector3} [target] - Optional orbit target center
      */
-    resetCamera(distance = 50) {
-        // Position camera at 45 degrees
+    resetCamera(distance = 50, target = null) {
+        if (target) {
+            this.orbitControls.target.copy(target);
+        }
+        const center = this.orbitControls.target;
         const angle = Math.PI / 4;
         this.camera.position.set(
-            distance * Math.sin(angle),
-            distance * Math.sin(angle),
-            distance * Math.cos(angle)
+            center.x + distance * Math.sin(angle),
+            center.y + distance * Math.sin(angle),
+            center.z + distance * Math.cos(angle)
         );
         this.orbitControls.update();
+    }
+
+    /**
+     * Sets orbit distance limits (min/max zoom).
+     * @param {number} min - Minimum distance from target
+     * @param {number} max - Maximum distance from target
+     */
+    setDistanceLimits(min, max) {
+        this.orbitControls.minDistance = min;
+        this.orbitControls.maxDistance = max;
     }
     
     // =========================================================================

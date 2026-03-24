@@ -41,6 +41,13 @@ export class BasicMesh {
          * @private
          */
         this._vertexMaxAngles = null;
+
+        /**
+         * Cached bounding info (computed on demand, invalidated on setMesh).
+         * @type {{center: {x,y,z}, size: {x,y,z}, diagonal: number}|null}
+         * @private
+         */
+        this._boundingInfo = null;
     }
 
     isNull() {
@@ -58,6 +65,7 @@ export class BasicMesh {
         this.adjacencyGraph = null;
         this.metadata = {};
         this._vertexMaxAngles = null;
+        this._boundingInfo = null;
     }
 
     /**
@@ -250,5 +258,51 @@ export class BasicMesh {
      */
     clearVertexMaxAnglesCache() {
         this._vertexMaxAngles = null;
+    }
+
+    /**
+     * Compute bounding box info from positions.
+     * Cached — invalidated when setMesh() is called.
+     *
+     * @returns {{center: {x: number, y: number, z: number}, size: {x: number, y: number, z: number}, diagonal: number}}
+     */
+    computeBoundingInfo() {
+        if (this._boundingInfo) return this._boundingInfo;
+
+        const positions = this.positions;
+        if (!positions || positions.length === 0) {
+            this._boundingInfo = {
+                center: { x: 0, y: 0, z: 0 },
+                size: { x: 0, y: 0, z: 0 },
+                diagonal: 1
+            };
+            return this._boundingInfo;
+        }
+
+        let minX = Infinity, minY = Infinity, minZ = Infinity;
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+        for (let i = 0; i < positions.length; i += 3) {
+            const x = positions[i], y = positions[i + 1], z = positions[i + 2];
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+            if (z < minZ) minZ = z;
+            if (z > maxZ) maxZ = z;
+        }
+
+        const sx = maxX - minX;
+        const sy = maxY - minY;
+        const sz = maxZ - minZ;
+        let diagonal = Math.sqrt(sx * sx + sy * sy + sz * sz);
+        if (diagonal < 1e-10) diagonal = 1;
+
+        this._boundingInfo = {
+            center: { x: (minX + maxX) / 2, y: (minY + maxY) / 2, z: (minZ + maxZ) / 2 },
+            size: { x: sx, y: sy, z: sz },
+            diagonal
+        };
+        return this._boundingInfo;
     }
 } 

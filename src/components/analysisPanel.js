@@ -120,12 +120,12 @@ export class AnalysisPanel {
 
         if (this._bboxValueEl) {
             if (vertexCount > 0) {
-                const bbox = this._computeBoundingBox();
+                const bbox = this.meshView.basicMesh.computeBoundingInfo();
                 const sourceUnit = getSourceUnit(this.meshView.metadata, this.userConfig);
                 const displayUnit = getEffectiveUnit(this.meshView.metadata, this.userConfig);
-                const dx = formatDistanceConverted(bbox.dx, sourceUnit, displayUnit);
-                const dy = formatDistanceConverted(bbox.dy, sourceUnit, displayUnit);
-                const dz = formatDistanceConverted(bbox.dz, sourceUnit, displayUnit);
+                const dx = formatDistanceConverted(bbox.size.x, sourceUnit, displayUnit);
+                const dy = formatDistanceConverted(bbox.size.y, sourceUnit, displayUnit);
+                const dz = formatDistanceConverted(bbox.size.z, sourceUnit, displayUnit);
                 this._bboxValueEl.textContent = `${dx} × ${dy} × ${dz}`;
             } else {
                 this._bboxValueEl.textContent = '--';
@@ -137,26 +137,6 @@ export class AnalysisPanel {
             const def = UNIT_DEFINITIONS[displayUnit];
             this._unitDisplayEl.textContent = `Unit: ${def?.label || displayUnit}`;
         }
-    }
-
-    _computeBoundingBox() {
-        const positions = this.meshView.positions;
-        if (!positions || positions.length === 0) return { dx: 0, dy: 0, dz: 0 };
-
-        let minX = Infinity, minY = Infinity, minZ = Infinity;
-        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-
-        for (let i = 0; i < positions.length; i += 3) {
-            const x = positions[i], y = positions[i + 1], z = positions[i + 2];
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-            if (z < minZ) minZ = z;
-            if (z > maxZ) maxZ = z;
-        }
-
-        return { dx: maxX - minX, dy: maxY - minY, dz: maxZ - minZ };
     }
 
     // ── Annotation Summary ────────────────────────────────────────────

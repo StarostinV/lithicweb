@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import {getFaceVertices} from '../geometry/intersections';
+import { eventBus, Events } from '../utils/EventBus.js';
 
 
 /**
  * DrawLines - Handles ridge/edge drawing mode for annotation.
- * 
+ *
  * Allows users to draw line segments on the mesh surface by clicking start
  * and end points. Lines are rendered in real-time and converted to edge
  * vertices along the mesh surface when completed.
- * 
+ *
  * Features:
  * - Left-click to start/end line segments
  * - Right-click to cancel current line
@@ -17,40 +18,44 @@ import {getFaceVertices} from '../geometry/intersections';
  */
 export default class DrawLines {
     /**
-     * Default distance threshold for snapping to annotated vertices (in local mesh units).
-     * Vertices within this distance of existing annotation edges will snap to them.
+     * Default snap distance as a fraction of the mesh diagonal.
      * @type {number}
      */
-    static DEFAULT_SNAP_DISTANCE = 0.15;
+    static SNAP_FRACTION = 0.003;
+
+    /**
+     * Default resolution as a fraction of the mesh diagonal.
+     * @type {number}
+     */
+    static RESOLUTION_FRACTION = 0.001;
 
     /**
      * Create a DrawLines handler.
-     * 
+     *
      * @param {Object} scene - Scene object with canvas, camera, etc.
      * @param {MeshView} meshView - The MeshView instance for mesh operations
      * @param {string} mode - Current interaction mode (reactive reference)
-     * @param {number} [resolution=0.05] - Sampling resolution for line interpolation
      */
-    constructor(scene, meshView, mode, resolution = 0.05) {
+    constructor(scene, meshView, mode) {
         this.scene = scene;
         this.meshView = meshView;
         this.mode = mode;
         this.line = null;
         this.isDrawing = false;
-        this.resolution = resolution;
-        
+        this.resolution = 0.05;
+
         // Store vertex indices and local positions for annotation
         this.startVertexIndex = null;
         this.endVertexIndex = null;
         this.startPointLocal = null;  // Local space for BVH queries
         this.endPointLocal = null;    // Local space for BVH queries
-        
+
         /**
          * Distance threshold for snapping to annotated vertices.
          * Set to 0 to disable snapping.
          * @type {number}
          */
-        this.snapDistance = DrawLines.DEFAULT_SNAP_DISTANCE;
+        this.snapDistance = 0.15;
 
         this.leftClick = this.leftClick.bind(this);
         this.rightClick = this.rightClick.bind(this);
@@ -63,6 +68,21 @@ export default class DrawLines {
         });
 
         this.scene.canvas.addEventListener('pointermove', this.handleMouseMove);
+
+        // Scale snap/resolution to mesh size on load
+        eventBus.on(Events.MESH_LOADED, () => this._scaleToMesh(), 'DrawLines');
+    }
+
+    /**
+     * Scale snap distance, resolution, and preview offset to mesh size.
+     * @private
+     */
+    _scaleToMesh() {
+        const info = this.meshView.basicMesh?.computeBoundingInfo();
+        if (!info) return;
+        const d = info.diagonal;
+        this.snapDistance = d * DrawLines.SNAP_FRACTION;
+        this.resolution = d * DrawLines.RESOLUTION_FRACTION;
     }
 
     leftClick(event) {
@@ -185,7 +205,7 @@ export default class DrawLines {
     }
 
     dispose() {
-        // Dispose of the geometry and material of the line
+        eventBus.offNamespace('DrawLines');
         if (this.line) {
             this.line.geometry.dispose();
             this.line.material.dispose();

@@ -209,6 +209,17 @@ export class MeshView {
         this.basicMesh.setMesh(positions, indices, metadata);
         this._ensureThreeMesh();
 
+        // Fit camera to mesh and scale rendering params
+        const boundingInfo = this.basicMesh.computeBoundingInfo();
+        if (this.scene.fitToMesh) {
+            this.scene.fitToMesh(boundingInfo);
+        }
+        const d = boundingInfo.diagonal;
+        this.arrowOffset = d * 0.004;
+        this.arrowShaftRadius = d * 0.0004;
+        this.arrowHeadRadius = d * 0.001;
+        this.arrowHeadLength = d * 0.004;
+
         this.edgeLabels = new Uint8Array(edgeLabels);
         this.currentEdgeIndices.clear();
         for (let i = 0; i < this.edgeLabels.length; i++) {
@@ -1156,13 +1167,13 @@ export class MeshView {
         const distance = direction.length();
         direction.normalize();
         
-        if (distance < 0.01) return null;
-        
+        if (distance < this.arrowHeadLength * 0.05) return null;
+
         // Create arrow group
         const group = new THREE.Group();
-        
+
         // Shaft
-        const shaftLength = Math.max(distance - this.arrowHeadLength, 0.01);
+        const shaftLength = Math.max(distance - this.arrowHeadLength, this.arrowShaftRadius);
         const shaftGeometry = new THREE.CylinderGeometry(
             this.arrowShaftRadius, this.arrowShaftRadius, shaftLength, 8
         );

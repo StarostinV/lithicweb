@@ -68,10 +68,41 @@ export default class Scene {
     }
     
     /**
+     * Fit camera, frustum, and orbit controls to frame a mesh.
+     * @param {{center: {x,y,z}, size: {x,y,z}, diagonal: number}} boundingInfo
+     */
+    fitToMesh(boundingInfo) {
+        const { center, diagonal } = boundingInfo;
+        this._meshCenter = new THREE.Vector3(center.x, center.y, center.z);
+        this._meshDiagonal = diagonal;
+
+        // Camera distance to frame the mesh with some padding
+        const fovRad = this.camera.fov * Math.PI / 180;
+        const fitDistance = (diagonal / 2) / Math.tan(fovRad / 2);
+        const cameraDistance = fitDistance * 1.5;
+
+        // Update frustum for this mesh scale
+        this.camera.near = Math.max(diagonal * 0.001, 0.0001);
+        this.camera.far = Math.max(diagonal * 100, 10);
+        this.camera.updateProjectionMatrix();
+
+        // Orbit controls
+        this.rotationController.setOrbitTarget(this._meshCenter);
+        this.rotationController.setDistanceLimits(diagonal * 0.01, diagonal * 10);
+        this.rotationController.resetCamera(cameraDistance, this._meshCenter);
+    }
+
+    /**
      * Resets the camera to default viewing position.
      */
     resetCamera() {
-        this.rotationController.resetCamera(50);
+        if (this._meshDiagonal) {
+            const fovRad = this.camera.fov * Math.PI / 180;
+            const fitDistance = (this._meshDiagonal / 2) / Math.tan(fovRad / 2);
+            this.rotationController.resetCamera(fitDistance * 1.5, this._meshCenter);
+        } else {
+            this.rotationController.resetCamera(50);
+        }
     }
 
     createRenderer() {
