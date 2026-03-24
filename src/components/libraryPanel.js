@@ -239,9 +239,13 @@ export class LibraryPanel {
             this.saveCurrentAnnotation();
         });
 
-        // Normalize button
+        // Normalize button (floating) — uses shared helper that reads panel controls
         this.normalizeBtn?.addEventListener('click', () => {
-            this.meshView.normalizeAnnotation();
+            if (window._runNormalize) {
+                window._runNormalize();
+            } else {
+                this.meshView.normalizeAnnotation();
+            }
         });
 
         // Clear library button

@@ -811,8 +811,12 @@ export class MeshView {
     /**
      * Normalize the current annotation edges: erode thick edges and
      * reassign clean, thin boundaries at segment borders.
+     * @param {Object} [options]
+     * @param {number} [options.minSegmentSize=1] - Remove vertex-level segments smaller than this
+     * @param {number} [options.maxIterations=3] - Maximum normalization iterations
+     * @returns {{converged: boolean, iterations: number}|undefined}
      */
-    normalizeAnnotation() {
+    normalizeAnnotation({ minSegmentSize = 1, maxIterations = 3 } = {}) {
         if (!this.currentEdgeIndices?.size || !this.adjacencyGraph) return;
 
         // Ensure segments are computed so faceLabels has per-vertex segment IDs
@@ -827,9 +831,10 @@ export class MeshView {
         }
 
         // Run the two-stage edge cleanup
-        const cleanEdgeLabels = normalizeEdges(
+        const { edgeLabels: cleanEdgeLabels, converged, iterations } = normalizeEdges(
             this.faceLabels, this.currentEdgeIndices,
-            this.adjacencyGraph, this.vertexCount, this.indices
+            this.adjacencyGraph, this.vertexCount, this.indices,
+            minSegmentSize, maxIterations
         );
 
         // Record as history operation
@@ -853,6 +858,8 @@ export class MeshView {
 
         this.finishDrawOperation();
         this.updateSegments();
+
+        return { converged, iterations };
     }
 
     /**

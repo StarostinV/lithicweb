@@ -575,7 +575,7 @@ export class ModelPanel {
         for (let v = 0; v < numVertices; v++) {
             if (vertexSegLabels[v] === 0) edgeIndices.add(v);
         }
-        const cleanEdgeLabels = normalizeEdges(vertexSegLabels, edgeIndices, adjacencyGraph, numVertices, indices, this.config.min_segment_size);
+        const { edgeLabels: cleanEdgeLabels } = normalizeEdges(vertexSegLabels, edgeIndices, adjacencyGraph, numVertices, indices, this.config.min_segment_size);
 
         // Apply via existing pathway
         this.applyResults({ labels: Array.from(cleanEdgeLabels) });

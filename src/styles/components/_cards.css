@@ -197,6 +197,16 @@
     animation: spin 1s linear infinite;
 }
 
+.inference-status.warning {
+    background: #fef3c7;
+    border-color: #fcd34d;
+    color: #92400e;
+}
+
+.inference-status.warning i {
+    color: var(--warning);
+}
+
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }

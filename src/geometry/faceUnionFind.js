@@ -655,18 +655,19 @@ function erodeEdgesToMin(faceLabels, edgeIndices, adjacencyGraph, vertexCount) {
  * @param {number} vertexCount - Total vertex count
  * @param {Uint32Array|Int32Array|Array} indicesFlat - Face vertex indices (numFaces * 3)
  * @param {number} [minSegmentSize=1] - Remove vertex-level segments smaller than this
- * @returns {Uint8Array} Per-vertex edge labels (0/1)
+ * @param {number} [maxIterations=3] - Maximum normalization iterations
+ * @returns {{edgeLabels: Uint8Array, converged: boolean, iterations: number}}
  */
-export function normalizeEdges(vertexSegmentLabels, edgeIndices, adjacencyGraph, vertexCount, indicesFlat, minSegmentSize = 1) {
-    const MAX_ITERATIONS = 3;
-
+export function normalizeEdges(vertexSegmentLabels, edgeIndices, adjacencyGraph, vertexCount, indicesFlat, minSegmentSize = 1, maxIterations = 3) {
     // Copy input labels so we can mutate across iterations
     const labels = new Int32Array(vertexCount);
     for (let i = 0; i < vertexCount; i++) labels[i] = vertexSegmentLabels[i];
 
     let edgeLabels;
+    let converged = false;
+    let iter;
 
-    for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+    for (iter = 0; iter < maxIterations; iter++) {
         // Step 1: Mark small vertex segments as edge
         if (minSegmentSize > 1) {
             markSmallVertexSegmentsAsEdge(labels, adjacencyGraph, vertexCount, minSegmentSize);
@@ -692,12 +693,15 @@ export function normalizeEdges(vertexSegmentLabels, edgeIndices, adjacencyGraph,
             labels[v] = newLabel;
         }
 
-        if (!changed) break;
+        if (!changed) {
+            converged = true;
+            break;
+        }
 
-        if (iter === MAX_ITERATIONS - 1) {
-            console.warn(`[normalizeEdges] Not fully converged after ${MAX_ITERATIONS} iterations`);
+        if (iter === maxIterations - 1) {
+            console.warn(`[normalizeEdges] Not fully converged after ${maxIterations} iterations`);
         }
     }
 
-    return edgeLabels;
+    return { edgeLabels, converged, iterations: iter + 1 };
 }

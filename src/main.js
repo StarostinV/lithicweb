@@ -144,6 +144,41 @@ document.getElementById('invertNormals').addEventListener('click', () => {
     meshView.invertMeshNormals();
 });
 
+// Normalize controls (panel card)
+{
+    const minSegSlider = document.getElementById('normalizeMinSegSize');
+    const minSegValue = document.getElementById('normalizeMinSegSizeValue');
+    const maxIterInput = document.getElementById('normalizeMaxIter');
+    const normalizeStatus = document.getElementById('normalizeStatus');
+
+    minSegSlider.addEventListener('input', () => {
+        minSegValue.textContent = minSegSlider.value;
+    });
+
+    function runNormalize() {
+        const minSegmentSize = parseInt(minSegSlider.value, 10);
+        const maxIterations = parseInt(maxIterInput.value, 10) || 3;
+        const result = meshView.normalizeAnnotation({ minSegmentSize, maxIterations });
+        if (!result) {
+            normalizeStatus.style.display = 'none';
+            return;
+        }
+        normalizeStatus.style.display = '';
+        if (result.converged) {
+            normalizeStatus.className = 'inference-status success';
+            normalizeStatus.innerHTML = `<i class="fas fa-check-circle"></i> <span>Converged in ${result.iterations} iteration${result.iterations !== 1 ? 's' : ''}</span>`;
+        } else {
+            normalizeStatus.className = 'inference-status warning';
+            normalizeStatus.innerHTML = `<i class="fas fa-exclamation-triangle"></i> <span>Did not converge after ${result.iterations} iterations</span>`;
+        }
+    }
+
+    document.getElementById('panelNormalizeBtn').addEventListener('click', runNormalize);
+
+    // Expose for the floating button
+    window._runNormalize = runNormalize;
+}
+
 document.getElementById('exportAnnotations').addEventListener('click', () => {
     // Include current state's metadata under the 'state-metadata' key
     const stateMetadata = meshView.getCurrentStateMetadata();
