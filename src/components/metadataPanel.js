@@ -515,7 +515,12 @@ export class MetadataPanel {
         if (key === 'inference' && typeof value === 'object' && value !== null) {
             return this.createInferenceMetadataItem(key, value);
         }
-        
+
+        // Special rendering for scar order data
+        if (key === 'scarOrder' && typeof value === 'object' && value !== null) {
+            return this.createScarOrderMetadataItem(key, value);
+        }
+
         const item = document.createElement('div');
         item.className = 'metadata-item state-metadata-item';
         
@@ -859,6 +864,181 @@ export class MetadataPanel {
         return (value * 100).toFixed(1) + '%';
     }
     
+    /**
+     * Create a special scar order metadata item with structured view.
+     * @param {string} key - The metadata key ('scarOrder')
+     * @param {Object} value - The scar order data object
+     * @returns {HTMLElement} The item element
+     */
+    createScarOrderMetadataItem(key, value) {
+        const item = document.createElement('div');
+        item.className = 'metadata-item state-metadata-item scarorder-item';
+
+        const nScars = value.scars?.length ?? 0;
+        const nComps = value.comparisons?.length ?? 0;
+        const hasExplicit = Array.isArray(value.explicitOrder) && value.explicitOrder.length > 0;
+
+        // Determine ordering status
+        let orderStatus = 'No comparisons';
+        if (nComps > 0) {
+            // Check if fully ordered: explicit order covers all scars, or enough comparisons
+            orderStatus = hasExplicit ? 'Fully ordered' : 'Partial';
+        }
+
+        const tableHtml = this.buildScarOrderTable(value);
+        const rawJson = this.formatValue(value);
+
+        item.innerHTML = `
+            <div class="metadata-item-header">
+                <div class="metadata-key">
+                    <span class="key-name"><i class="fas fa-sort-amount-down"></i> ${this.escapeHtml(key)}</span>
+                    <span class="type-badge type-object">order</span>
+                    <span class="state-badge">state-specific</span>
+                </div>
+                <div class="metadata-actions">
+                    <button class="eval-view-toggle" title="Show raw JSON">
+                        <i class="fas fa-code"></i>
+                    </button>
+                    <button class="metadata-delete-btn state-meta-delete" data-key="${this.escapeHtml(key)}" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="scarorder-summary">
+                <i class="fas fa-layer-group"></i>
+                ${nScars} scar${nScars !== 1 ? 's' : ''} · ${nComps} comparison${nComps !== 1 ? 's' : ''} · ${orderStatus}
+            </div>
+            <div class="scarorder-table-view">
+                ${tableHtml}
+            </div>
+            <div class="scarorder-raw-view hidden">
+                <pre class="metadata-value type-object long-value">${this.escapeHtml(rawJson)}</pre>
+            </div>
+        `;
+
+        // Toggle button handler
+        const toggleBtn = item.querySelector('.eval-view-toggle');
+        const tableView = item.querySelector('.scarorder-table-view');
+        const rawView = item.querySelector('.scarorder-raw-view');
+
+        toggleBtn.addEventListener('click', () => {
+            tableView.classList.toggle('hidden');
+            rawView.classList.toggle('hidden');
+            const icon = toggleBtn.querySelector('i');
+            if (rawView.classList.contains('hidden')) {
+                icon.className = 'fas fa-code';
+                toggleBtn.title = 'Show raw JSON';
+            } else {
+                icon.className = 'fas fa-table';
+                toggleBtn.title = 'Show table view';
+            }
+        });
+
+        // Delete button handler
+        const deleteBtn = item.querySelector('.state-meta-delete');
+        deleteBtn.addEventListener('click', () => this.deleteStateMetadata(key));
+
+        return item;
+    }
+
+    /**
+     * Build HTML table for scar order metadata.
+     * @param {Object} data - The scar order data
+     * @returns {string} HTML string for the table
+     */
+    buildScarOrderTable(data) {
+        const sections = [];
+        const scars = data.scars || [];
+        const edges = data.edges || [];
+        const comparisons = data.comparisons || [];
+
+        // Determine display order (oldest first)
+        let orderedScarIds;
+        if (Array.isArray(data.explicitOrder) && data.explicitOrder.length > 0) {
+            orderedScarIds = data.explicitOrder;
+        } else {
+            // Fall back to scar array order
+            orderedScarIds = scars.map(s => s.scarId);
+        }
+
+        // Build scar lookup
+        const scarMap = new Map();
+        scars.forEach(s => scarMap.set(s.scarId, s));
+        const maxVertices = Math.max(...scars.map(s => s.vertexCount), 1);
+
+        // Section 1: Ordered scar list
+        if (orderedScarIds.length > 0) {
+            const scarRows = orderedScarIds.map((scarId, idx) => {
+                const scar = scarMap.get(scarId);
+                if (!scar) return '';
+                const rank = idx + 1;
+                const pct = Math.round((scar.vertexCount / maxVertices) * 100);
+                const vertexStr = scar.vertexCount.toLocaleString();
+                return `
+                    <div class="scarorder-scar-row">
+                        <span class="scarorder-rank">${rank}</span>
+                        <span class="scarorder-vertices">${vertexStr}v</span>
+                        <span class="scarorder-bar-track">
+                            <span class="scarorder-bar-fill" style="width: ${pct}%"></span>
+                        </span>
+                    </div>`;
+            }).join('');
+
+            sections.push(`
+                <div class="scarorder-section">
+                    <div class="scarorder-section-title">Order (oldest → youngest)</div>
+                    <div class="scarorder-list">
+                        ${scarRows}
+                    </div>
+                </div>
+            `);
+        }
+
+        // Section 2: Comparisons breakdown
+        if (comparisons.length > 0) {
+            const nExpert = comparisons.filter(c => c.source === 'expert').length;
+            const nPreseed = comparisons.filter(c => c.source === 'preseed').length;
+
+            sections.push(`
+                <div class="scarorder-section">
+                    <div class="scarorder-section-title">Comparisons</div>
+                    <div class="scarorder-stats-row">
+                        <div class="scarorder-stat">
+                            <span class="scarorder-stat-value">${nExpert}</span>
+                            <span class="scarorder-stat-label">Expert</span>
+                        </div>
+                        <div class="scarorder-stat">
+                            <span class="scarorder-stat-value">${nPreseed}</span>
+                            <span class="scarorder-stat-label">Preseed</span>
+                        </div>
+                        <div class="scarorder-stat">
+                            <span class="scarorder-stat-value">${edges.length}</span>
+                            <span class="scarorder-stat-label">Boundaries</span>
+                        </div>
+                    </div>
+                </div>
+            `);
+        }
+
+        // Section 3: Boundary statistics
+        if (edges.length > 0) {
+            const avgSharpness = edges.reduce((s, e) => s + e.sharpness, 0) / edges.length;
+            const avgRoughness = edges.reduce((s, e) => s + e.roughness, 0) / edges.length;
+            const toDeg = (rad) => (rad * 180 / Math.PI).toFixed(1) + '°';
+
+            sections.push(`
+                <div class="scarorder-section scarorder-section-small">
+                    <div class="scarorder-info-row">
+                        <span><i class="fas fa-angle-double-right"></i> Avg sharpness: ${toDeg(avgSharpness)}</span>
+                        <span><i class="fas fa-wave-square"></i> Avg roughness: ${toDeg(avgRoughness)}</span>
+                    </div>
+                </div>
+            `);
+        }
+
+        return sections.join('');
+    }
+
     /**
      * Delete a state-metadata entry.
      * @param {string} key - The key to delete

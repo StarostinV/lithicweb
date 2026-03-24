@@ -122,102 +122,116 @@ export class ModelPanel {
         if (!this.configContainer) return;
 
         this.configContainer.innerHTML = '';
-        
-        for (const [key, meta] of Object.entries(CONFIG_PARAMS)) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'config-item';
-            
-            if (meta.type === 'slider') {
-                // Use slider-row-labeled for consistent styling
-                wrapper.className = 'slider-row-labeled';
-                
-                const label = document.createElement('label');
-                label.textContent = meta.label;
-                label.title = meta.description;
-                wrapper.appendChild(label);
-                
-                const slider = document.createElement('input');
-                slider.type = 'range';
-                slider.id = `config_${key}`;
-                slider.min = meta.min;
-                slider.max = meta.max;
-                slider.step = meta.step;
-                slider.value = this.config[key];
-                slider.className = 'styled-slider';
-                
-                const valueDisplay = document.createElement('span');
-                valueDisplay.id = `config_${key}_value`;
-                valueDisplay.className = 'slider-value';
-                valueDisplay.textContent = this.config[key];
-                
-                slider.addEventListener('input', (e) => {
-                    const value = parseFloat(e.target.value);
-                    valueDisplay.textContent = value;
-                    this.config[key] = value;
-                    this._onConfigChanged(key, meta);
-                });
-                
-                wrapper.appendChild(slider);
-                wrapper.appendChild(valueDisplay);
-            } else if (meta.type === 'number') {
-                wrapper.className = 'control-row';
-                
-                const label = document.createElement('label');
-                label.textContent = meta.label;
-                label.title = meta.description;
-                wrapper.appendChild(label);
-                
-                const input = document.createElement('input');
-                input.type = 'number';
-                input.id = `config_${key}`;
-                input.min = meta.min;
-                input.max = meta.max;
-                input.step = meta.step;
-                input.value = this.config[key];
-                input.className = 'control-input';
-                
-                input.addEventListener('change', (e) => {
-                    this.config[key] = parseInt(e.target.value);
-                    this._onConfigChanged(key, meta);
-                });
-                
-                wrapper.appendChild(input);
-            } else if (meta.type === 'select') {
-                wrapper.className = 'control-row';
-                
-                const label = document.createElement('label');
-                label.textContent = meta.label;
-                label.title = meta.description;
-                wrapper.appendChild(label);
-                
-                const select = document.createElement('select');
-                select.id = `config_${key}`;
-                select.className = 'control-select';
-                
-                meta.options.forEach(opt => {
-                    const option = document.createElement('option');
-                    option.value = opt;
-                    option.textContent = opt;
-                    option.selected = this.config[key] === opt;
-                    select.appendChild(option);
-                });
-                
-                select.addEventListener('change', (e) => {
-                    this.config[key] = e.target.value;
-                    this._onConfigChanged(key, meta);
-                });
-                
-                wrapper.appendChild(select);
-            }
-            
-            // Add default value hint
-            const defaultVal = DEFAULT_INFERENCE_CONFIG[key];
-            const hint = document.createElement('span');
-            hint.className = 'config-default-hint';
-            hint.textContent = `Default: ${defaultVal === null ? 'None' : defaultVal}`;
-            wrapper.appendChild(hint);
 
-            this.configContainer.appendChild(wrapper);
+        // Group parameters by category
+        const categories = { nn: [], postprocess: [] };
+        for (const [key, meta] of Object.entries(CONFIG_PARAMS)) {
+            const cat = meta.category || 'nn';
+            if (!categories[cat]) categories[cat] = [];
+            categories[cat].push({ key, meta });
+        }
+
+        const categoryLabels = { nn: 'Neural Network', postprocess: 'Postprocessing' };
+
+        for (const [cat, params] of Object.entries(categories)) {
+            if (params.length === 0) continue;
+
+            // Category sub-header
+            const title = document.createElement('div');
+            title.className = 'config-category-title';
+            title.textContent = categoryLabels[cat] || cat;
+            this.configContainer.appendChild(title);
+
+            for (const { key, meta } of params) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'config-param';
+                wrapper.title = meta.description;
+
+                // Header row: label + default hint
+                const header = document.createElement('div');
+                header.className = 'config-param-header';
+
+                const label = document.createElement('span');
+                label.className = 'config-param-label';
+                label.textContent = meta.label;
+                header.appendChild(label);
+
+                const defaultVal = DEFAULT_INFERENCE_CONFIG[key];
+                const hint = document.createElement('span');
+                hint.className = 'config-param-default';
+                hint.textContent = `Default: ${defaultVal === null ? 'None' : defaultVal}`;
+                header.appendChild(hint);
+
+                wrapper.appendChild(header);
+
+                // Control row
+                if (meta.type === 'slider') {
+                    const row = document.createElement('div');
+                    row.className = 'slider-row';
+
+                    const slider = document.createElement('input');
+                    slider.type = 'range';
+                    slider.id = `config_${key}`;
+                    slider.min = meta.min;
+                    slider.max = meta.max;
+                    slider.step = meta.step;
+                    slider.value = this.config[key];
+                    slider.className = 'styled-slider';
+
+                    const valueDisplay = document.createElement('span');
+                    valueDisplay.id = `config_${key}_value`;
+                    valueDisplay.className = 'slider-value';
+                    valueDisplay.textContent = this.config[key];
+
+                    slider.addEventListener('input', (e) => {
+                        const value = parseFloat(e.target.value);
+                        valueDisplay.textContent = value;
+                        this.config[key] = value;
+                        this._onConfigChanged(key, meta);
+                    });
+
+                    row.appendChild(slider);
+                    row.appendChild(valueDisplay);
+                    wrapper.appendChild(row);
+                } else if (meta.type === 'number') {
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.id = `config_${key}`;
+                    input.min = meta.min;
+                    input.max = meta.max;
+                    input.step = meta.step;
+                    input.value = this.config[key];
+                    input.className = 'control-input';
+
+                    input.addEventListener('change', (e) => {
+                        this.config[key] = parseInt(e.target.value);
+                        this._onConfigChanged(key, meta);
+                    });
+
+                    wrapper.appendChild(input);
+                } else if (meta.type === 'select') {
+                    const select = document.createElement('select');
+                    select.id = `config_${key}`;
+                    select.className = 'control-select';
+
+                    meta.options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.textContent = opt;
+                        option.selected = this.config[key] === opt;
+                        select.appendChild(option);
+                    });
+
+                    select.addEventListener('change', (e) => {
+                        this.config[key] = e.target.value;
+                        this._onConfigChanged(key, meta);
+                    });
+
+                    wrapper.appendChild(select);
+                }
+
+                this.configContainer.appendChild(wrapper);
+            }
         }
     }
 

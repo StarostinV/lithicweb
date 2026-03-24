@@ -938,9 +938,12 @@
                         <span>Postprocessing</span>
                     </div>
                     <div class="section-content">
-                        <div class="control-row">
-                            <label for="clientPostprocessToggle">Client-side Postprocessing</label>
-                            <input type="checkbox" id="clientPostprocessToggle">
+                        <div class="toggle-row">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="clientPostprocessToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>Client-side Postprocessing</span>
                         </div>
                         <p class="help-text">When on, postprocessing runs locally for instant parameter tuning</p>
                         <button id="showModelOutputBtn" class="btn btn-secondary btn-full" disabled>
@@ -959,7 +962,7 @@
                         <div id="configContainer" class="config-container">
                             <!-- Config inputs will be generated here -->
                         </div>
-                        <button id="resetConfigBtn" class="btn btn-secondary btn-sm" style="margin-top: 8px; width: 100%;">
+                        <button id="resetConfigBtn" class="btn btn-secondary btn-sm btn-full" style="margin-top: 8px;">
                             <i class="fas fa-undo-alt"></i> Reset to Defaults
                         </button>
                     </div>

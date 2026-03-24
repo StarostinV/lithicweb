@@ -810,3 +810,154 @@
 .swap-views-btn:hover i {
     transform: rotate(180deg);
 }
+
+/* ==========================================================================
+   Scar Order Metadata Display
+   ========================================================================== */
+
+.scarorder-item {
+    padding: 12px;
+}
+
+.scarorder-summary {
+    font-size: 0.7rem;
+    color: #6b7280;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.scarorder-summary i {
+    margin-right: 4px;
+}
+
+.scarorder-table-view {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.scarorder-raw-view pre {
+    margin: 0;
+    font-size: 0.7rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.scarorder-section {
+    background: #f9fafb;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.scarorder-section-small {
+    background: transparent;
+    padding: 6px 0;
+}
+
+.scarorder-section-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+/* Ordered scar list */
+.scarorder-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.scarorder-scar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+}
+
+.scarorder-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #3b82f6;
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.scarorder-vertices {
+    font-size: 0.75rem;
+    color: #374151;
+    font-family: monospace;
+    min-width: 55px;
+    text-align: right;
+}
+
+.scarorder-bar-track {
+    flex: 1;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.scarorder-bar-fill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #93c5fd, #3b82f6);
+    border-radius: 3px;
+    transition: width 0.2s;
+}
+
+/* Stats row (comparisons / boundaries) */
+.scarorder-stats-row {
+    display: flex;
+    gap: 8px;
+}
+
+.scarorder-stat {
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+}
+
+.scarorder-stat-value {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.scarorder-stat-label {
+    display: block;
+    font-size: 0.65rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+/* Info row (boundary statistics) */
+.scarorder-info-row {
+    display: flex;
+    justify-content: space-around;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.scarorder-info-row i {
+    margin-right: 4px;
+    opacity: 0.7;
+}

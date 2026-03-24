@@ -106,29 +106,8 @@
 }
 
 /* Config Container */
-.config-container {
-    max-height: 200px;
-    overflow-y: auto;
-}
-
 #configContainer {
-    max-height: 220px;
-    overflow-y: auto;
     padding-right: 4px;
-}
-
-#configContainer::-webkit-scrollbar {
-    width: 6px;
-}
-
-#configContainer::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-#configContainer::-webkit-scrollbar-thumb {
-    background: #c4c4c4;
-    border-radius: 3px;
 }
 
 /* Input Group */
@@ -411,18 +390,70 @@
     display: none;
 }
 
-/* Config Item */
-.config-item {
-    margin-bottom: 12px;
+/* Config Category Group */
+.config-category-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--gray-200);
 }
 
-/* Config Default Hint */
-.config-default-hint {
-    display: block;
+.config-category-title:not(:first-child) {
+    margin-top: 14px;
+}
+
+/* Config Parameter */
+.config-param {
+    margin-bottom: 10px;
+}
+
+.config-param-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+}
+
+.config-param-label {
+    font-size: 12px;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.config-param-default {
     font-size: 10px;
-    color: var(--gray-400, #9ca3af);
-    margin-top: 2px;
+    color: var(--gray-400);
     font-style: italic;
+}
+
+/* Slider inside config-param */
+.config-param .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.config-param .slider-row .styled-slider {
+    flex: 1;
+}
+
+.config-param .slider-row .slider-value {
+    min-width: 32px;
+    text-align: right;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray-600);
+}
+
+/* Number/select inside config-param */
+.config-param .control-input,
+.config-param .control-select {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Connection Status Enhanced */
