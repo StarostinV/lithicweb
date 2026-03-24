@@ -139,6 +139,11 @@ document.getElementById('resetRenderingBtn').addEventListener('click', () => {
     renderingPanel.resetToDefaults();
 });
 
+// Refresh segment colors button
+document.getElementById('update-segment-colors').addEventListener('click', () => {
+    meshView.refreshSegmentColors();
+});
+
 // Invert normals button
 document.getElementById('invertNormals').addEventListener('click', () => {
     meshView.invertMeshNormals();

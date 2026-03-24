@@ -1019,10 +1019,23 @@ export class MeshView {
         return this._generateUniqueColor(usedColors);
     }
     
+    /**
+     * Reassign random colors to all segments.
+     * Largest segment keeps the object color; others get new unique randoms.
+     */
+    refreshSegmentColors() {
+        if (!this.segments || this.segments.length === 0) return;
+        this._updateSegmentColors([]); // empty previous → all fresh colors
+        // Re-apply edge colors on top
+        for (const index of this.currentEdgeIndices) {
+            this.colorVertex(index, this.edgeColor);
+        }
+    }
+
     // ========================================
     // Color Operations
     // ========================================
-    
+
     /**
      * Color a single vertex.
      * 

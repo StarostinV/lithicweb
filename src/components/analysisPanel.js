@@ -78,6 +78,7 @@ export class AnalysisPanel {
         this._scarChartEl = document.getElementById('analysisScarChart');
         this._scarTableEl = document.getElementById('analysisScarTable');
         this._csvExportBtn = document.getElementById('analysisCsvExportBtn');
+        this._refreshColorsBtn = document.getElementById('analysisRefreshColorsBtn');
 
         // DOM elements - Selected scar detail
         this._selectedDetailEl = document.getElementById('analysisSelectedScar');
@@ -127,6 +128,9 @@ export class AnalysisPanel {
     _setupControls() {
         if (this._csvExportBtn) {
             this._csvExportBtn.addEventListener('click', () => this.exportCsv());
+        }
+        if (this._refreshColorsBtn) {
+            this._refreshColorsBtn.addEventListener('click', () => this._refreshColors());
         }
         if (this._metricSelectEl) {
             this._metricSelectEl.addEventListener('change', () => {
@@ -637,6 +641,19 @@ export class AnalysisPanel {
         if (!this._graphContext) return;
         const colormapMap = this._buildColormapMap();
         this._graphContext.applyColormap(this._colormapName, colormapMap);
+    }
+
+    /**
+     * Randomize segment colors, then re-apply the panel's visual state.
+     */
+    _refreshColors() {
+        this.meshView.refreshSegmentColors();
+        // Re-apply erosion + colormap/labels on top of new colors
+        if (this._graphContext?.isInitialized) {
+            this._graphContext.recolorAllScars();
+            if (this._colormapEnabled) this._applyColormapColors();
+        }
+        this._updateScarUI();
     }
 
     _updateColormapLegend() {
