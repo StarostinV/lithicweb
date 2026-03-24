@@ -32,8 +32,9 @@
  * @module LibraryPanel
  */
 
-import { escapeHtml, formatTimestamp } from '../utils/sanitize.js';
+import { escapeHtml, formatTimestamp, formatMetadataValue } from '../utils/sanitize.js';
 import { eventBus, Events } from '../utils/EventBus.js';
+import { confirmUnsavedChanges } from '../utils/confirmUnsavedChanges.js';
 
 export class LibraryPanel {
     /**
@@ -56,6 +57,21 @@ export class LibraryPanel {
         this.libraryStats = document.getElementById('libraryStats');
         this.gtStatus = document.getElementById('libraryGtStatus');
         this.predStatus = document.getElementById('libraryPredStatus');
+
+        // Floating save button
+        this.floatingSaveBtn = document.getElementById('floatingSaveBtn');
+
+        // Save-to-library modal elements
+        this.saveModal = document.getElementById('saveToLibraryModal');
+        this.saveModalClose = document.getElementById('saveToLibraryModalClose');
+        this.saveModalName = document.getElementById('librarySaveName');
+        this.saveModalMetadataPreview = document.getElementById('librarySaveMetadataPreview');
+        this.saveModalMetadataCount = document.getElementById('librarySaveMetadataCount');
+        this.saveModalCloudSection = document.getElementById('librarySaveCloudSection');
+        this.saveModalAlsoCloud = document.getElementById('librarySaveAlsoCloud');
+        this.saveModalCancelBtn = document.getElementById('librarySaveCancelBtn');
+        this.saveModalConfirmBtn = document.getElementById('librarySaveConfirmBtn');
+        this._saveModalResolve = null; // Promise resolver for modal
 
         this.setupEventListeners();
         this._setupEventBusSubscriptions();
@@ -108,6 +124,15 @@ export class LibraryPanel {
         // Listen to state saved events to update cloud sync status
         eventBus.on(Events.STATE_SAVED, () => {
             this.updateUI();
+        }, 'libraryPanel');
+
+        // Update floating save button state when edges change
+        eventBus.on(Events.STATE_CHANGED, () => {
+            this._updateFloatingSaveBtn();
+        }, 'libraryPanel');
+
+        eventBus.on(Events.HISTORY_CHANGED, () => {
+            this._updateFloatingSaveBtn();
         }, 'libraryPanel');
     }
     
@@ -208,38 +233,75 @@ export class LibraryPanel {
             this.saveCurrentAnnotation();
         });
 
+        // Floating save button
+        this.floatingSaveBtn?.addEventListener('click', () => {
+            this.saveCurrentAnnotation();
+        });
+
         // Clear library button
         this.clearBtn?.addEventListener('click', () => {
             if (confirm('Are you sure you want to clear all saved annotations? This cannot be undone.')) {
                 this.library.clear();
             }
         });
+
+        // Save modal buttons
+        this.saveModalConfirmBtn?.addEventListener('click', () => {
+            const resolve = this._saveModalResolve;
+            if (!resolve) return;
+            const name = this.saveModalName.value.trim();
+            const alsoCloud = this.saveModalAlsoCloud?.checked || false;
+            this._closeSaveModal();
+            resolve({ name, alsoCloud });
+        });
+        this.saveModalCancelBtn?.addEventListener('click', () => {
+            const resolve = this._saveModalResolve;
+            this._closeSaveModal();
+            if (resolve) resolve(null);
+        });
+        this.saveModalClose?.addEventListener('click', () => {
+            const resolve = this._saveModalResolve;
+            this._closeSaveModal();
+            if (resolve) resolve(null);
+        });
+        // Close on backdrop click
+        this.saveModal?.addEventListener('click', (e) => {
+            if (e.target === this.saveModal) {
+                const resolve = this._saveModalResolve;
+                this._closeSaveModal();
+                if (resolve) resolve(null);
+            }
+        });
+        // Enter key in name input confirms
+        this.saveModalName?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                this.saveModalConfirmBtn?.click();
+            }
+        });
     }
 
     /**
      * Save the current annotation to the library.
-     * 
-     * This always creates a NEW library entry, even if the current annotation
-     * was originally loaded from the library. This is "Save As" semantics -
-     * the user is explicitly saving their current work as a new entry.
-     * 
-     * After saving, this updates the workingAnnotation to link it to the new library
-     * entry and emits ANNOTATION_ACTIVE_CHANGED so the UI label reflects the new name.
+     *
+     * Opens a modal dialog for the user to set the name and optionally save to cloud.
+     * This always creates a NEW library entry ("Save As" semantics).
+     *
+     * After saving, updates workingAnnotation to link to the new library entry
+     * and emits ANNOTATION_ACTIVE_CHANGED so the UI label reflects the new name.
      */
-    saveCurrentAnnotation() {
+    async saveCurrentAnnotation() {
         let annotation = this.meshView.getAnnotation();
         if (annotation.isEmpty()) {
             alert('Cannot save an empty annotation.');
             return;
         }
-        
-        // Prompt for name
-        const currentName = annotation.name || 'Untitled';
-        const name = prompt('Enter a name for this annotation:', currentName);
-        if (name === null) return; // Cancelled
-        
-        const finalName = name.trim() || currentName;
-        
+
+        // Open save modal and wait for user input
+        const result = await this._openSaveModal(annotation);
+        if (!result) return; // Cancelled
+
+        const finalName = result.name || annotation.name || 'Untitled';
+
         // IMPORTANT: If this annotation ID already exists in the library, we want to
         // create a NEW entry rather than update the existing one. This is "Save As"
         // semantics - the user has modified the annotation and wants to save their
@@ -248,7 +310,7 @@ export class LibraryPanel {
             // Generate a new ID by cloning with new ID
             annotation = annotation.cloneWithNewId();
         }
-        
+
         annotation.name = finalName;
         const id = this.library.save(annotation);
 
@@ -258,6 +320,9 @@ export class LibraryPanel {
             this.meshView.workingAnnotation.metadata.name = finalName;
         }
 
+        // Mark current state as saved — reset the baseline for unsaved changes detection
+        this.meshView.markAsSaved();
+
         // Clear history — clean slate for new edits on this saved annotation
         this.meshView.history.clear();
 
@@ -266,42 +331,159 @@ export class LibraryPanel {
             name: finalName,
             source: 'library'
         });
+
+        // Also save to cloud if requested
+        if (result.alsoCloud && this.isMeshCloudSynced()) {
+            this.uploadAnnotationToCloud(id);
+        }
+    }
+
+    /**
+     * Open the save-to-library modal dialog.
+     * @param {Annotation} annotation - The annotation to save
+     * @returns {Promise<{name: string, alsoCloud: boolean}|null>} Resolves with user input or null if cancelled
+     * @private
+     */
+    _openSaveModal(annotation) {
+        return new Promise((resolve) => {
+            this._saveModalResolve = resolve;
+
+            // Set default name with timestamp
+            const now = new Date();
+            const dateStr = now.toLocaleDateString();
+            const timeStr = now.toLocaleTimeString();
+            const currentName = annotation.name || `Annotation ${dateStr} ${timeStr}`;
+            this.saveModalName.value = currentName;
+
+            // Populate metadata preview
+            this._populateSaveMetadataPreview(annotation);
+
+            // Show/hide cloud section
+            if (this.saveModalCloudSection) {
+                const meshIsCloud = this.isMeshCloudSynced();
+                this.saveModalCloudSection.style.display = meshIsCloud ? '' : 'none';
+                if (this.saveModalAlsoCloud) {
+                    this.saveModalAlsoCloud.checked = false;
+                }
+            }
+
+            // Show modal
+            this.saveModal.style.display = 'flex';
+            this.saveModalName.focus();
+            this.saveModalName.select();
+        });
+    }
+
+    /**
+     * Close the save-to-library modal.
+     * @private
+     */
+    _closeSaveModal() {
+        if (this.saveModal) {
+            this.saveModal.style.display = 'none';
+        }
+        this._saveModalResolve = null;
+    }
+
+    /**
+     * Populate the metadata preview in the save modal.
+     * @param {Annotation} annotation
+     * @private
+     */
+    _populateSaveMetadataPreview(annotation) {
+        if (!this.saveModalMetadataPreview) return;
+
+        const metadata = annotation.metadata || {};
+        // Filter out internal/built-in fields
+        const displayKeys = Object.keys(metadata).filter(k =>
+            !['name', 'source', 'createdAt', 'modifiedAt', 'cloudStateId'].includes(k)
+        );
+
+        if (displayKeys.length === 0) {
+            this.saveModalMetadataPreview.innerHTML = '<div class="metadata-empty">No additional metadata</div>';
+            if (this.saveModalMetadataCount) {
+                this.saveModalMetadataCount.textContent = '0 entries';
+            }
+            return;
+        }
+
+        let html = '';
+        for (const key of displayKeys) {
+            const raw = metadata[key];
+            let display;
+            if (typeof raw === 'object' && raw !== null) {
+                // Compact JSON preview — truncate to keep one-liner
+                const json = JSON.stringify(raw);
+                display = json.length > 60 ? json.slice(0, 57) + '...' : json;
+            } else {
+                display = formatMetadataValue(key, raw);
+                if (display.length > 80) {
+                    display = display.slice(0, 77) + '...';
+                }
+            }
+            html += `<div class="metadata-preview-item">
+                <span class="metadata-key">${escapeHtml(key)}</span>
+                <span class="metadata-value">${escapeHtml(display)}</span>
+            </div>`;
+        }
+        this.saveModalMetadataPreview.innerHTML = html;
+
+        if (this.saveModalMetadataCount) {
+            this.saveModalMetadataCount.textContent = `${displayKeys.length} ${displayKeys.length === 1 ? 'entry' : 'entries'}`;
+        }
+    }
+
+    /**
+     * Update the floating save button enabled state.
+     * @private
+     */
+    _updateFloatingSaveBtn() {
+        if (this.floatingSaveBtn) {
+            const hasContent = this.meshView.currentEdgeIndices?.size > 0;
+            this.floatingSaveBtn.disabled = !hasContent;
+        }
     }
 
     /**
      * Load an annotation from the library into the view.
-     * 
-     * Architecture:
-     * - workingAnnotation is THE source of truth for current state
-     * - Library is just storage (we load FROM it into workingAnnotation)
-     * - History stores snapshots for undo/redo
-     * 
+     * Checks for unsaved changes first and prompts the user.
+     *
      * @param {string} id - Annotation ID
+     * @param {boolean} [skipConfirmation=false] - Skip unsaved changes check
      */
-    loadAnnotation(id) {
+    async loadAnnotation(id, skipConfirmation = false) {
+        // Check for unsaved changes
+        if (!skipConfirmation) {
+            const result = await confirmUnsavedChanges(this.meshView);
+            if (result === 'cancel') return;
+            if (result === 'save') {
+                await this.saveCurrentAnnotation();
+            }
+        }
+
         const annotation = this.library.load(id);
         if (!annotation) {
             console.warn('Annotation not found:', id);
             return;
         }
-        
+
         // Update workingAnnotation (THE source of truth)
         if (this.meshView.workingAnnotation) {
             this.meshView.workingAnnotation.id = annotation.id;
             this.meshView.workingAnnotation.metadata = { ...annotation.metadata };
         }
-        
+
         // Record to history for undo/redo
         this.meshView.startDrawOperation('library-load');
         this.meshView._restoreEdgeState(annotation.edgeIndices);
         this.meshView.finishDrawOperation();
-        
+
         // Update segments
         const autoSegments = document.getElementById('auto-segments');
         if (autoSegments?.checked) {
             this.meshView.updateSegments();
         }
-        
+
         // Emit event to update UI
         eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
             name: annotation.name,

@@ -199,6 +199,10 @@
         <div id="annotationLabel" class="annotation-label" title="Click to open Annotation Library">
             <i class="fas fa-tag"></i> <span id="annotationLabelText">Untitled</span>
         </div>
+        <!-- Save button (bottom-right of canvas) -->
+        <button id="floatingSaveBtn" class="floating-save-btn" title="Save to Library (Ctrl+S)">
+            Save
+        </button>
     </div>
 
     <!-- Mode Indicator (clickable: toggles between view and previous tool) -->
@@ -230,7 +234,7 @@
             <i class="fas fa-redo"></i>
         </button>
     </div>
-    
+
     <!-- Floating button to show sidebar when hidden -->
     <button id="sidebarShowBtn" class="sidebar-show-btn" title="Show Sidebar">
         <i class="fas fa-chevron-left"></i>
@@ -920,6 +924,9 @@
                         <div id="configContainer" class="config-container">
                             <!-- Config inputs will be generated here -->
                         </div>
+                        <button id="resetConfigBtn" class="btn btn-secondary btn-sm" style="margin-top: 8px; width: 100%;">
+                            <i class="fas fa-undo-alt"></i> Reset to Defaults
+                        </button>
                     </div>
                 </div>
 
@@ -1073,24 +1080,27 @@
                         <div class="comparison-status">
                             <div class="status-row">
                                 <span class="status-label gt-label">
-                                    <i class="fas fa-bullseye"></i> Ground Truth
+                                    <i class="fas fa-bullseye"></i> GT
                                 </span>
-                                <span id="evalGtStatus" class="status-value">Not set</span>
+                                <select id="evalGtSelect" class="eval-annotation-select">
+                                    <option value="">-- Select --</option>
+                                </select>
                                 <button id="evalClearGt" class="btn-icon btn-icon-danger btn-icon-sm" title="Clear Ground Truth">
                                     <i class="fas fa-times"></i>
                                 </button>
                             </div>
                             <div class="status-row">
                                 <span class="status-label pred-label">
-                                    <i class="fas fa-crosshairs"></i> Prediction
+                                    <i class="fas fa-crosshairs"></i> Pred
                                 </span>
-                                <span id="evalPredStatus" class="status-value">Not set</span>
+                                <select id="evalPredSelect" class="eval-annotation-select">
+                                    <option value="">-- Select --</option>
+                                </select>
                                 <button id="evalClearPred" class="btn-icon btn-icon-danger btn-icon-sm" title="Clear Prediction">
                                     <i class="fas fa-times"></i>
                                 </button>
                             </div>
                         </div>
-                        <p class="help-text">Use GT/Pred buttons in Annotations panel to set states</p>
                     </div>
                 </div>
 
@@ -1481,6 +1491,75 @@
         </div>
     </div>
     
+
+    <!-- Unsaved Changes Confirmation Modal -->
+    <div id="unsavedChangesModal" class="modal">
+        <div class="settings-modal" style="max-width: 420px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-exclamation-triangle"></i> Unsaved Changes</h2>
+                <button class="modal-close" id="unsavedChangesModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>You have unsaved changes to the current annotation. What would you like to do?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="unsavedChangesCancelBtn">Cancel</button>
+                <button class="btn btn-warning" id="unsavedChangesLoadBtn">
+                    <i class="fas fa-upload"></i> Load
+                </button>
+                <button class="btn btn-primary" id="unsavedChangesSaveBtn">
+                    <i class="fas fa-bookmark"></i> Save Current
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save to Library Modal -->
+    <div id="saveToLibraryModal" class="modal">
+        <div class="settings-modal" style="max-width: 440px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-bookmark"></i> Save Annotation</h2>
+                <button class="modal-close" id="saveToLibraryModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="librarySaveName">
+                        <i class="fas fa-tag"></i> Annotation Name
+                    </label>
+                    <input type="text" id="librarySaveName" class="form-input" placeholder="Enter annotation name...">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <i class="fas fa-info-circle"></i> Annotation Metadata
+                        <span class="label-badge" id="librarySaveMetadataCount">0 entries</span>
+                    </label>
+                    <div id="librarySaveMetadataPreview" class="metadata-preview">
+                        <div class="metadata-empty">No metadata</div>
+                    </div>
+                </div>
+                <div class="form-group" id="librarySaveCloudSection" style="display: none;">
+                    <div class="toggle-row">
+                        <label><i class="fas fa-cloud-upload-alt"></i> Also save to cloud</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="librarySaveAlsoCloud">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <p class="form-help">Upload this annotation to the connected cloud storage.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="librarySaveCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="librarySaveConfirmBtn">
+                    <i class="fas fa-bookmark"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Save Annotation Modal -->
     <div id="saveAnnotationModal" class="modal">

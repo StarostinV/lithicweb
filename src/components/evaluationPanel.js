@@ -23,6 +23,7 @@
 import { summarizeMetrics } from '../evaluation/MetricsComputer.js';
 import { eventBus, Events } from '../utils/EventBus.js';
 import { DUAL_VIEW_MODES } from './DualViewManager.js';
+import { escapeHtml } from '../utils/sanitize.js';
 import { 
     MatchedVisualization, 
     OverSegVisualization, 
@@ -43,10 +44,12 @@ export class EvaluationPanel {
      * Create an EvaluationPanel.
      * @param {MeshView} meshView - The mesh view object
      * @param {EvaluationManager} evaluationManager - The evaluation manager
+     * @param {AnnotationLibrary} library - The annotation library
      */
-    constructor(meshView, evaluationManager) {
+    constructor(meshView, evaluationManager, library) {
         this.meshView = meshView;
         this.evaluationManager = evaluationManager;
+        this.library = library;
 
         // Default threshold values
         this.iouThreshold = 0.5;
@@ -101,6 +104,11 @@ export class EvaluationPanel {
             }
         }, 'evaluationPanel');
         
+        // Refresh dropdowns when library changes (annotations added/removed/renamed)
+        eventBus.on(Events.LIBRARY_CHANGED, () => {
+            this._populateDropdowns();
+        }, 'evaluationPanel');
+
         // Listen to dual view changes (in case it's toggled externally)
         eventBus.on(Events.DUAL_VIEW_CHANGED, (data) => {
             // Only update UI if this is evaluation mode or if disabling
@@ -128,34 +136,26 @@ export class EvaluationPanel {
      * @private
      */
     _onGtChanged(data) {
-        if (this.gtStatusEl) {
-            if (data.isSet) {
-                this.gtStatusEl.textContent = data.description || 'Ground Truth';
-                this.gtStatusEl.classList.remove('text-gray-400');
-                this.gtStatusEl.classList.add('text-green-600');
-            } else {
-                this.gtStatusEl.textContent = 'Not set';
-                this.gtStatusEl.classList.remove('text-green-600');
-                this.gtStatusEl.classList.add('text-gray-400');
+        // Sync dropdown selection
+        if (this.gtSelect) {
+            const gtId = this.library.groundTruthId || '';
+            if (this.gtSelect.value !== gtId) {
+                this._populateDropdowns();
             }
         }
         this._updateComputeButtonState();
     }
-    
+
     /**
      * Handle Pred changed event.
      * @private
      */
     _onPredChanged(data) {
-        if (this.predStatusEl) {
-            if (data.isSet) {
-                this.predStatusEl.textContent = data.description || 'Prediction';
-                this.predStatusEl.classList.remove('text-gray-400');
-                this.predStatusEl.classList.add('text-purple-600');
-            } else {
-                this.predStatusEl.textContent = 'Not set';
-                this.predStatusEl.classList.remove('text-purple-600');
-                this.predStatusEl.classList.add('text-gray-400');
+        // Sync dropdown selection
+        if (this.predSelect) {
+            const predId = this.library.predictionId || '';
+            if (this.predSelect.value !== predId) {
+                this._populateDropdowns();
             }
         }
         this._updateComputeButtonState();
@@ -168,6 +168,60 @@ export class EvaluationPanel {
     _updateComputeButtonState() {
         if (this.computeBtn) {
             this.computeBtn.disabled = !this.evaluationManager.canComputeMetrics();
+        }
+    }
+
+    /**
+     * Populate GT and Pred dropdown selects from the annotation library.
+     * @private
+     */
+    _populateDropdowns() {
+        if (!this.library) return;
+        const annotations = this.library.getAllSorted();
+        const gtId = this.library.groundTruthId || '';
+        const predId = this.library.predictionId || '';
+
+        for (const [select, selectedId] of [[this.gtSelect, gtId], [this.predSelect, predId]]) {
+            if (!select) continue;
+            // Preserve current value if possible
+            const html = ['<option value="">-- Select --</option>'];
+            for (const ann of annotations) {
+                const sourceIcon = ann.source === 'model' ? '\u{1F9E0} ' :
+                                   ann.source === 'cloud' ? '\u2601 ' : '';
+                const name = ann.name || 'Untitled';
+                const selected = ann.id === selectedId ? ' selected' : '';
+                html.push(`<option value="${ann.id}"${selected}>${sourceIcon}${escapeHtml(name)}</option>`);
+            }
+            select.innerHTML = html.join('');
+        }
+    }
+
+    /**
+     * Handle dropdown selection change for GT or Pred.
+     * @param {'gt'|'pred'} type - Which dropdown changed
+     * @param {string} annotationId - Selected annotation ID (empty string = cleared)
+     * @private
+     */
+    _onDropdownChange(type, annotationId) {
+        if (!annotationId) {
+            // Cleared selection
+            if (type === 'gt') {
+                this.evaluationManager.clearGroundTruth();
+            } else {
+                this.evaluationManager.clearPrediction();
+            }
+            return;
+        }
+
+        const annotation = this.library.load(annotationId);
+        if (!annotation) return;
+
+        if (type === 'gt') {
+            this.library.setAsGroundTruth(annotationId);
+            this.evaluationManager.setGroundTruth(annotation);
+        } else {
+            this.library.setAsPrediction(annotationId);
+            this.evaluationManager.setPrediction(annotation);
         }
     }
     
@@ -185,8 +239,8 @@ export class EvaluationPanel {
      */
     _initializeUI() {
         // Get references to UI elements
-        this.gtStatusEl = document.getElementById('evalGtStatus');
-        this.predStatusEl = document.getElementById('evalPredStatus');
+        this.gtSelect = document.getElementById('evalGtSelect');
+        this.predSelect = document.getElementById('evalPredSelect');
         this.clearGtBtn = document.getElementById('evalClearGt');
         this.clearPredBtn = document.getElementById('evalClearPred');
         
@@ -222,15 +276,24 @@ export class EvaluationPanel {
      * @private
      */
     _setupEventListeners() {
-        // Note: Evaluation state changes are now listened via EventBus in _setupEventBusSubscriptions()
+        // GT/Pred dropdown selectors
+        this.gtSelect?.addEventListener('change', (e) => {
+            this._onDropdownChange('gt', e.target.value);
+        });
+
+        this.predSelect?.addEventListener('change', (e) => {
+            this._onDropdownChange('pred', e.target.value);
+        });
 
         // Clear buttons
         this.clearGtBtn?.addEventListener('click', () => {
             this.evaluationManager.clearGroundTruth();
+            if (this.gtSelect) this.gtSelect.value = '';
         });
 
         this.clearPredBtn?.addEventListener('click', () => {
             this.evaluationManager.clearPrediction();
+            if (this.predSelect) this.predSelect.value = '';
         });
 
         // Threshold sliders
@@ -711,6 +774,9 @@ export class EvaluationPanel {
      * Called when panel is shown.
      */
     onShow() {
+        // Refresh dropdowns from library
+        this._populateDropdowns();
+
         // Refresh state display
         const state = this.evaluationManager.getSummary();
         

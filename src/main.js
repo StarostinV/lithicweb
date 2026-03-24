@@ -92,7 +92,7 @@ const modelPanel = new ModelPanel(meshView, connectionManager);
 modelPanel.setEvaluationManager(evaluationManager);
 
 // Evaluation panel
-const evaluationPanel = new EvaluationPanel(meshView, evaluationManager);
+const evaluationPanel = new EvaluationPanel(meshView, evaluationManager, annotationLibrary);
 evaluationPanel.setDualViewManager(dualViewManager);
 
 // Metadata panel
@@ -106,6 +106,8 @@ modelPanel.setCloudStoragePanel(cloudStoragePanel);
 
 // Wire up cloud storage panel to library panel for cloud upload functionality
 libraryPanel.setCloudStoragePanel(cloudStoragePanel);
+// Wire up library panel to cloud storage panel for save-before-load
+cloudStoragePanel.setLibraryPanel(libraryPanel);
 
 // Rendering panel (view mode controls) - with userConfig for persistence
 const renderingPanel = new RenderingPanel(scene, meshView, userConfig);
@@ -361,10 +363,15 @@ document.getElementById('scarOrderPanelBtn').addEventListener('click', () => {
     setActiveNavBtn('scarOrderPanelBtn');
 });
 
-// Keyboard shortcuts for undo/redo
+// Keyboard shortcuts for undo/redo/save
 window.addEventListener('keydown', (event) => {
+    // Ctrl+S / Cmd+S for save
+    if ((event.ctrlKey || event.metaKey) && event.key === 's' && !event.shiftKey) {
+        event.preventDefault();
+        libraryPanel.saveCurrentAnnotation();
+    }
     // Ctrl+Z for undo
-    if (event.ctrlKey && event.key === 'z' && !event.shiftKey) {
+    else if (event.ctrlKey && event.key === 'z' && !event.shiftKey) {
         event.preventDefault();
         meshView.undo();
     }

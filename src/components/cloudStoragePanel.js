@@ -51,6 +51,7 @@ import { exportMeshToBlob } from '../loaders/meshExporter.js';
 import { eventBus, Events } from '../utils/EventBus.js';
 import { Annotation } from '../geometry/Annotation.js';
 import { formatMetadataValue } from '../utils/sanitize.js';
+import { confirmUnsavedChanges } from '../utils/confirmUnsavedChanges.js';
 
 export class CloudStoragePanel {
     /**
@@ -63,7 +64,8 @@ export class CloudStoragePanel {
         this.meshView = meshView;
         this.meshLoader = meshLoader;
         this.connectionManager = connectionManager; // Kept for backward compatibility
-        
+        this.libraryPanel = null; // Set via setLibraryPanel()
+
         // State
         this.meshes = [];
         this.selectedMeshId = null;
@@ -143,6 +145,14 @@ export class CloudStoragePanel {
         eventBus.offNamespace('cloudStoragePanel');
     }
     
+    /**
+     * Set the library panel reference (for save-before-load).
+     * @param {LibraryPanel} libraryPanel
+     */
+    setLibraryPanel(libraryPanel) {
+        this.libraryPanel = libraryPanel;
+    }
+
     /**
      * Set the cloud mesh connection info.
      * @param {string} meshId - The cloud mesh ID
@@ -910,6 +920,16 @@ export class CloudStoragePanel {
      * - `Events.ANNOTATION_ACTIVE_CHANGED` - for UI updates (label, etc.)
      */
     async loadState(meshId, stateId) {
+        // Check for unsaved changes before loading
+        const unsavedResult = await confirmUnsavedChanges(this.meshView);
+        if (unsavedResult === 'cancel') return;
+        if (unsavedResult === 'save') {
+            // Delegate save to libraryPanel if available
+            if (this.libraryPanel) {
+                await this.libraryPanel.saveCurrentAnnotation();
+            }
+        }
+
         // Check if the correct mesh is loaded
         if (this.cloudMeshInfo?.meshId !== meshId) {
             const mesh = this.meshes.find(m => m.filename === meshId);

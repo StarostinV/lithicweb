@@ -416,6 +416,15 @@
     margin-bottom: 12px;
 }
 
+/* Config Default Hint */
+.config-default-hint {
+    display: block;
+    font-size: 10px;
+    color: var(--gray-400, #9ca3af);
+    margin-top: 2px;
+    font-style: italic;
+}
+
 /* Connection Status Enhanced */
 .connection-status.connected {
     color: var(--success);

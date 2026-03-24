@@ -287,8 +287,16 @@ export class MeshView {
     }
     
     /**
+     * Mark the current edge state as the saved baseline.
+     * After calling this, hasUnsavedChanges() returns false until the user edits.
+     */
+    markAsSaved() {
+        this.initialState = new Set(this.currentEdgeIndices);
+    }
+
+    /**
      * Check if the current state differs from the loaded annotation.
-     * 
+     *
      * @returns {boolean} True if there are unsaved changes
      */
     hasUnsavedChanges() {
@@ -422,27 +430,34 @@ export class MeshView {
      */
     finishDrawOperation() {
         if (this.pendingAction === null) return;
-        
+
+        const actionType = this.pendingAction.type;
         const currentState = new Set(this.currentEdgeIndices);
-        
+
         // Only save if there were actual changes
         if (!this._setsEqual(this.pendingAction.previousState, currentState)) {
             // Create history snapshot (edges + arrows only, no metadata)
             const action = this.history.createAction({
                 edgeIndices: currentState,
                 arrows: this._getArrowData(),
-                type: this.pendingAction.type,
+                type: actionType,
                 description: this.pendingAction.description,
             });
-            
+
             // Store previous state for undo compatibility
             action.previousState = this.pendingAction.previousState;
             action.newState = currentState;
-            
+
             this.history.push(action);
         }
-        
+
         this.pendingAction = null;
+
+        // External loads (not user edits) reset the saved baseline
+        // so hasUnsavedChanges() returns false until the user draws/erases
+        if (actionType !== 'draw' && actionType !== 'erase') {
+            this.markAsSaved();
+        }
     }
     
     /**

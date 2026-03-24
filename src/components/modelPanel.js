@@ -99,6 +99,9 @@ export class ModelPanel {
         this.postprocessToggle = document.getElementById('clientPostprocessToggle');
         this.showModelOutputBtn = document.getElementById('showModelOutputBtn');
 
+        // Reset to defaults button
+        this.resetConfigBtn = document.getElementById('resetConfigBtn');
+
         // Build config UI
         this.buildConfigUI();
     }
@@ -207,6 +210,13 @@ export class ModelPanel {
                 wrapper.appendChild(select);
             }
             
+            // Add default value hint
+            const defaultVal = DEFAULT_INFERENCE_CONFIG[key];
+            const hint = document.createElement('span');
+            hint.className = 'config-default-hint';
+            hint.textContent = `Default: ${defaultVal === null ? 'None' : defaultVal}`;
+            wrapper.appendChild(hint);
+
             this.configContainer.appendChild(wrapper);
         }
     }
@@ -245,6 +255,18 @@ export class ModelPanel {
         if (this.showModelOutputBtn) {
             this.showModelOutputBtn.addEventListener('click', () => {
                 this.toggleModelOutputHeatmap();
+            });
+        }
+
+        // Reset config to defaults
+        if (this.resetConfigBtn) {
+            this.resetConfigBtn.addEventListener('click', () => {
+                this.config = { ...DEFAULT_INFERENCE_CONFIG };
+                this.buildConfigUI();
+                // If client-side postprocessing is active with cached output, rerun
+                if (this.clientSidePostprocessing && this.cachedModelOutput) {
+                    this.rerunPostprocessingLocally();
+                }
             });
         }
     }

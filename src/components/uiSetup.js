@@ -74,12 +74,18 @@ function initSidebarResize() {
     const MIN_WIDTH = 280;
     const MAX_WIDTH = 600;
     
+    // Sync --sidebar-width CSS variable with actual sidebar width
+    function updateSidebarWidth(width) {
+        sideMenu.style.width = width + 'px';
+        document.documentElement.style.setProperty('--sidebar-width', width + 'px');
+    }
+
     // Load saved width
     const savedWidth = localStorage.getItem(STORAGE_KEY_WIDTH);
     if (savedWidth) {
         const width = parseInt(savedWidth);
         if (width >= MIN_WIDTH && width <= MAX_WIDTH) {
-            sideMenu.style.width = width + 'px';
+            updateSidebarWidth(width);
         }
     }
     
@@ -106,9 +112,9 @@ function initSidebarResize() {
         
         // Clamp to min/max
         newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
-        sideMenu.style.width = newWidth + 'px';
+        updateSidebarWidth(newWidth);
     });
-    
+
     document.addEventListener('mouseup', () => {
         if (isResizing) {
             isResizing = false;
@@ -136,9 +142,9 @@ function initSidebarResize() {
         const deltaX = startX - e.touches[0].clientX;
         let newWidth = startWidth + deltaX;
         newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
-        sideMenu.style.width = newWidth + 'px';
+        updateSidebarWidth(newWidth);
     });
-    
+
     document.addEventListener('touchend', () => {
         if (isResizing) {
             isResizing = false;

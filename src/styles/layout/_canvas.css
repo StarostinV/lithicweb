@@ -244,6 +244,44 @@ body.sidebar-collapsed .floating-controls {
     cursor: not-allowed;
 }
 
+/* Floating Save Button - bottom-right of canvas, mirrors mode-indicator style */
+.floating-save-btn {
+    --save-color: var(--primary, #3b82f6);
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid var(--save-color);
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--save-color);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    user-select: none;
+}
+
+.floating-save-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1));
+}
+
+.floating-save-btn:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.floating-save-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
 .floating-action-btn {
     width: 56px;
     height: 56px;
@@ -318,6 +356,13 @@ body.sidebar-collapsed .floating-controls {
         width: 44px;
         height: 44px;
         font-size: 16px;
+    }
+
+    .floating-save-btn {
+        right: 12px;
+        bottom: 16px;
+        padding: 8px 12px;
+        font-size: 12px;
     }
 }
 

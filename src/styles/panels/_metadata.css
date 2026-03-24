@@ -286,6 +286,8 @@
     background: var(--gray-100);
     border-radius: 6px;
     font-size: 11px;
+    max-height: 200px;
+    overflow-y: auto;
 }
 
 .metadata-preview .metadata-empty {
@@ -297,24 +299,33 @@
 
 .metadata-preview-item {
     display: flex;
-    padding: 8px 12px;
+    padding: 6px 12px;
     border-bottom: 1px solid var(--gray-200);
+    align-items: baseline;
+    gap: 8px;
+    overflow: hidden;
 }
 
 .metadata-preview-item:last-child {
     border-bottom: none;
 }
 
-.metadata-preview-key {
+.metadata-preview-key,
+.metadata-preview-item > .metadata-key {
     font-weight: 600;
     color: var(--gray-600);
-    min-width: 100px;
+    min-width: 80px;
     flex-shrink: 0;
+    white-space: nowrap;
 }
 
-.metadata-preview-value {
+.metadata-preview-value,
+.metadata-preview-item > .metadata-value {
     color: var(--gray-700);
-    word-break: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 /* Metadata Empty State */
