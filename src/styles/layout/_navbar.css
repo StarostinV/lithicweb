@@ -250,10 +250,21 @@
     flex-direction: column;
     align-items: center;
     padding: 2px 4px;
+    border-bottom: 2px solid transparent;
+    padding-bottom: 2px;
+}
+
+.nav-group:hover {
+    border-bottom-color: var(--primary);
 }
 
 .nav-group-label {
-    display: none;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gray-500);
+    margin-bottom: 1px;
 }
 
 .nav-group-buttons {
@@ -300,14 +311,15 @@
     border-radius: 4px;
     font-size: 11px;
     white-space: nowrap;
+    visibility: hidden;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.15s;
+    transition: opacity 0.15s, visibility 0.15s;
     z-index: 200;
-    border: 1px solid var(--gray-600);
 }
 
 .nav-btn:hover::after {
+    visibility: visible;
     opacity: 1;
 }
 
@@ -321,8 +333,8 @@
 }
 
 .nav-btn.active {
-    background: var(--primary);
-    color: white;
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--primary-light);
 }
 
 .nav-btn-ai {
