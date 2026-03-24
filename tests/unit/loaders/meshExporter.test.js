@@ -28,7 +28,7 @@
  * @see tests/unit/loaders/customPLYLoader.test.js - Tests for the matching loader
  */
 
-import { serializeMetadata, exportMeshToBlob } from '../../../src/loaders/meshExporter.js';
+import { serializeMetadata, exportMeshToBlob, flattenObject, escapeCSV, vertexLabelsToFaceLabels } from '../../../src/loaders/meshExporter.js';
 
 describe('meshExporter', () => {
     // =========================================================================
@@ -326,6 +326,120 @@ describe('meshExporter', () => {
             expect(text).toContain('comment metadata author Test Author');
             expect(text).toContain('comment metadata version 1');
             expect(text).toContain('comment metadata:json settings');
+        });
+    });
+
+    // =========================================================================
+    // FLATTEN OBJECT
+    // =========================================================================
+
+    describe('flattenObject', () => {
+        test('should flatten nested objects with dot notation', () => {
+            const result = flattenObject({ a: { b: 1, c: { d: 2 } } });
+            expect(result).toEqual({ 'a.b': 1, 'a.c.d': 2 });
+        });
+
+        test('should pass through flat objects unchanged', () => {
+            const result = flattenObject({ x: 1, y: 'hello' });
+            expect(result).toEqual({ x: 1, y: 'hello' });
+        });
+
+        test('should preserve arrays as leaf values', () => {
+            const result = flattenObject({ tags: [1, 2, 3] });
+            expect(result).toEqual({ tags: [1, 2, 3] });
+        });
+
+        test('should handle empty object', () => {
+            expect(flattenObject({})).toEqual({});
+        });
+
+        test('should handle null values', () => {
+            const result = flattenObject({ a: null, b: 1 });
+            expect(result).toEqual({ a: null, b: 1 });
+        });
+    });
+
+    // =========================================================================
+    // ESCAPE CSV
+    // =========================================================================
+
+    describe('escapeCSV', () => {
+        test('should return plain values unchanged', () => {
+            expect(escapeCSV('hello')).toBe('hello');
+            expect(escapeCSV('42')).toBe('42');
+        });
+
+        test('should wrap values with commas in quotes', () => {
+            expect(escapeCSV('a,b')).toBe('"a,b"');
+        });
+
+        test('should double internal quotes', () => {
+            expect(escapeCSV('say "hi"')).toBe('"say ""hi"""');
+        });
+
+        test('should wrap values with newlines in quotes', () => {
+            expect(escapeCSV('line1\nline2')).toBe('"line1\nline2"');
+        });
+
+        test('should handle null and undefined', () => {
+            expect(escapeCSV(null)).toBe('');
+            expect(escapeCSV(undefined)).toBe('');
+        });
+    });
+
+    // =========================================================================
+    // VERTEX LABELS TO FACE LABELS
+    // =========================================================================
+
+    describe('vertexLabelsToFaceLabels', () => {
+        test('should return all zeros when no annotations exist', () => {
+            const indices = [0, 1, 2, 1, 2, 3];
+            const result = vertexLabelsToFaceLabels([], new Set(), new Map(), indices, 4);
+            expect(result).toEqual(new Uint16Array([0, 0]));
+        });
+
+        test('should return all zeros for null faceLabels', () => {
+            const indices = [0, 1, 2];
+            const result = vertexLabelsToFaceLabels(null, new Set(), new Map(), indices, 3);
+            expect(result).toEqual(new Uint16Array([0]));
+        });
+
+        test('should compute per-face labels via majority vote', () => {
+            // 4 vertices, 2 faces
+            // Vertices 0,1 in segment 1; vertices 2,3 in segment 2
+            // Face 0: vertices 0,1,2 → majority is 1 (two votes for 1, one for 2)
+            // Face 1: vertices 1,2,3 → majority is 2 (two votes for 2, one for 1)
+            const faceLabels = new Int32Array([1, 1, 2, 2]);
+            const edgeIndices = new Set(); // no edges
+            const adjacencyGraph = new Map([
+                [0, new Set([1, 2])],
+                [1, new Set([0, 2, 3])],
+                [2, new Set([0, 1, 3])],
+                [3, new Set([1, 2])],
+            ]);
+            const indices = [0, 1, 2, 1, 2, 3];
+
+            const result = vertexLabelsToFaceLabels(faceLabels, edgeIndices, adjacencyGraph, indices, 4);
+            expect(result[0]).toBe(1); // face 0: v0=1, v1=1, v2=2 → majority 1
+            expect(result[1]).toBe(2); // face 1: v1=1, v2=2, v3=2 → majority 2
+        });
+
+        test('should erode edge vertices before computing face labels', () => {
+            // 3 vertices, 1 face
+            // Vertex 0 is an edge (label 0), vertices 1,2 are segment 1
+            // After erosion, vertex 0 should be assigned to segment 1
+            const faceLabels = new Int32Array([0, 1, 1]);
+            const edgeIndices = new Set([0]);
+            const adjacencyGraph = new Map([
+                [0, new Set([1, 2])],
+                [1, new Set([0, 2])],
+                [2, new Set([0, 1])],
+            ]);
+            const indices = [0, 1, 2];
+
+            const result = vertexLabelsToFaceLabels(faceLabels, edgeIndices, adjacencyGraph, indices, 3);
+            // After erosion, all vertices are segment 1
+            expect(result[0]).toBe(1);
         });
     });
 });

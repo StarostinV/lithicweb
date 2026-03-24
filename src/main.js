@@ -2,7 +2,7 @@
 import './styles/main.css';
 
 import * as THREE from 'three';
-import { exportAnnotations } from './loaders/meshExporter.js';
+import { exportAnnotations, exportAnnotationsToMAT, exportMetadataToJSON, exportMetadataToCSV } from './loaders/meshExporter.js';
 import { MODES, Mode } from './utils/mode.js';
 import { eventBus, Events } from './utils/EventBus.js';
 import {ArrowDrawer} from './components/arrow.js';
@@ -132,10 +132,53 @@ document.getElementById('invertNormals').addEventListener('click', () => {
 document.getElementById('exportAnnotations').addEventListener('click', () => {
     // Include current state's metadata under the 'state-metadata' key
     const stateMetadata = meshView.getCurrentStateMetadata();
-    const additionalMetadata = Object.keys(stateMetadata).length > 0 
-        ? { 'state-metadata': stateMetadata } 
+    const additionalMetadata = Object.keys(stateMetadata).length > 0
+        ? { 'state-metadata': stateMetadata }
         : {};
     exportAnnotations(meshView.mesh, meshView.meshColors, arrowDrawer, meshLoader, additionalMetadata);
+});
+
+// Export dropdown
+const exportDropdownMenu = document.getElementById('exportDropdownMenu');
+document.getElementById('exportDropdownToggle').addEventListener('click', (e) => {
+    e.stopPropagation();
+    exportDropdownMenu.classList.toggle('open');
+});
+
+// Close dropdown on outside click or Escape
+document.addEventListener('click', () => exportDropdownMenu.classList.remove('open'));
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') exportDropdownMenu.classList.remove('open');
+});
+
+function doExportPLY() {
+    const stateMetadata = meshView.getCurrentStateMetadata();
+    const additionalMetadata = Object.keys(stateMetadata).length > 0
+        ? { 'state-metadata': stateMetadata }
+        : {};
+    exportAnnotations(meshView.mesh, meshView.meshColors, arrowDrawer, meshLoader, additionalMetadata);
+}
+
+document.querySelectorAll('.export-option').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        exportDropdownMenu.classList.remove('open');
+        const format = btn.dataset.format;
+        switch (format) {
+            case 'ply':
+                doExportPLY();
+                break;
+            case 'mat':
+                exportAnnotationsToMAT(meshView.mesh, meshView, arrowDrawer, meshLoader);
+                break;
+            case 'json':
+                exportMetadataToJSON(meshLoader, meshView);
+                break;
+            case 'csv':
+                exportMetadataToCSV(meshLoader, meshView);
+                break;
+        }
+    });
 });
 
 // Track current panel for evaluation mode management

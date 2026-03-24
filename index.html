@@ -41,10 +41,29 @@
                     <span>Open</span>
                 </label>
                 <input type="file" id="fileInput" accept=".ply,.mat" class="hidden-file-input">
-                <button id="exportAnnotations" class="file-btn file-btn-export" title="Export Annotations to PLY">
-                    <i class="fas fa-download"></i>
-                    <span>Export</span>
-                </button>
+                <div class="export-dropdown">
+                    <button id="exportAnnotations" class="file-btn file-btn-export" title="Export Annotations to PLY">
+                        <i class="fas fa-download"></i>
+                        <span>Export</span>
+                    </button><button id="exportDropdownToggle" class="file-btn file-btn-export export-caret" title="More export formats">
+                        <i class="fas fa-caret-down"></i>
+                    </button>
+                    <div id="exportDropdownMenu" class="export-dropdown-menu">
+                        <button class="export-option" data-format="ply">
+                            <i class="fas fa-cube"></i> PLY (Annotated Mesh)
+                        </button>
+                        <button class="export-option" data-format="mat">
+                            <i class="fas fa-file-code"></i> MAT (MATLAB)
+                        </button>
+                        <div class="export-divider"></div>
+                        <button class="export-option" data-format="json">
+                            <i class="fas fa-file-alt"></i> Metadata (JSON)
+                        </button>
+                        <button class="export-option" data-format="csv">
+                            <i class="fas fa-file-csv"></i> Metadata (CSV)
+                        </button>
+                    </div>
+                </div>
                 <span id="fileName" class="file-name-display"></span>
             </div>
         </div>

@@ -87,7 +87,7 @@ module.exports = {
      * - node_modules/(?!(three)/) = ignore node_modules except 'three' folder
      */
     transformIgnorePatterns: [
-        'node_modules/(?!(three)/)'
+        'node_modules/(?!(three|mat-for-js|pako)/)'
     ],
     
     // =========================================================================
