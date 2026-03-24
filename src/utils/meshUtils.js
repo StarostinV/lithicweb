@@ -10,7 +10,7 @@ import { standardizePositions } from '../geometry/standardizePositions.js';
  * Create a BufferGeometry from positions and indices.
  * Does NOT include colors - those are view-specific.
  * Includes BVH for efficient raycasting.
- * 
+ *
  * @param {Float32Array} positions - Vertex positions (x, y, z triplets)
  * @param {Array} indices - Face indices (triangles)
  * @returns {THREE.BufferGeometry} Geometry with positions, normals, and BVH
@@ -20,11 +20,11 @@ export function createGeometry(positions, indices) {
     geometry.setAttribute('position', new THREE.BufferAttribute(standardizePositions(positions), 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
-    
+
     // Create BVH for efficient raycasting
     const bvh = new MeshBVH(geometry);
     geometry.boundsTree = bvh;
-    
+
     return geometry;
 }
 
@@ -66,7 +66,7 @@ export function createColorBufferFromLabels(labels, edgeColor, objectColor) {
 
 /**
  * Create a Three.js mesh from geometry with a color buffer.
- * 
+ *
  * @param {THREE.BufferGeometry} geometry - The geometry (will be used directly, not cloned)
  * @param {Float32Array} colorBuffer - Color buffer to use
  * @returns {THREE.Mesh} The Three.js mesh
@@ -75,19 +75,19 @@ export function createMeshFromGeometry(geometry, colorBuffer) {
     // Clone geometry so each mesh can have its own color attribute
     const meshGeometry = geometry.clone();
     meshGeometry.setAttribute('color', new THREE.BufferAttribute(colorBuffer, 3));
-    
+
     // Copy BVH reference to cloned geometry
     if (geometry.boundsTree) {
         meshGeometry.boundsTree = geometry.boundsTree;
     }
-    
+
     const material = new THREE.MeshLambertMaterial({
         vertexColors: true,
     });
-    
+
     const mesh = new THREE.Mesh(meshGeometry, material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    
+
     return mesh;
 }

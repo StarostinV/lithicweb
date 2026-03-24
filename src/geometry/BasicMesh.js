@@ -48,6 +48,7 @@ export class BasicMesh {
          * @private
          */
         this._boundingInfo = null;
+
     }
 
     isNull() {
@@ -70,7 +71,7 @@ export class BasicMesh {
 
     /**
      * Set the mesh geometry.
-     * 
+     *
      * @param {Float32Array} positions - Vertex positions (x, y, z triplets)
      * @param {Array} indices - Face indices (triangles)
      * @param {Object} [metadata={}] - Optional mesh-level metadata
@@ -81,7 +82,7 @@ export class BasicMesh {
 
         // Remove existing mesh if it exists
         this.clear();
-        
+
         // Set metadata after clear() since clear() resets it
         this.metadata = { ...metadata };
 

@@ -154,18 +154,18 @@ export class MeshView {
     _ensureThreeMesh() {
         if (this._threeMesh) return true;
         if (!this.basicMesh?.geometry) return false;
-        
+
         const colorBuffer = createColorBuffer(this.vertexCount, this.objectColor);
         this._meshColors = colorBuffer;
         this._threeMesh = createMeshFromGeometry(this.basicMesh.geometry, colorBuffer);
-        
+
         this.scene.light.target = this._threeMesh;
         this.scene.scene.add(this._threeMesh);
-        
+
         if (this.scene.attachObjectToGizmo) {
             this.scene.attachObjectToGizmo(this._threeMesh);
         }
-        
+
         return true;
     }
 

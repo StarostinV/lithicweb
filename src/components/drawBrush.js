@@ -391,16 +391,19 @@ export default class DrawBrush {
         
         const localPos = this.meshView.indexToVertex(vertexIndex);
         if (!localPos) return;
-        
+
+        const info = this.meshView.basicMesh?.computeBoundingInfo();
+        const d = info ? info.diagonal : 1;
+
         const normal = this.meshView.getVertexNormal(vertexIndex);
         if (normal && normal !== -1) {
-            localPos.addScaledVector(normal, 0.05);
+            localPos.addScaledVector(normal, d * 0.001);
         }
-        
+
         const worldPos = localPos.clone().applyMatrix4(mesh.matrixWorld);
-        
+
         // Create sphere marker
-        const geometry = new THREE.SphereGeometry(0.03, 16, 16);
+        const geometry = new THREE.SphereGeometry(d * 0.003, 16, 16);
         const material = new THREE.MeshBasicMaterial({ 
             color: 0x14b8a6,  // Teal to match the mode color
             depthTest: false
