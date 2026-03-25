@@ -16,6 +16,7 @@ import { computeScarMetrics } from '../geometry/scarMetrics.js';
 import { ScarOrdering } from '../geometry/ScarOrdering.js';
 import { METRIC_REGISTRY, getMetricByKey, getAvailableMetrics } from '../geometry/metricRegistry.js';
 import { sampleColormap, colormapHexColors } from '../utils/colormaps.js';
+import { exportScarAsWatertightPLY } from '../loaders/scarExporter.js';
 
 export class AnalysisPanel {
     /**
@@ -86,6 +87,7 @@ export class AnalysisPanel {
         this._selectedMetricsEl = document.getElementById('analysisSelectedMetrics');
         this._selectedColorEl = document.getElementById('analysisSelectedColor');
         this._selectedFocusEl = document.getElementById('analysisSelectedFocus');
+        this._selectedExportPlyEl = document.getElementById('analysisSelectedExportPly');
         this._selectedCloseEl = document.getElementById('analysisSelectedClose');
 
         // Label overlay elements (shared with order panel)
@@ -171,6 +173,21 @@ export class AnalysisPanel {
             this._selectedFocusEl.addEventListener('click', () => {
                 if (this._selectedScarId != null && this._graphContext) {
                     this._graphContext.focusCameraOnScar(this._selectedScarId);
+                }
+            });
+        }
+        if (this._selectedExportPlyEl) {
+            this._selectedExportPlyEl.addEventListener('click', () => {
+                if (this._selectedScarId != null && this._graphContext) {
+                    const sorted = this._getSortedScars();
+                    const rank = sorted.findIndex(s => s.scarId === this._selectedScarId) + 1;
+                    exportScarAsWatertightPLY(
+                        this._selectedScarId,
+                        this._graphContext,
+                        this.meshView.basicMesh,
+                        this.meshLoader,
+                        String(rank)
+                    );
                 }
             });
         }
