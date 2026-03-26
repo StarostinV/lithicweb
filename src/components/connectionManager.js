@@ -297,16 +297,17 @@ export class ConnectionManager {
             }
         }
         
-        // Also update the model panel's connection status if it exists
+        // Also update the model panel's connection indicator in header
         const modelPanelStatus = document.getElementById('connectionStatus');
         if (modelPanelStatus) {
             if (configured) {
-                modelPanelStatus.innerHTML = '<i class="fas fa-circle status-dot connected"></i> <span>Connected</span>';
-                modelPanelStatus.className = 'connection-status connected';
-                modelPanelStatus.title = serverUrl;
+                modelPanelStatus.innerHTML = '<i class="fas fa-circle status-dot connected"></i>';
+                modelPanelStatus.className = 'connection-indicator connected';
+                modelPanelStatus.title = `Connected: ${serverUrl}`;
             } else {
-                modelPanelStatus.innerHTML = '<i class="fas fa-circle status-dot disconnected"></i> <span>Not configured</span>';
-                modelPanelStatus.className = 'connection-status';
+                modelPanelStatus.innerHTML = '<i class="fas fa-circle status-dot disconnected"></i>';
+                modelPanelStatus.className = 'connection-indicator';
+                modelPanelStatus.title = 'Not configured';
             }
         }
         

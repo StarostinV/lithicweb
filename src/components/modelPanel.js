@@ -95,14 +95,16 @@ export class ModelPanel {
         this.uploadToServerBtn = document.getElementById('uploadToServerBtn');
         this.runInferenceBtn = document.getElementById('runInferenceBtn');
         this.inferenceStatus = document.getElementById('inferenceStatus');
-        this.configContainer = document.getElementById('configContainer');
+        this.nnConfigContainer = document.getElementById('nnConfigContainer');
+        this.postprocessConfigContainer = document.getElementById('postprocessConfigContainer');
 
         // Client-side postprocessing elements
         this.postprocessToggle = document.getElementById('clientPostprocessToggle');
         this.showModelOutputBtn = document.getElementById('showModelOutputBtn');
 
-        // Reset to defaults button
-        this.resetConfigBtn = document.getElementById('resetConfigBtn');
+        // Reset to defaults buttons (per-category)
+        this.resetNnConfigBtn = document.getElementById('resetNnConfigBtn');
+        this.resetPostprocessConfigBtn = document.getElementById('resetPostprocessConfigBtn');
 
         // Build config UI
         this.buildConfigUI();
@@ -121,10 +123,6 @@ export class ModelPanel {
     }
 
     buildConfigUI() {
-        if (!this.configContainer) return;
-
-        this.configContainer.innerHTML = '';
-
         // Group parameters by category
         const categories = { nn: [], postprocess: [] };
         for (const [key, meta] of Object.entries(CONFIG_PARAMS)) {
@@ -133,108 +131,116 @@ export class ModelPanel {
             categories[cat].push({ key, meta });
         }
 
-        const categoryLabels = { nn: 'Neural Network', postprocess: 'Postprocessing' };
-
-        for (const [cat, params] of Object.entries(categories)) {
-            if (params.length === 0) continue;
-
-            // Category sub-header
-            const title = document.createElement('div');
-            title.className = 'config-category-title';
-            title.textContent = categoryLabels[cat] || cat;
-            this.configContainer.appendChild(title);
-
-            for (const { key, meta } of params) {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'config-param';
-                wrapper.title = meta.description;
-
-                // Header row: label + default hint
-                const header = document.createElement('div');
-                header.className = 'config-param-header';
-
-                const label = document.createElement('span');
-                label.className = 'config-param-label';
-                label.textContent = meta.label;
-                header.appendChild(label);
-
-                const defaultVal = DEFAULT_INFERENCE_CONFIG[key];
-                const hint = document.createElement('span');
-                hint.className = 'config-param-default';
-                hint.textContent = `Default: ${defaultVal === null ? 'None' : defaultVal}`;
-                header.appendChild(hint);
-
-                wrapper.appendChild(header);
-
-                // Control row
-                if (meta.type === 'slider') {
-                    const row = document.createElement('div');
-                    row.className = 'slider-row';
-
-                    const slider = document.createElement('input');
-                    slider.type = 'range';
-                    slider.id = `config_${key}`;
-                    slider.min = meta.min;
-                    slider.max = meta.max;
-                    slider.step = meta.step;
-                    slider.value = this.config[key];
-                    slider.className = 'styled-slider';
-
-                    const valueDisplay = document.createElement('span');
-                    valueDisplay.id = `config_${key}_value`;
-                    valueDisplay.className = 'slider-value';
-                    valueDisplay.textContent = this.config[key];
-
-                    slider.addEventListener('input', (e) => {
-                        const value = parseFloat(e.target.value);
-                        valueDisplay.textContent = value;
-                        this.config[key] = value;
-                        this._onConfigChanged(key, meta);
-                    });
-
-                    row.appendChild(slider);
-                    row.appendChild(valueDisplay);
-                    wrapper.appendChild(row);
-                } else if (meta.type === 'number') {
-                    const input = document.createElement('input');
-                    input.type = 'number';
-                    input.id = `config_${key}`;
-                    input.min = meta.min;
-                    input.max = meta.max;
-                    input.step = meta.step;
-                    input.value = this.config[key];
-                    input.className = 'control-input';
-
-                    input.addEventListener('change', (e) => {
-                        this.config[key] = parseInt(e.target.value);
-                        this._onConfigChanged(key, meta);
-                    });
-
-                    wrapper.appendChild(input);
-                } else if (meta.type === 'select') {
-                    const select = document.createElement('select');
-                    select.id = `config_${key}`;
-                    select.className = 'control-select';
-
-                    meta.options.forEach(opt => {
-                        const option = document.createElement('option');
-                        option.value = opt;
-                        option.textContent = opt;
-                        option.selected = this.config[key] === opt;
-                        select.appendChild(option);
-                    });
-
-                    select.addEventListener('change', (e) => {
-                        this.config[key] = e.target.value;
-                        this._onConfigChanged(key, meta);
-                    });
-
-                    wrapper.appendChild(select);
-                }
-
-                this.configContainer.appendChild(wrapper);
+        // Render NN params into nnConfigContainer
+        if (this.nnConfigContainer) {
+            this.nnConfigContainer.innerHTML = '';
+            for (const { key, meta } of categories.nn) {
+                this.nnConfigContainer.appendChild(this._buildParamControl(key, meta));
             }
         }
+
+        // Render postprocess params into postprocessConfigContainer
+        if (this.postprocessConfigContainer) {
+            this.postprocessConfigContainer.innerHTML = '';
+            for (const { key, meta } of categories.postprocess) {
+                this.postprocessConfigContainer.appendChild(this._buildParamControl(key, meta));
+            }
+        }
+    }
+
+    /**
+     * Build a single config parameter control element.
+     * @private
+     */
+    _buildParamControl(key, meta) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'config-param';
+        wrapper.title = meta.description;
+
+        // Header row: label + default hint
+        const header = document.createElement('div');
+        header.className = 'config-param-header';
+
+        const label = document.createElement('span');
+        label.className = 'config-param-label';
+        label.textContent = meta.label;
+        header.appendChild(label);
+
+        const defaultVal = DEFAULT_INFERENCE_CONFIG[key];
+        const hint = document.createElement('span');
+        hint.className = 'config-param-default';
+        hint.textContent = `Default: ${defaultVal === null ? 'None' : defaultVal}`;
+        header.appendChild(hint);
+
+        wrapper.appendChild(header);
+
+        // Control row
+        if (meta.type === 'slider') {
+            const row = document.createElement('div');
+            row.className = 'slider-row';
+
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.id = `config_${key}`;
+            slider.min = meta.min;
+            slider.max = meta.max;
+            slider.step = meta.step;
+            slider.value = this.config[key];
+            slider.className = 'styled-slider';
+
+            const valueDisplay = document.createElement('span');
+            valueDisplay.id = `config_${key}_value`;
+            valueDisplay.className = 'slider-value';
+            valueDisplay.textContent = this.config[key];
+
+            slider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                valueDisplay.textContent = value;
+                this.config[key] = value;
+                this._onConfigChanged(key, meta);
+            });
+
+            row.appendChild(slider);
+            row.appendChild(valueDisplay);
+            wrapper.appendChild(row);
+        } else if (meta.type === 'number') {
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.id = `config_${key}`;
+            input.min = meta.min;
+            input.max = meta.max;
+            input.step = meta.step;
+            input.value = this.config[key];
+            input.className = 'control-input';
+
+            input.addEventListener('change', (e) => {
+                this.config[key] = parseInt(e.target.value);
+                this._onConfigChanged(key, meta);
+            });
+
+            wrapper.appendChild(input);
+        } else if (meta.type === 'select') {
+            const select = document.createElement('select');
+            select.id = `config_${key}`;
+            select.className = 'control-select';
+
+            meta.options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt;
+                option.selected = this.config[key] === opt;
+                select.appendChild(option);
+            });
+
+            select.addEventListener('change', (e) => {
+                this.config[key] = e.target.value;
+                this._onConfigChanged(key, meta);
+            });
+
+            wrapper.appendChild(select);
+        }
+
+        return wrapper;
     }
 
     setupEventListeners() {
@@ -252,6 +258,16 @@ export class ModelPanel {
 
         if (this.runInferenceBtn) {
             this.runInferenceBtn.addEventListener('click', () => this.runInference());
+        }
+
+        // NN params collapsible toggle (pure UI)
+        const nnParamsToggle = document.getElementById('nnParamsToggle');
+        const nnParamsPanel = document.getElementById('nnParamsPanel');
+        if (nnParamsToggle && nnParamsPanel) {
+            nnParamsToggle.addEventListener('click', () => {
+                nnParamsToggle.classList.toggle('expanded');
+                nnParamsPanel.classList.toggle('expanded');
+            });
         }
 
         // Client-side postprocessing toggle
@@ -274,10 +290,26 @@ export class ModelPanel {
             });
         }
 
-        // Reset config to defaults
-        if (this.resetConfigBtn) {
-            this.resetConfigBtn.addEventListener('click', () => {
-                this.config = { ...DEFAULT_INFERENCE_CONFIG };
+        // Reset NN config to defaults
+        if (this.resetNnConfigBtn) {
+            this.resetNnConfigBtn.addEventListener('click', () => {
+                for (const [key, meta] of Object.entries(CONFIG_PARAMS)) {
+                    if ((meta.category || 'nn') === 'nn') {
+                        this.config[key] = DEFAULT_INFERENCE_CONFIG[key];
+                    }
+                }
+                this.buildConfigUI();
+            });
+        }
+
+        // Reset postprocessing config to defaults
+        if (this.resetPostprocessConfigBtn) {
+            this.resetPostprocessConfigBtn.addEventListener('click', () => {
+                for (const [key, meta] of Object.entries(CONFIG_PARAMS)) {
+                    if (meta.category === 'postprocess') {
+                        this.config[key] = DEFAULT_INFERENCE_CONFIG[key];
+                    }
+                }
                 this.buildConfigUI();
                 // If client-side postprocessing is active with cached output, rerun
                 if (this.clientSidePostprocessing && this.cachedModelOutput) {
