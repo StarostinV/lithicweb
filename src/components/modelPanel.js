@@ -41,7 +41,7 @@ export class ModelPanel {
         this.isLoading = false;
 
         // Client-side postprocessing state
-        this.clientSidePostprocessing = true;
+        this.clientSidePostprocessing = false;
         this.cachedModelOutput = null; // { edgePredictions: Float64Array, faceAdjacencyFlat: Int32Array, numFaces: number }
         this.showingHeatmap = false;
         this._postprocessDebounceTimer = null;
@@ -89,26 +89,20 @@ export class ModelPanel {
     }
 
     setupUI() {
+        // Setup existing panel elements
         this.settingsBtn = document.getElementById('modelSettingsBtn');
         this.connectionStatus = document.getElementById('connectionStatus');
+        this.uploadToServerBtn = document.getElementById('uploadToServerBtn');
         this.runInferenceBtn = document.getElementById('runInferenceBtn');
         this.inferenceStatus = document.getElementById('inferenceStatus');
-
-        // Separate config containers for NN and postprocess
-        this.nnConfigContainer = document.getElementById('nnConfigContainer');
-        this.postprocessConfigContainer = document.getElementById('postprocessConfigContainer');
-
-        // Collapsible NN params
-        this.nnParamsToggle = document.getElementById('nnParamsToggle');
-        this.nnParamsPanel = document.getElementById('nnParamsPanel');
+        this.configContainer = document.getElementById('configContainer');
 
         // Client-side postprocessing elements
         this.postprocessToggle = document.getElementById('clientPostprocessToggle');
         this.showModelOutputBtn = document.getElementById('showModelOutputBtn');
 
-        // Reset to defaults buttons (per-category)
-        this.resetNnConfigBtn = document.getElementById('resetNnConfigBtn');
-        this.resetPostprocessConfigBtn = document.getElementById('resetPostprocessConfigBtn');
+        // Reset to defaults button
+        this.resetConfigBtn = document.getElementById('resetConfigBtn');
 
         // Build config UI
         this.buildConfigUI();
@@ -127,6 +121,10 @@ export class ModelPanel {
     }
 
     buildConfigUI() {
+        if (!this.configContainer) return;
+
+        this.configContainer.innerHTML = '';
+
         // Group parameters by category
         const categories = { nn: [], postprocess: [] };
         for (const [key, meta] of Object.entries(CONFIG_PARAMS)) {
@@ -135,116 +133,108 @@ export class ModelPanel {
             categories[cat].push({ key, meta });
         }
 
-        // Render NN params into nnConfigContainer
-        if (this.nnConfigContainer) {
-            this.nnConfigContainer.innerHTML = '';
-            for (const { key, meta } of categories.nn) {
-                this.nnConfigContainer.appendChild(this._buildParamControl(key, meta));
+        const categoryLabels = { nn: 'Neural Network', postprocess: 'Postprocessing' };
+
+        for (const [cat, params] of Object.entries(categories)) {
+            if (params.length === 0) continue;
+
+            // Category sub-header
+            const title = document.createElement('div');
+            title.className = 'config-category-title';
+            title.textContent = categoryLabels[cat] || cat;
+            this.configContainer.appendChild(title);
+
+            for (const { key, meta } of params) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'config-param';
+                wrapper.title = meta.description;
+
+                // Header row: label + default hint
+                const header = document.createElement('div');
+                header.className = 'config-param-header';
+
+                const label = document.createElement('span');
+                label.className = 'config-param-label';
+                label.textContent = meta.label;
+                header.appendChild(label);
+
+                const defaultVal = DEFAULT_INFERENCE_CONFIG[key];
+                const hint = document.createElement('span');
+                hint.className = 'config-param-default';
+                hint.textContent = `Default: ${defaultVal === null ? 'None' : defaultVal}`;
+                header.appendChild(hint);
+
+                wrapper.appendChild(header);
+
+                // Control row
+                if (meta.type === 'slider') {
+                    const row = document.createElement('div');
+                    row.className = 'slider-row';
+
+                    const slider = document.createElement('input');
+                    slider.type = 'range';
+                    slider.id = `config_${key}`;
+                    slider.min = meta.min;
+                    slider.max = meta.max;
+                    slider.step = meta.step;
+                    slider.value = this.config[key];
+                    slider.className = 'styled-slider';
+
+                    const valueDisplay = document.createElement('span');
+                    valueDisplay.id = `config_${key}_value`;
+                    valueDisplay.className = 'slider-value';
+                    valueDisplay.textContent = this.config[key];
+
+                    slider.addEventListener('input', (e) => {
+                        const value = parseFloat(e.target.value);
+                        valueDisplay.textContent = value;
+                        this.config[key] = value;
+                        this._onConfigChanged(key, meta);
+                    });
+
+                    row.appendChild(slider);
+                    row.appendChild(valueDisplay);
+                    wrapper.appendChild(row);
+                } else if (meta.type === 'number') {
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.id = `config_${key}`;
+                    input.min = meta.min;
+                    input.max = meta.max;
+                    input.step = meta.step;
+                    input.value = this.config[key];
+                    input.className = 'control-input';
+
+                    input.addEventListener('change', (e) => {
+                        this.config[key] = parseInt(e.target.value);
+                        this._onConfigChanged(key, meta);
+                    });
+
+                    wrapper.appendChild(input);
+                } else if (meta.type === 'select') {
+                    const select = document.createElement('select');
+                    select.id = `config_${key}`;
+                    select.className = 'control-select';
+
+                    meta.options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.textContent = opt;
+                        option.selected = this.config[key] === opt;
+                        select.appendChild(option);
+                    });
+
+                    select.addEventListener('change', (e) => {
+                        this.config[key] = e.target.value;
+                        this._onConfigChanged(key, meta);
+                    });
+
+                    wrapper.appendChild(select);
+                }
+
+                this.configContainer.appendChild(wrapper);
             }
         }
-
-        // Render postprocess params into postprocessConfigContainer
-        if (this.postprocessConfigContainer) {
-            this.postprocessConfigContainer.innerHTML = '';
-            for (const { key, meta } of categories.postprocess) {
-                this.postprocessConfigContainer.appendChild(this._buildParamControl(key, meta));
-            }
-        }
-    }
-
-    /**
-     * Build a single config parameter control element.
-     * @private
-     */
-    _buildParamControl(key, meta) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'config-param';
-        wrapper.title = meta.description;
-
-        // Header row: label + default hint
-        const header = document.createElement('div');
-        header.className = 'config-param-header';
-
-        const label = document.createElement('span');
-        label.className = 'config-param-label';
-        label.textContent = meta.label;
-        header.appendChild(label);
-
-        const defaultVal = DEFAULT_INFERENCE_CONFIG[key];
-        const hint = document.createElement('span');
-        hint.className = 'config-param-default';
-        hint.textContent = `Default: ${defaultVal === null ? 'None' : defaultVal}`;
-        header.appendChild(hint);
-
-        wrapper.appendChild(header);
-
-        // Control row
-        if (meta.type === 'slider') {
-            const row = document.createElement('div');
-            row.className = 'slider-row';
-
-            const slider = document.createElement('input');
-            slider.type = 'range';
-            slider.id = `config_${key}`;
-            slider.min = meta.min;
-            slider.max = meta.max;
-            slider.step = meta.step;
-            slider.value = this.config[key];
-            slider.className = 'styled-slider';
-
-            const valueDisplay = document.createElement('span');
-            valueDisplay.id = `config_${key}_value`;
-            valueDisplay.className = 'slider-value';
-            valueDisplay.textContent = this.config[key];
-
-            slider.addEventListener('input', (e) => {
-                const value = parseFloat(e.target.value);
-                valueDisplay.textContent = value;
-                this.config[key] = value;
-                this._onConfigChanged(key, meta);
-            });
-
-            row.appendChild(slider);
-            row.appendChild(valueDisplay);
-            wrapper.appendChild(row);
-        } else if (meta.type === 'number') {
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.id = `config_${key}`;
-            input.min = meta.min;
-            input.max = meta.max;
-            input.step = meta.step;
-            input.value = this.config[key];
-            input.className = 'control-input';
-
-            input.addEventListener('change', (e) => {
-                this.config[key] = parseInt(e.target.value);
-                this._onConfigChanged(key, meta);
-            });
-
-            wrapper.appendChild(input);
-        } else if (meta.type === 'select') {
-            const select = document.createElement('select');
-            select.id = `config_${key}`;
-            select.className = 'control-select';
-
-            meta.options.forEach(opt => {
-                const option = document.createElement('option');
-                option.value = opt;
-                option.textContent = opt;
-                option.selected = this.config[key] === opt;
-                select.appendChild(option);
-            });
-
-            select.addEventListener('change', (e) => {
-                this.config[key] = e.target.value;
-                this._onConfigChanged(key, meta);
-            });
-
-            wrapper.appendChild(select);
-        }
-
-        return wrapper;
     }
 
     setupEventListeners() {
@@ -255,22 +245,17 @@ export class ModelPanel {
             });
         }
 
-        // Smart inference button (handles upload + inference)
-        if (this.runInferenceBtn) {
-            this.runInferenceBtn.addEventListener('click', () => this.runSmartInference());
+        // Upload and inference
+        if (this.uploadToServerBtn) {
+            this.uploadToServerBtn.addEventListener('click', () => this.uploadCurrentMesh());
         }
 
-        // NN params collapsible toggle
-        if (this.nnParamsToggle) {
-            this.nnParamsToggle.addEventListener('click', () => {
-                this.nnParamsToggle.classList.toggle('expanded');
-                this.nnParamsPanel.classList.toggle('expanded');
-            });
+        if (this.runInferenceBtn) {
+            this.runInferenceBtn.addEventListener('click', () => this.runInference());
         }
 
         // Client-side postprocessing toggle
         if (this.postprocessToggle) {
-            this.postprocessToggle.checked = this.clientSidePostprocessing;
             this.postprocessToggle.addEventListener('change', (e) => {
                 this.clientSidePostprocessing = e.target.checked;
                 console.log('[ModelPanel] Client-side postprocessing:', this.clientSidePostprocessing);
@@ -289,27 +274,12 @@ export class ModelPanel {
             });
         }
 
-        // Reset NN config to defaults
-        if (this.resetNnConfigBtn) {
-            this.resetNnConfigBtn.addEventListener('click', () => {
-                for (const [key, meta] of Object.entries(CONFIG_PARAMS)) {
-                    if ((meta.category || 'nn') === 'nn') {
-                        this.config[key] = DEFAULT_INFERENCE_CONFIG[key];
-                    }
-                }
+        // Reset config to defaults
+        if (this.resetConfigBtn) {
+            this.resetConfigBtn.addEventListener('click', () => {
+                this.config = { ...DEFAULT_INFERENCE_CONFIG };
                 this.buildConfigUI();
-            });
-        }
-
-        // Reset postprocessing config to defaults
-        if (this.resetPostprocessConfigBtn) {
-            this.resetPostprocessConfigBtn.addEventListener('click', () => {
-                for (const [key, meta] of Object.entries(CONFIG_PARAMS)) {
-                    if (meta.category === 'postprocess') {
-                        this.config[key] = DEFAULT_INFERENCE_CONFIG[key];
-                    }
-                }
-                this.buildConfigUI();
+                // If client-side postprocessing is active with cached output, rerun
                 if (this.clientSidePostprocessing && this.cachedModelOutput) {
                     this.rerunPostprocessingLocally();
                 }
@@ -489,123 +459,6 @@ export class ModelPanel {
         }
         
         return { vertices, faces };
-    }
-
-    // ============== Smart Inference (Combined Upload + Inference) ==============
-
-    async runSmartInference() {
-        if (this.meshView.isNull()) {
-            this.setStatus('No mesh loaded in viewer', 'error');
-            return;
-        }
-
-        if (!lithicClient.isConfigured()) {
-            this.setStatus('Please configure server settings first', 'error');
-            return;
-        }
-
-        this.setProgressLoading(true);
-
-        try {
-            // Ensure session exists
-            if (!await this.ensureSession()) {
-                this.setProgressLoading(false);
-                return;
-            }
-
-            // Phase 1: Upload if needed
-            const needsUpload = !this.currentSession || !this.currentSession.has_data;
-            if (needsUpload) {
-                this.setButtonProgress(5, 'Preparing...');
-
-                // Update config first
-                await lithicClient.updateSessionConfig(this.currentSession.session_id, this.config);
-
-                // Check if mesh is already in cloud storage (optimized path)
-                const cloudMeshInfo = this.cloudStoragePanel?.cloudMeshInfo;
-                if (cloudMeshInfo && this.cloudStoragePanel.verifyCloudConnection()) {
-                    this.setButtonProgress(10, 'Loading from cloud...');
-                    console.log(`[ModelPanel] Mesh found in cloud storage: ${cloudMeshInfo.meshId}`);
-
-                    const loadResult = await lithicClient.loadFileIntoSession(
-                        this.currentSession.session_id,
-                        cloudMeshInfo.meshId
-                    );
-                    if (loadResult && loadResult.success) {
-                        this.currentSession.has_data = true;
-                        this.currentSession.current_filename = cloudMeshInfo.meshId;
-                    }
-                } else {
-                    this.setButtonProgress(10, 'Preparing mesh...');
-                    const { vertices, faces } = this.extractMeshData();
-                    console.log(`[ModelPanel] Uploading mesh: ${vertices.length} vertices, ${faces.length} faces`);
-
-                    this.setButtonProgress(20, 'Uploading...');
-                    const loadResult = await lithicClient.loadMeshDirectly(
-                        this.currentSession.session_id,
-                        vertices,
-                        faces,
-                        'mesh'
-                    );
-                    if (loadResult && loadResult.success) {
-                        this.currentSession.has_data = true;
-                        this.currentSession.current_filename = 'mesh';
-                    }
-                }
-                this.setButtonProgress(40, 'Upload complete');
-            }
-
-            // Phase 2: Run inference
-            this.setButtonProgress(needsUpload ? 45 : 10, 'Running inference...');
-            this.setStatus('Running inference... This may take a while.', 'info');
-
-            // Hide heatmap if showing
-            if (this.showingHeatmap) {
-                this._hideHeatmap();
-            }
-
-            // Update config before running
-            await lithicClient.updateSessionConfig(this.currentSession.session_id, this.config);
-
-            const returnModelOutput = this.clientSidePostprocessing;
-            const response = await lithicClient.runInference(
-                this.currentSession.session_id,
-                { returnModelOutput }
-            );
-
-            this.setButtonProgress(85, 'Applying results...');
-
-            if (returnModelOutput) {
-                // Cache model output for local postprocessing
-                const result = response.result;
-                const numFaces = result.edge_predictions.length;
-                this.cachedModelOutput = {
-                    edgePredictions: new Float64Array(result.edge_predictions),
-                    faceAdjacencyFlat: new Int32Array(result.face_adjacency),
-                    numFaces,
-                };
-                this._updateHeatmapButton();
-                this.rerunPostprocessingLocally();
-                this.setButtonProgress(100, 'Done!');
-                this.setStatus('Done! Model output cached. Adjust postprocessing params for instant updates.', 'success');
-            } else {
-                const appliedCount = this.applyResults(response.result);
-                this.setButtonProgress(100, 'Done!');
-                this.setStatus(`Done! Applied ${appliedCount} edge annotations.`, 'success');
-            }
-
-            // Hold at 100% briefly, then reset
-            setTimeout(() => this.setProgressLoading(false), 1500);
-
-        } catch (e) {
-            console.error('[ModelPanel] Smart inference failed:', e);
-            const msg = e?.message || String(e);
-            if (msg.includes('404') || msg.includes('session') || msg.includes('Session')) {
-                this.clearSession();
-            }
-            this.setStatus('Failed: ' + msg, 'error');
-            this.setProgressLoading(false);
-        }
     }
 
     async runInference() {
@@ -968,45 +821,26 @@ export class ModelPanel {
 
     setLoading(loading) {
         this.isLoading = loading;
+        
+        const buttons = [
+            this.uploadToServerBtn,
+            this.runInferenceBtn
+        ];
+        
+        buttons.forEach(btn => {
+            if (btn) btn.disabled = loading;
+        });
+        
+        if (this.uploadToServerBtn) {
+            this.uploadToServerBtn.innerHTML = loading 
+                ? '<i class="fas fa-spinner fa-spin"></i> Processing...'
+                : '<i class="fas fa-upload"></i> Upload & Prepare';
+        }
+        
         if (this.runInferenceBtn) {
-            this.runInferenceBtn.disabled = loading;
-        }
-    }
-
-    /**
-     * Update the progress fill and text on the Run Inference button.
-     */
-    setButtonProgress(percent, text) {
-        if (!this.runInferenceBtn) return;
-        const fill = this.runInferenceBtn.querySelector('.btn-progress-fill');
-        const label = this.runInferenceBtn.querySelector('.btn-progress-text');
-        if (fill) {
-            fill.style.width = `${percent}%`;
-        }
-        if (label && text) {
-            label.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${text}`;
-        }
-    }
-
-    /**
-     * Toggle the progress loading state on the Run Inference button.
-     */
-    setProgressLoading(loading) {
-        if (!this.runInferenceBtn) return;
-
-        if (loading) {
-            this.isLoading = true;
-            this.runInferenceBtn.classList.add('in-progress');
-            this.runInferenceBtn.disabled = true;
-        } else {
-            this.isLoading = false;
-            this.runInferenceBtn.classList.remove('in-progress');
-            this.runInferenceBtn.disabled = false;
-            // Reset fill and text
-            const fill = this.runInferenceBtn.querySelector('.btn-progress-fill');
-            const label = this.runInferenceBtn.querySelector('.btn-progress-text');
-            if (fill) fill.style.width = '0%';
-            if (label) label.innerHTML = '<i class="fas fa-brain"></i> Run Inference';
+            this.runInferenceBtn.innerHTML = loading 
+                ? '<i class="fas fa-spinner fa-spin"></i> Running...'
+                : '<i class="fas fa-brain"></i> Run Inference';
         }
     }
 }
