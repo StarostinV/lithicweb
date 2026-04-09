@@ -195,9 +195,10 @@ export class ModelPanel {
             valueDisplay.textContent = this.config[key];
 
             slider.addEventListener('input', (e) => {
-                const value = parseFloat(e.target.value);
-                valueDisplay.textContent = value;
-                this.config[key] = value;
+                valueDisplay.textContent = parseFloat(e.target.value);
+            });
+            slider.addEventListener('change', (e) => {
+                this.config[key] = parseFloat(e.target.value);
                 this._onConfigChanged(key, meta);
             });
 

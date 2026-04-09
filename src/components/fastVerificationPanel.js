@@ -204,9 +204,10 @@ export class FastVerificationPanel {
                 valueDisplay.textContent = this.config[key];
 
                 input.addEventListener('input', () => {
-                    const val = parseFloat(input.value);
-                    valueDisplay.textContent = val;
-                    this.config[key] = val;
+                    valueDisplay.textContent = parseFloat(input.value);
+                });
+                input.addEventListener('change', () => {
+                    this.config[key] = parseFloat(input.value);
                     this._onPostprocessChanged();
                 });
 
