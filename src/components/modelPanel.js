@@ -29,6 +29,7 @@ import {
     facePredictionsToVertexValues,
     normalizeEdges,
 } from '../geometry/faceUnionFind.js';
+import { runClientPostprocessing } from '../utils/postprocess.js';
 
 export class ModelPanel {
     constructor(meshView, connectionManager = null) {
@@ -580,38 +581,8 @@ export class ModelPanel {
         }
 
         console.time('[ModelPanel] Client postprocessing');
-
-        const { edgePredictions, faceAdjacencyFlat, numFaces } = this.cachedModelOutput;
-        const indices = this.meshView.indices;
-        const numVertices = this.meshView.positions.length / 3;
-        const adjacencyGraph = this.meshView.adjacencyGraph;
-
-        // Step 1: Union-find segmentation (skip internal cleanup — normalizeEdges handles it)
-        const faceSegments = unionFindSegmentation(
-            edgePredictions,
-            faceAdjacencyFlat,
-            numFaces,
-            {
-                maxMergeCost: this.config.union_find_max_merge_cost,
-                maxSegmentSize: this.config.union_find_max_segment_size,
-                minSegmentSize: 1, // skip internal cleanupPass
-                mergeCost: this.config.union_find_merge_cost,
-            }
-        );
-
-        // Step 2: Convert per-face → per-vertex segment labels (0 = edge)
-        const vertexSegLabels = faceSegmentsToVertexSegments(faceSegments, indices, numVertices);
-
-        // Step 3: Normalize edges (removes small segments, erodes, assigns thin edges)
-        const edgeIndices = new Set();
-        for (let v = 0; v < numVertices; v++) {
-            if (vertexSegLabels[v] === 0) edgeIndices.add(v);
-        }
-        const { edgeLabels: cleanEdgeLabels } = normalizeEdges(vertexSegLabels, edgeIndices, adjacencyGraph, numVertices, indices, this.config.min_segment_size);
-
-        // Apply via existing pathway
-        this.applyResults({ labels: Array.from(cleanEdgeLabels) });
-
+        const labels = runClientPostprocessing(this.cachedModelOutput, this.meshView, this.config);
+        this.applyResults({ labels });
         console.timeEnd('[ModelPanel] Client postprocessing');
     }
 
@@ -734,20 +705,17 @@ export class ModelPanel {
             this.setStatus('No inference results to apply', 'error');
             return 0;
         }
-        
+
         // The inference result should contain edge labels
         // Expected format: { labels: [0, 1, 0, 1, ...] } or similar
         const labels = result.labels || result.edge_labels || result.predictions;
-        
+
         if (!labels || !Array.isArray(labels)) {
             this.setStatus('Invalid inference result format', 'error');
             console.error('Inference result:', result);
             return 0;
         }
-        
-        // Start a draw operation for history tracking
-        this.meshView.startDrawOperation('model');
-        
+
         // Build set of edge indices from inference results
         const edgeIndices = new Set();
         for (let i = 0; i < labels.length; i++) {
@@ -755,85 +723,54 @@ export class ModelPanel {
                 edgeIndices.add(i);
             }
         }
-        
-        // Clear current edges and apply new ones
-        this.meshView.currentEdgeIndices.forEach(index => {
-            this.meshView.edgeLabels[index] = 0;
-            this.meshView.colorVertex(index, this.meshView.objectColor);
-        });
-        this.meshView.currentEdgeIndices.clear();
-        
-        // Apply inference edges
-        edgeIndices.forEach(index => {
-            if (index < this.meshView.edgeLabels.length) {
-                this.meshView.edgeLabels[index] = 1;
-                this.meshView.colorVertex(index, this.meshView.edgeColor);
-                this.meshView.currentEdgeIndices.add(index);
-            }
-        });
-        
-        // Finish draw operation to record in history (type 'model' -> 'AI segmentation')
-        this.meshView.finishDrawOperation();
-        
-        // Save model inference metadata to current state's annotation metadata
-        const inferenceMetadata = {
-            model: {
-                inferredAt: Date.now(),
-                config: { ...this.config },
-                sessionId: this.currentSession?.session_id,
-                edgeCount: edgeIndices.size,
-                clientSidePostprocessing: this.clientSidePostprocessing,
-                postprocessingParams: this.clientSidePostprocessing ? {
-                    union_find_max_merge_cost: this.config.union_find_max_merge_cost,
-                    union_find_merge_cost: this.config.union_find_merge_cost,
-                    min_segment_size: this.config.min_segment_size,
-                    union_find_max_segment_size: this.config.union_find_max_segment_size,
-                } : null,
-            }
-        };
-        this.meshView.setCurrentStateMetadata('inference', inferenceMetadata);
-        
-        // Create Annotation object from inference results for library auto-save
-        const annotationMetadata = {
-            name: `Model Prediction ${new Date().toLocaleString()}`,
-            source: 'model',
-            config: { ...this.config }  // Include model config for reproducibility
-        };
-        
+
+        // Create annotation with all metadata upfront
         const annotation = new Annotation({
             edgeIndices: edgeIndices,
             arrows: [],
-            metadata: annotationMetadata
+            metadata: {
+                name: `Model Prediction ${new Date().toLocaleString()}`,
+                source: 'model',
+                config: { ...this.config },
+                inference: {
+                    model: {
+                        inferredAt: Date.now(),
+                        config: { ...this.config },
+                        sessionId: this.currentSession?.session_id,
+                        edgeCount: edgeIndices.size,
+                        clientSidePostprocessing: this.clientSidePostprocessing,
+                        postprocessingParams: this.clientSidePostprocessing ? {
+                            union_find_max_merge_cost: this.config.union_find_max_merge_cost,
+                            union_find_merge_cost: this.config.union_find_merge_cost,
+                            min_segment_size: this.config.min_segment_size,
+                            union_find_max_segment_size: this.config.union_find_max_segment_size,
+                        } : null,
+                    }
+                }
+            }
         });
-        
-        // Update workingAnnotation metadata so getAnnotation() returns correct name
-        if (this.meshView.workingAnnotation) {
-            Object.assign(this.meshView.workingAnnotation.metadata, annotationMetadata);
-        }
-        
+
+        // Apply to mesh — fresh annotation ID prevents library overwrite
+        this.meshView.applyExternalAnnotation(annotation, 'model');
+
         // Emit ANNOTATION_IMPORTED for library auto-save
         eventBus.emit(Events.ANNOTATION_IMPORTED, {
             annotation: annotation,
             source: 'model'
         });
-        
+
         // Emit ANNOTATION_ACTIVE_CHANGED for UI updates (label, etc.)
         eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
             name: annotation.name,
             source: 'model'
         });
-        
+
         // Automatically set this state as the prediction in evaluation manager
         if (this.evaluationManager) {
             this.evaluationManager.setPrediction(annotation);
             console.log('[ModelPanel] Auto-assigned prediction from AI inference');
         }
-        
-        // Update segments if auto-segmentation is enabled
-        if (document.getElementById('auto-segments')?.checked) {
-            this.meshView.updateSegments();
-        }
-        
+
         return edgeIndices.size;
     }
 

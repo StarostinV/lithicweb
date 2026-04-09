@@ -404,6 +404,105 @@ class LithicClient {
             body: JSON.stringify({ return_model_output: returnModelOutput })
         });
     }
+
+    // ============== Dataset Endpoints (Fast Verification) ==============
+
+    /**
+     * List all datasets for the current user
+     * @returns {Promise<{datasets: Array, total_count: number}>}
+     */
+    async listDatasets() {
+        return this.request('/datasets/');
+    }
+
+    /**
+     * List all meshes in a dataset with their verification verdicts
+     * @param {string} datasetId
+     * @returns {Promise<{dataset_id: string, meshes: Array, total_count: number, verified_count: number}>}
+     */
+    async listDatasetMeshes(datasetId) {
+        return this.request(`/datasets/${encodeURIComponent(datasetId)}/meshes`);
+    }
+
+    /**
+     * Download a dataset mesh PLY file as a Blob
+     * @param {string} datasetId
+     * @param {string} meshId
+     * @returns {Promise<Blob>}
+     */
+    async downloadDatasetMesh(datasetId, meshId) {
+        const url = `${this.serverUrl}/datasets/${encodeURIComponent(datasetId)}/meshes/${encodeURIComponent(meshId)}/download`;
+        const response = await fetch(url, {
+            headers: { 'X-API-Key': this.apiToken }
+        });
+        if (!response.ok) {
+            throw new Error(`Download failed: ${response.status}`);
+        }
+        return response.blob();
+    }
+
+    /**
+     * Get precomputed model output for a dataset mesh.
+     * Returns the same shape as inference with returnModelOutput=true.
+     * @param {string} datasetId
+     * @param {string} meshId
+     * @returns {Promise<{edge_predictions: number[], face_adjacency: number[], num_faces: number}>}
+     */
+    async getDatasetModelOutput(datasetId, meshId) {
+        return this.request(
+            `/datasets/${encodeURIComponent(datasetId)}/meshes/${encodeURIComponent(meshId)}/model-output`
+        );
+    }
+
+    /**
+     * List verification states for a dataset mesh
+     * @param {string} datasetId
+     * @param {string} meshId
+     * @returns {Promise<{mesh_id: string, states: Array, total_count: number}>}
+     */
+    async listDatasetMeshStates(datasetId, meshId) {
+        return this.request(
+            `/datasets/${encodeURIComponent(datasetId)}/meshes/${encodeURIComponent(meshId)}/states`
+        );
+    }
+
+    /**
+     * Load a single dataset mesh state with full data (edge indices and metadata)
+     * @param {string} datasetId
+     * @param {string} meshId
+     * @param {string} stateId
+     * @returns {Promise<{state_id: string, edge_indices: number[], metadata: Object}>}
+     */
+    async loadDatasetMeshState(datasetId, meshId, stateId) {
+        return this.request(
+            `/datasets/${encodeURIComponent(datasetId)}/meshes/${encodeURIComponent(meshId)}/states/${encodeURIComponent(stateId)}`
+        );
+    }
+
+    /**
+     * Save a verification state for a dataset mesh
+     * @param {string} datasetId
+     * @param {string} meshId
+     * @param {number[]} edgeIndices
+     * @param {string} name
+     * @param {string} description
+     * @param {Object} metadata - Should include { verdict: 'accept'|'reject', ... }
+     * @returns {Promise<{state_id: string, name: string, created_at: string, edge_count: number}>}
+     */
+    async saveDatasetMeshState(datasetId, meshId, edgeIndices, name = '', description = '', metadata = null) {
+        return this.request(
+            `/datasets/${encodeURIComponent(datasetId)}/meshes/${encodeURIComponent(meshId)}/states`,
+            {
+                method: 'POST',
+                body: JSON.stringify({
+                    edge_indices: edgeIndices,
+                    name,
+                    description,
+                    metadata,
+                })
+            }
+        );
+    }
 }
 
 // Singleton instance

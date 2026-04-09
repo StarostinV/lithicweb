@@ -959,9 +959,9 @@ export class CloudStoragePanel {
             // Create Annotation object from cloud data
             // This is the canonical representation that will be saved to library
             const annotation = this._createAnnotationFromCloudState(stateData, stateId);
-            
-            // Apply the state to the mesh view
-            this.applyState(stateData);
+
+            // Apply to mesh — fresh annotation ID prevents library overwrite
+            this.meshView.applyExternalAnnotation(annotation, 'cloud');
             
             this.setStatus('State loaded successfully!', 'success');
             
@@ -1114,68 +1114,6 @@ export class CloudStoragePanel {
             arrows: [], // Cloud states don't currently store arrows
             metadata: metadata
         });
-    }
-
-    /**
-     * Apply a loaded state to the mesh.
-     * @param {Object} stateData - The state data to apply
-     * @param {Array<number>} stateData.edge_indices - Array of edge indices to apply
-     * @param {Object} [stateData.metadata] - Optional metadata for the state
-     */
-    /**
-     * Apply loaded state data to the mesh view.
-     * 
-     * Architecture:
-     * - workingAnnotation is THE source of truth for current state
-     * - Cloud is just storage (we load FROM it into workingAnnotation)
-     * - History stores snapshots for undo/redo
-     * 
-     * @param {Object} stateData - State data from cloud
-     */
-    applyState(stateData) {
-        if (!stateData || !Array.isArray(stateData.edge_indices)) {
-            console.error('[CloudStorage] Invalid state data received:', stateData);
-            this.setStatus('Failed to apply state: invalid data format', 'error');
-            return;
-        }
-        
-        const edgeIndices = new Set(stateData.edge_indices);
-        const annotationName = stateData.name || stateData.metadata?.name || 'Cloud state';
-        
-        // Update workingAnnotation (THE source of truth)
-        if (this.meshView.workingAnnotation) {
-            Object.assign(this.meshView.workingAnnotation.metadata, {
-                ...(stateData.metadata || {}),
-                name: annotationName,
-                source: 'cloud',
-            });
-        }
-        
-        // Record to history for undo/redo
-        this.meshView.startDrawOperation('cloud');
-        
-        // Clear current edges
-        this.meshView.currentEdgeIndices.forEach(index => {
-            this.meshView.edgeLabels[index] = 0;
-            this.meshView.colorVertex(index, this.meshView.objectColor);
-        });
-        this.meshView.currentEdgeIndices.clear();
-        
-        // Apply loaded edges
-        edgeIndices.forEach(index => {
-            if (index < this.meshView.edgeLabels.length) {
-                this.meshView.edgeLabels[index] = 1;
-                this.meshView.colorVertex(index, this.meshView.edgeColor);
-                this.meshView.currentEdgeIndices.add(index);
-            }
-        });
-        
-        this.meshView.finishDrawOperation();
-        
-        // Update segments if auto-segmentation is enabled
-        if (document.getElementById('auto-segments')?.checked) {
-            this.meshView.updateSegments();
-        }
     }
 
     /**

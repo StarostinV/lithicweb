@@ -34,6 +34,7 @@ import { MeshView } from './components/MeshView.js';
 import { AnnotationLibrary } from './utils/AnnotationLibrary.js';
 import { ScarOrderPanel } from './components/scarOrderPanel.js';
 import { AnalysisPanel } from './components/analysisPanel.js';
+import { FastVerificationPanel } from './components/fastVerificationPanel.js';
 import { MeasureTool } from './components/measureTool.js';
 import { captureScreenshot } from './utils/screenshotExporter.js';
 
@@ -124,6 +125,9 @@ const scarOrderPanel = new ScarOrderPanel(meshView, mode);
 
 // Analysis panel (mesh & annotation statistics)
 const analysisPanel = new AnalysisPanel(meshView, meshLoader, userConfig, mode);
+
+// Fast verification panel (bulk dataset verification)
+const fastVerificationPanel = new FastVerificationPanel(meshView, meshLoader);
 
 // Measure tool (distance & angle measurement)
 const measureTool = new MeasureTool(meshView, mode, userConfig, scene);
@@ -392,7 +396,8 @@ eventBus.on(Events.SWITCH_PANEL, (data) => {
         'cloudStoragePanel': { btnId: 'cloudStoragePanelBtn', onShow: () => cloudStoragePanel.onShow() },
         'settingsPanel': { btnId: 'settingsPanelBtn', onShow: () => settingsPanel.onShow() },
         'scarOrderPanel': { btnId: 'scarOrderPanelBtn', onShow: () => scarOrderPanel.onShow() },
-        'analysisPanel': { btnId: 'analysisPanelBtn', onShow: () => analysisPanel.onShow() }
+        'analysisPanel': { btnId: 'analysisPanelBtn', onShow: () => analysisPanel.onShow() },
+        'fastVerificationPanel': { btnId: 'fastVerificationPanelBtn', onShow: () => fastVerificationPanel.onShow() }
     };
     
     const config = panelConfig[panelId];
@@ -470,6 +475,14 @@ document.getElementById('analysisPanelBtn').addEventListener('click', () => {
         onShow: () => analysisPanel.onShow()
     });
     setActiveNavBtn('analysisPanelBtn');
+    mode.setMode(MODES.VIEW, true);
+});
+
+document.getElementById('fastVerificationPanelBtn')?.addEventListener('click', () => {
+    showHidePanel('fastVerificationPanel', {
+        onShow: () => fastVerificationPanel.onShow()
+    });
+    setActiveNavBtn('fastVerificationPanelBtn');
     mode.setMode(MODES.VIEW, true);
 });
 

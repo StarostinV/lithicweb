@@ -496,6 +496,33 @@ export class MeshView {
         this._restoreEdgeState(edgeIndices);
     }
 
+    /**
+     * Apply an external annotation to the mesh, replacing the current working state.
+     * Records the change in history for undo/redo.
+     *
+     * This is the single entry point for model inference, cloud loads, and library loads.
+     * It sets workingAnnotation to the given annotation, which controls whether
+     * _syncMetadataToLibrary can write back:
+     * - Library loads pass an annotation with the library ID → sync works (intentional)
+     * - Model/cloud pass annotations with fresh IDs → no library match → no overwrite
+     *
+     * @param {Annotation} annotation - Fully-formed annotation to apply
+     * @param {string} source - History label: 'model', 'cloud', 'library-load'
+     */
+    applyExternalAnnotation(annotation, source) {
+        if (!this._ensureThreeMesh()) return;
+
+        this.workingAnnotation = annotation.clone();
+
+        this.startDrawOperation(source);
+        this._restoreEdgeState(annotation.edgeIndices);
+        this.finishDrawOperation();
+
+        if (document.getElementById('auto-segments')?.checked) {
+            this.updateSegments();
+        }
+    }
+
     // ========================================
     // Raycasting / Intersection Helpers
     // ========================================

@@ -480,22 +480,9 @@ export class LibraryPanel {
             return;
         }
 
-        // Update workingAnnotation (THE source of truth)
-        if (this.meshView.workingAnnotation) {
-            this.meshView.workingAnnotation.id = annotation.id;
-            this.meshView.workingAnnotation.metadata = { ...annotation.metadata };
-        }
-
-        // Record to history for undo/redo
-        this.meshView.startDrawOperation('library-load');
-        this.meshView._restoreEdgeState(annotation.edgeIndices);
-        this.meshView.finishDrawOperation();
-
-        // Update segments
-        const autoSegments = document.getElementById('auto-segments');
-        if (autoSegments?.checked) {
-            this.meshView.updateSegments();
-        }
+        // Apply to mesh — library annotation keeps its ID so _syncMetadataToLibrary
+        // correctly writes back edits to the same library entry
+        this.meshView.applyExternalAnnotation(annotation, 'library-load');
 
         // Emit event to update UI
         eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {

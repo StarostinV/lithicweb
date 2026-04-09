@@ -119,6 +119,10 @@
                         <i class="fas fa-cloud"></i>
                         <span>Cloud</span>
                     </button>
+                    <button id="fastVerificationPanelBtn" class="nav-btn" title="Fast Verification">
+                        <i class="fas fa-bolt"></i>
+                        <span>Verify</span>
+                    </button>
                 </div>
             </div>
             <div class="nav-group">
@@ -203,6 +207,10 @@
             <button class="nav-btn mobile-nav-btn" data-panel="cloudStoragePanel" title="Cloud Storage">
                 <i class="fas fa-cloud"></i>
                 <span>Cloud</span>
+            </button>
+            <button class="nav-btn mobile-nav-btn" data-panel="fastVerificationPanel" title="Fast Verification">
+                <i class="fas fa-bolt"></i>
+                <span>Verify</span>
             </button>
         </div>
     </div>
@@ -1607,6 +1615,20 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- ===== FAST VERIFICATION PANEL ===== -->
+        <div id="fastVerificationPanel" class="panel hidden">
+            <div class="panel-header">
+                <div class="panel-header-icon verify-icon"><i class="fas fa-bolt"></i></div>
+                <div class="panel-header-text">
+                    <h2>Fast Verification</h2>
+                    <span class="panel-subtitle">Bulk dataset verification</span>
+                </div>
+            </div>
+            <div class="panel-content" id="fvPanelContent">
+                <!-- Content built dynamically by FastVerificationPanel -->
             </div>
         </div>
 
