@@ -1,1 +1,1 @@
-web: npm run build && npx serve -s dist
+web: serve -s dist
