@@ -621,6 +621,51 @@
     color: var(--primary-light);
 }
 
+/* Laconic model status chips (device + cache) */
+.model-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.model-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+    color: var(--gray-600);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.model-chip i {
+    font-size: 11px;
+}
+
+/* Confirmed-on state: solid accent once we know the real backend / cache status */
+.model-chip.is-gpu {
+    background: rgba(124, 58, 237, 0.1);
+    border-color: rgba(124, 58, 237, 0.25);
+    color: var(--purple);
+}
+
+.model-chip.is-cached {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.25);
+    color: #047857;
+}
+
+/* Tentative (pre-run capability hint / not-yet-downloaded): muted */
+.model-chip.is-tentative {
+    opacity: 0.75;
+}
+
 /* Progress bar */
 .inference-progress {
     margin-top: 12px;

@@ -31,7 +31,7 @@ import {
 } from '../geometry/faceUnionFind.js';
 import { runClientPostprocessing } from '../utils/postprocess.js';
 import { runLocalInference } from '../inference/runLocalInference.js';
-import { webgpuAvailable } from '../inference/onnxModel.js';
+import { webgpuAvailable, isModelCached } from '../inference/onnxModel.js';
 import {
     MODEL_REGISTRY,
     DEFAULT_MODEL_ID,
@@ -40,6 +40,19 @@ import {
     customModel,
     modelUrls as hfModelUrls,
 } from '../inference/modelRegistry.js';
+
+/** Human-readable default for a config param (resolves select options to their label). */
+function formatDefault(meta, value) {
+    if (value === null || value === undefined) return 'None';
+    if (meta.type === 'select' && Array.isArray(meta.options)) {
+        const match = meta.options.find(o =>
+            (o && typeof o === 'object' && 'value' in o)
+                ? JSON.stringify(o.value) === JSON.stringify(value)
+                : o === value);
+        if (match) return typeof match === 'object' ? match.label : String(match);
+    }
+    return String(value);
+}
 
 export class ModelPanel {
     constructor(meshView, connectionManager = null) {
@@ -63,6 +76,7 @@ export class ModelPanel {
         this.modelId = DEFAULT_MODEL_ID; // selected Hugging Face model (see modelRegistry)
         this.customRepo = '';            // HF "org/repo[@rev]" when modelId === custom
         this.maxLocalFaces = 1_500_000;  // above this, fall back to server (if configured)
+        this.lastProvider = null;        // real ONNX execution provider from the last run ('webgpu'|'wasm')
 
         this.setupUI();
         this.setupEventListeners();
@@ -125,6 +139,8 @@ export class ModelPanel {
         this.modelPrecisionSegment = document.getElementById('modelPrecisionSegment');
         this.modelSelect = document.getElementById('modelSelect');
         this.customModelRepo = document.getElementById('customModelRepo');
+        this.modelDeviceChip = document.getElementById('modelDeviceChip');
+        this.modelCacheChip = document.getElementById('modelCacheChip');
         this.inferenceProgress = document.getElementById('inferenceProgress');
         this.inferenceProgressLabel = document.getElementById('inferenceProgressLabel');
         this.inferenceProgressFill = document.getElementById('inferenceProgressFill');
@@ -132,6 +148,7 @@ export class ModelPanel {
         this._populateModelSelect();
         this._syncPrecisionSegment();
         this._updateInferenceModeUI();
+        this._updateModelStatus();
 
         // Reset to defaults buttons (per-category)
         this.resetNnConfigBtn = document.getElementById('resetNnConfigBtn');
@@ -200,7 +217,7 @@ export class ModelPanel {
         const defaultVal = DEFAULT_INFERENCE_CONFIG[key];
         const hint = document.createElement('span');
         hint.className = 'config-param-default';
-        hint.textContent = `Default: ${defaultVal === null ? 'None' : defaultVal}`;
+        hint.textContent = `Default: ${formatDefault(meta, defaultVal)}`;
         header.appendChild(hint);
 
         wrapper.appendChild(header);
@@ -256,16 +273,23 @@ export class ModelPanel {
             select.id = `config_${key}`;
             select.className = 'control-select';
 
-            meta.options.forEach(opt => {
+            // Options may be primitives (value === label) or { value, label } objects,
+            // where value can be a tuple (e.g. n_angles). Index into options on change so
+            // non-string values survive the round-trip through the DOM.
+            const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+            const opts = meta.options.map(o =>
+                (o && typeof o === 'object' && 'value' in o) ? o : { value: o, label: String(o) });
+
+            opts.forEach((opt, i) => {
                 const option = document.createElement('option');
-                option.value = opt;
-                option.textContent = opt;
-                option.selected = this.config[key] === opt;
+                option.value = String(i);
+                option.textContent = opt.label;
+                option.selected = eq(this.config[key], opt.value);
                 select.appendChild(option);
             });
 
             select.addEventListener('change', (e) => {
-                this.config[key] = e.target.value;
+                this.config[key] = opts[parseInt(e.target.value)].value;
                 this._onConfigChanged(key, meta);
             });
 
@@ -329,17 +353,20 @@ export class ModelPanel {
                 if (!btn) return;
                 this.modelPrecision = btn.dataset.precision;
                 this._syncPrecisionSegment();
+                this._updateModelStatus();
             });
         }
         if (this.modelSelect) {
             this.modelSelect.addEventListener('change', (e) => {
                 this.modelId = e.target.value;
                 this._updateCustomRepoVisibility();
+                this._updateModelStatus();
             });
         }
         if (this.customModelRepo) {
             this.customModelRepo.addEventListener('input', (e) => {
                 this.customRepo = e.target.value;
+                this._updateModelStatus();
             });
         }
 
@@ -663,11 +690,7 @@ export class ModelPanel {
         if (this.showingHeatmap) this._hideHeatmap();
 
         try {
-            const hasGpu = await webgpuAvailable();
-            this.setStatus(
-                `Running in-browser inference (${this.modelPrecision}, ${hasGpu ? 'WebGPU' : 'CPU/wasm'})…`,
-                'info'
-            );
+            this.setStatus(`Running in-browser inference (${this.modelPrecision})…`, 'info');
             this._showProgress('Preparing…', 0);
 
             const model = this.modelId === CUSTOM_MODEL_ID
@@ -680,11 +703,17 @@ export class ModelPanel {
             }
 
             const result = await runLocalInference(positions, indices, {
+                nAngles: this.config.n_angles,
                 precision: this.modelPrecision,
                 modelUrls: hfModelUrls(model),
                 onProgress: (fraction, label) => this._showProgress(label, fraction),
             });
             this._hideProgress();
+
+            // Record the real execution provider ONNX actually used (may differ from the
+            // capability guess if WebGPU init failed and it fell back to wasm) and reflect it.
+            this.lastProvider = result.provider;
+            this._updateModelStatus();
 
             // Adapt to the cached-model-output shape consumed by client-side postprocessing.
             this.cachedModelOutput = {
@@ -769,6 +798,68 @@ export class ModelPanel {
         this.modelSelect.appendChild(custom);
         this.modelSelect.value = this.modelId;
         this._updateCustomRepoVisibility();
+    }
+
+    /**
+     * Refresh the laconic model status chips: which compute device inference uses
+     * (real provider after a run, capability hint before) and whether the selected
+     * model+precision is already cached locally.
+     * @private
+     */
+    async _updateModelStatus() {
+        // Snapshot every input up front: this method awaits (capability probe + IndexedDB
+        // lookup), and the user can change model/precision mid-flight. Reading this.* after
+        // an await would mismatch the cache result with a different precision's label
+        // (e.g. fp16 inheriting fp32's "cached" state). A monotonic token then ensures only
+        // the most recent invocation writes to the DOM, dropping any stale in-flight call.
+        const seq = (this._modelStatusSeq = (this._modelStatusSeq || 0) + 1);
+        const provider = this.lastProvider;
+        const precision = this.modelPrecision;
+        const isCustom = this.modelId === CUSTOM_MODEL_ID;
+        const customEmpty = isCustom && !this.customRepo.trim();
+        const model = isCustom ? customModel(this.customRepo) : getModel(this.modelId);
+        const label = customEmpty ? 'Custom' : model.label;
+
+        // Resolve async facts against the snapshot. With a real provider known, the GPU
+        // state is decided — skip the capability probe.
+        const [gpuActive, cached] = await Promise.all([
+            provider ? Promise.resolve(provider === 'webgpu') : webgpuAvailable().catch(() => false),
+            customEmpty ? Promise.resolve(false)
+                : isModelCached(hfModelUrls(model)[precision]).catch(() => false),
+        ]);
+
+        // A newer call superseded us while awaiting — let it own the DOM.
+        if (seq !== this._modelStatusSeq) return;
+
+        // Device chip: the real ONNX execution provider once we've run, else a tentative
+        // capability hint. GPU == WebGPU, CPU == wasm.
+        if (this.modelDeviceChip) {
+            if (provider) {
+                this.modelDeviceChip.className = `model-chip ${gpuActive ? 'is-gpu' : ''}`.trim();
+                this.modelDeviceChip.innerHTML =
+                    `<i class="fas ${gpuActive ? 'fa-bolt' : 'fa-microchip'}"></i> ${gpuActive ? 'GPU (WebGPU)' : 'CPU (wasm)'}`;
+                this.modelDeviceChip.title = `In-browser inference ran on the ${provider} execution provider`;
+            } else {
+                this.modelDeviceChip.className = 'model-chip is-tentative';
+                this.modelDeviceChip.innerHTML =
+                    `<i class="fas ${gpuActive ? 'fa-bolt' : 'fa-microchip'}"></i> ${gpuActive ? 'GPU available' : 'CPU only'}`;
+                this.modelDeviceChip.title = gpuActive
+                    ? 'WebGPU is available — inference will try the GPU first. Run inference to confirm.'
+                    : 'WebGPU unavailable — inference will run on the CPU (wasm).';
+            }
+        }
+
+        // Cache chip: model name + whether its onnx file is in IndexedDB.
+        if (this.modelCacheChip) {
+            this.modelCacheChip.className = `model-chip ${cached ? 'is-cached' : 'is-tentative'}`;
+            this.modelCacheChip.innerHTML =
+                `<i class="fas ${cached ? 'fa-database' : 'fa-cloud-arrow-down'}"></i> ${label} · ${precision}`;
+            this.modelCacheChip.title = customEmpty
+                ? 'Enter a Hugging Face repo to select a custom model'
+                : cached
+                    ? `${label} (${precision}) is cached locally — no download needed`
+                    : `${label} (${precision}) will download from Hugging Face on first run`;
+        }
     }
 
     /** Show the custom-repo input only when the "Custom…" model is selected. */

@@ -17,7 +17,7 @@ import { EdgeAccumulator, propagateGamma } from './backProject.js';
 import { getModel, modelUrls as hfModelUrls, DEFAULT_MODEL_ID } from './modelRegistry.js';
 
 const DEFAULTS = {
-  nAngles: 6,
+  nAngles: [6, 6, 6],   // (n_x, n_y, n_z) -> 10 canonical views, matches training config
   resolution: 512,
   gamma: 0.95,
   maxSteps: 500,

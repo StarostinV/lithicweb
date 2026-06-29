@@ -977,6 +977,10 @@
                             <input id="customModelRepo" class="control-input" type="text"
                                    placeholder="org/repo  (e.g. neurolithic/unet_v1)"
                                    style="width: 100%; margin-top: 6px; display: none;">
+                            <div class="model-status" id="modelStatus">
+                                <span class="model-chip" id="modelDeviceChip" title="Compute device used for in-browser inference"></span>
+                                <span class="model-chip" id="modelCacheChip" title="Whether this model is downloaded and cached locally"></span>
+                            </div>
                         </div>
 
                         <div class="precision-row">

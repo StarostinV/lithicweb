@@ -180,7 +180,7 @@ class LithicClient {
     async createSession(config = null) {
         return this.request('/inference/sessions', {
             method: 'POST',
-            body: config ? JSON.stringify({ config }) : JSON.stringify({})
+            body: config ? JSON.stringify({ config: toServerConfig(config) }) : JSON.stringify({})
         });
     }
 
@@ -213,7 +213,7 @@ class LithicClient {
     async updateSessionConfig(sessionId, config) {
         return this.request(`/inference/sessions/${encodeURIComponent(sessionId)}/config`, {
             method: 'PATCH',
-            body: JSON.stringify(config)
+            body: JSON.stringify(toServerConfig(config))
         });
     }
 
@@ -508,9 +508,31 @@ class LithicClient {
 // Singleton instance
 export const lithicClient = new LithicClient();
 
+// Rotation-view presets. `value` is the (n_x, n_y, n_z) tuple consumed by the local
+// inference path (canonicalRotations); `label` shows the deduplicated view count.
+// The server only accepts a scalar n (views about the long axis); serverNAngles()
+// maps a tuple to its n_x for that path.
+export const N_ANGLES_OPTIONS = [
+    { value: [6, 6, 6], label: '10 — all axes (recommended)' },
+    { value: [6, 0, 0], label: '6 — long axis only (faster)' },
+    { value: [8, 8, 8], label: '14 — denser (experimental)' },
+];
+
+/** Map an n_angles config value (tuple or scalar) to the integer the server expects. */
+export function serverNAngles(nAngles) {
+    if (Array.isArray(nAngles)) return nAngles[0] || 1;
+    return nAngles;
+}
+
+/** Clone a UI config into the shape the server accepts (n_angles must be a scalar int). */
+function toServerConfig(config) {
+    if (!config || config.n_angles === undefined) return config;
+    return { ...config, n_angles: serverNAngles(config.n_angles) };
+}
+
 // Default inference config values (from server defaults)
 export const DEFAULT_INFERENCE_CONFIG = {
-    n_angles: 6,
+    n_angles: [6, 6, 6],   // (n_x, n_y, n_z) view config; 10 views after dedup. See N_ANGLES_OPTIONS.
     max_steps: 5000,
     gamma: 0.95,
     min_segment_size: 50,
@@ -527,12 +549,11 @@ export const DEFAULT_INFERENCE_CONFIG = {
 // Parameters are categorized: 'nn' requires server round-trip, 'postprocess' can rerun locally
 export const CONFIG_PARAMS = {
     n_angles: {
-        label: 'Rotation Angles',
-        type: 'number',
-        min: 1,
-        max: 360,
-        step: 1,
-        description: 'Number of rotation angles for inference',
+        label: 'Rotation Views',
+        type: 'select',
+        options: N_ANGLES_OPTIONS,
+        description: 'Orthographic views used for inference. 10 (rotations about all 3 PCA axes) ' +
+            'matches the trained model; 6 (long axis only) is faster; 14 is denser/experimental.',
         category: 'nn'
     },
     zoom: {

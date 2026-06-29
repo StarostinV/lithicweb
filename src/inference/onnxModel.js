@@ -65,6 +65,11 @@ export async function webgpuAvailable() {
     !!(await navigator.gpu?.requestAdapter().catch(() => null));
 }
 
+/** Whether the model file at `url` is already cached in IndexedDB (downloaded once). */
+export async function isModelCached(url) {
+  return !!(await idbGet(url).catch(() => null));
+}
+
 export class OnnxModel {
   constructor() { this.session = null; this.provider = null; }
 
