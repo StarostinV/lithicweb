@@ -37,6 +37,15 @@ module.exports = (env, argv) => {
                         from: 'tests/fixtures/ply/test_annotated_mesh.ply',
                         to: 'demo/showcase.ply',
                     },
+                    // ONNX models are loaded from Hugging Face at runtime (see
+                    // src/inference/modelRegistry.js) and cached in IndexedDB — not bundled.
+                    // Only the onnxruntime-web wasm runtime is served locally.
+                    {
+                        from: 'node_modules/onnxruntime-web/dist',
+                        to: 'ort',
+                        filter: (p) => /\.(wasm|mjs)$/.test(p),
+                        noErrorOnMissing: true,
+                    },
                 ]
             }),
         ],

@@ -30,6 +30,16 @@ import {
     normalizeEdges,
 } from '../geometry/faceUnionFind.js';
 import { runClientPostprocessing } from '../utils/postprocess.js';
+import { runLocalInference } from '../inference/runLocalInference.js';
+import { webgpuAvailable } from '../inference/onnxModel.js';
+import {
+    MODEL_REGISTRY,
+    DEFAULT_MODEL_ID,
+    CUSTOM_MODEL_ID,
+    getModel,
+    customModel,
+    modelUrls as hfModelUrls,
+} from '../inference/modelRegistry.js';
 
 export class ModelPanel {
     constructor(meshView, connectionManager = null) {
@@ -46,6 +56,13 @@ export class ModelPanel {
         this.cachedModelOutput = null; // { edgePredictions: Float64Array, faceAdjacencyFlat: Int32Array, numFaces: number }
         this.showingHeatmap = false;
         this._postprocessDebounceTimer = null;
+
+        // Client-side (in-browser) inference state
+        this.localInference = true;      // default: run the model in-browser
+        this.modelPrecision = 'fp32';    // 'fp32' (exact) | 'fp16' (smaller download)
+        this.modelId = DEFAULT_MODEL_ID; // selected Hugging Face model (see modelRegistry)
+        this.customRepo = '';            // HF "org/repo[@rev]" when modelId === custom
+        this.maxLocalFaces = 1_500_000;  // above this, fall back to server (if configured)
 
         this.setupUI();
         this.setupEventListeners();
@@ -102,6 +119,19 @@ export class ModelPanel {
         // Client-side postprocessing elements
         this.postprocessToggle = document.getElementById('clientPostprocessToggle');
         this.showModelOutputBtn = document.getElementById('showModelOutputBtn');
+
+        // Client-side (in-browser) inference controls
+        this.localInferenceToggle = document.getElementById('localInferenceToggle');
+        this.modelPrecisionSegment = document.getElementById('modelPrecisionSegment');
+        this.modelSelect = document.getElementById('modelSelect');
+        this.customModelRepo = document.getElementById('customModelRepo');
+        this.inferenceProgress = document.getElementById('inferenceProgress');
+        this.inferenceProgressLabel = document.getElementById('inferenceProgressLabel');
+        this.inferenceProgressFill = document.getElementById('inferenceProgressFill');
+        if (this.localInferenceToggle) this.localInferenceToggle.checked = this.localInference;
+        this._populateModelSelect();
+        this._syncPrecisionSegment();
+        this._updateInferenceModeUI();
 
         // Reset to defaults buttons (per-category)
         this.resetNnConfigBtn = document.getElementById('resetNnConfigBtn');
@@ -282,6 +312,34 @@ export class ModelPanel {
                     this.cachedModelOutput = null;
                     this._updateHeatmapButton();
                 }
+            });
+        }
+
+        // Local (in-browser) inference toggle + precision
+        if (this.localInferenceToggle) {
+            this.localInferenceToggle.addEventListener('change', (e) => {
+                this.localInference = e.target.checked;
+                console.log('[ModelPanel] Local inference:', this.localInference);
+                this._updateInferenceModeUI();
+            });
+        }
+        if (this.modelPrecisionSegment) {
+            this.modelPrecisionSegment.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-precision]');
+                if (!btn) return;
+                this.modelPrecision = btn.dataset.precision;
+                this._syncPrecisionSegment();
+            });
+        }
+        if (this.modelSelect) {
+            this.modelSelect.addEventListener('change', (e) => {
+                this.modelId = e.target.value;
+                this._updateCustomRepoVisibility();
+            });
+        }
+        if (this.customModelRepo) {
+            this.customModelRepo.addEventListener('input', (e) => {
+                this.customRepo = e.target.value;
             });
         }
 
@@ -496,6 +554,15 @@ export class ModelPanel {
     }
 
     async runInference() {
+        // Client-side (in-browser) inference is the default; falls back to the server
+        // path inside runLocalInferenceFlow() when unsupported or on error.
+        if (this.localInference) {
+            return this.runLocalInferenceFlow();
+        }
+        return this.runServerInference();
+    }
+
+    async runServerInference() {
         if (!lithicClient.isConfigured()) {
             this.setStatus('Please configure server settings first', 'error');
             return;
@@ -566,6 +633,148 @@ export class ModelPanel {
             this.setStatus('Inference failed: ' + msg, 'error');
         } finally {
             this.setLoading(false);
+        }
+    }
+
+    /**
+     * Run the model fully in-browser (render -> ONNX -> back-project), then postprocess
+     * locally. Falls back to the server path when the mesh is too large for local inference
+     * and a server session is available.
+     */
+    async runLocalInferenceFlow() {
+        if (!this.meshView || !this.meshView.positions || !this.meshView.indices) {
+            this.setStatus('Please load a mesh first', 'error');
+            return;
+        }
+        const positions = this.meshView.positions;
+        const indices = this.meshView.indices;
+        const numFaces = indices.length / 3;
+
+        // Size guard: very large meshes fall back to the server if one is configured.
+        if (numFaces > this.maxLocalFaces) {
+            if (lithicClient.isConfigured() && this.currentSession?.has_data) {
+                this.setStatus(`Mesh too large for in-browser inference (${numFaces} faces); using server…`, 'info');
+                return this.runServerInference();
+            }
+            this.setStatus(`Mesh has ${numFaces} faces — large for in-browser inference; this may be slow.`, 'info');
+        }
+
+        this.setLoading(true);
+        if (this.showingHeatmap) this._hideHeatmap();
+
+        try {
+            const hasGpu = await webgpuAvailable();
+            this.setStatus(
+                `Running in-browser inference (${this.modelPrecision}, ${hasGpu ? 'WebGPU' : 'CPU/wasm'})…`,
+                'info'
+            );
+            this._showProgress('Preparing…', 0);
+
+            const model = this.modelId === CUSTOM_MODEL_ID
+                ? customModel(this.customRepo)
+                : getModel(this.modelId);
+            if (this.modelId === CUSTOM_MODEL_ID && !this.customRepo.trim()) {
+                this.setStatus('Enter a Hugging Face repo (e.g. neurolithic/unet_v1) for the custom model.', 'error');
+                this.setLoading(false);
+                return;
+            }
+
+            const result = await runLocalInference(positions, indices, {
+                precision: this.modelPrecision,
+                modelUrls: hfModelUrls(model),
+                onProgress: (fraction, label) => this._showProgress(label, fraction),
+            });
+            this._hideProgress();
+
+            // Adapt to the cached-model-output shape consumed by client-side postprocessing.
+            this.cachedModelOutput = {
+                edgePredictions: Float64Array.from(result.edge_predictions),
+                faceAdjacencyFlat: result.face_adjacency,
+                numFaces: result.num_faces,
+            };
+            // Local inference always produces model output -> use the local postprocessing path.
+            this.clientSidePostprocessing = true;
+            if (this.postprocessToggle) this.postprocessToggle.checked = true;
+
+            this._updateHeatmapButton();
+            this.setStatus('Running postprocessing locally…', 'info');
+            this.rerunPostprocessingLocally();
+            this.setStatus(
+                `Done (in-browser, ${result.provider}). Adjust postprocessing params for instant updates.`,
+                'success'
+            );
+        } catch (e) {
+            console.error('[ModelPanel] Local inference failed:', e);
+            if (lithicClient.isConfigured() && this.currentSession?.has_data) {
+                this.setStatus('In-browser inference failed; falling back to server…', 'info');
+                this.setLoading(false);
+                return this.runServerInference();
+            }
+            this.setStatus('In-browser inference failed: ' + (e?.message || String(e)), 'error');
+        } finally {
+            this._hideProgress();
+            this.setLoading(false);
+        }
+    }
+
+    /** Show/update the inference progress bar. fraction in [0,1], or null for indeterminate. */
+    _showProgress(label, fraction) {
+        if (!this.inferenceProgress) return;
+        this.inferenceProgress.hidden = false;
+        if (this.inferenceProgressLabel) this.inferenceProgressLabel.textContent = label || '';
+        if (this.inferenceProgressFill) {
+            const indeterminate = fraction === null || fraction === undefined;
+            this.inferenceProgress.classList.toggle('indeterminate', indeterminate);
+            this.inferenceProgressFill.style.width = indeterminate
+                ? '100%'
+                : `${Math.max(0, Math.min(1, fraction)) * 100}%`;
+        }
+    }
+
+    _hideProgress() {
+        if (this.inferenceProgress) {
+            this.inferenceProgress.hidden = true;
+            this.inferenceProgress.classList.remove('indeterminate');
+        }
+    }
+
+    /** Show/hide server-only controls based on the in-browser inference toggle. */
+    _updateInferenceModeUI() {
+        if (this.uploadToServerBtn) {
+            this.uploadToServerBtn.style.display = this.localInference ? 'none' : '';
+        }
+    }
+
+    /** Reflect this.modelPrecision in the segmented control's active button. */
+    _syncPrecisionSegment() {
+        if (!this.modelPrecisionSegment) return;
+        for (const btn of this.modelPrecisionSegment.querySelectorAll('[data-precision]')) {
+            btn.classList.toggle('active', btn.dataset.precision === this.modelPrecision);
+        }
+    }
+
+    /** Fill the model dropdown from the registry, plus a "Custom…" entry. */
+    _populateModelSelect() {
+        if (!this.modelSelect) return;
+        this.modelSelect.innerHTML = '';
+        for (const m of MODEL_REGISTRY) {
+            const opt = document.createElement('option');
+            opt.value = m.id;
+            opt.textContent = m.label;
+            this.modelSelect.appendChild(opt);
+        }
+        const custom = document.createElement('option');
+        custom.value = CUSTOM_MODEL_ID;
+        custom.textContent = 'Custom Hugging Face repo…';
+        this.modelSelect.appendChild(custom);
+        this.modelSelect.value = this.modelId;
+        this._updateCustomRepoVisibility();
+    }
+
+    /** Show the custom-repo input only when the "Custom…" model is selected. */
+    _updateCustomRepoVisibility() {
+        if (this.customModelRepo) {
+            this.customModelRepo.style.display = this.modelId === CUSTOM_MODEL_ID ? '' : 'none';
         }
     }
 

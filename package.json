@@ -23,6 +23,7 @@
         "mat-for-js": "^1.1.0",
         "mini-css-extract-plugin": "^2.9.2",
         "nouislider": "^15.8.1",
+        "onnxruntime-web": "^1.19.2",
         "serve": "^14.2.3",
         "style-loader": "^4.0.0",
         "three": "^0.166.0",

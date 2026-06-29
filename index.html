@@ -962,6 +962,42 @@
                             </button>
                         </div>
 
+                        <div class="toggle-row" style="margin-top: 8px;">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="localInferenceToggle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>In-browser inference</span>
+                        </div>
+                        <p class="help-text">Runs the model locally (no server). First run downloads the model from Hugging Face, then it's cached.</p>
+
+                        <div class="precision-row">
+                            <span class="precision-label">Model</span>
+                            <select id="modelSelect" class="control-select" style="width: 100%;"></select>
+                            <input id="customModelRepo" class="control-input" type="text"
+                                   placeholder="org/repo  (e.g. neurolithic/unet_v1)"
+                                   style="width: 100%; margin-top: 6px; display: none;">
+                        </div>
+
+                        <div class="precision-row">
+                            <span class="precision-label">Model precision</span>
+                            <div class="precision-segment" id="modelPrecisionSegment" role="tablist">
+                                <button type="button" class="precision-btn active" data-precision="fp32">
+                                    fp32 <span class="precision-hint">exact · ~120 MB</span>
+                                </button>
+                                <button type="button" class="precision-btn" data-precision="fp16">
+                                    fp16 <span class="precision-hint">smaller · ~60 MB</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="inference-progress" id="inferenceProgress" hidden>
+                            <div class="inference-progress-label" id="inferenceProgressLabel"></div>
+                            <div class="inference-progress-track">
+                                <div class="inference-progress-fill" id="inferenceProgressFill"></div>
+                            </div>
+                        </div>
+
                         <div class="nn-params-toggle" id="nnParamsToggle">
                             <span>Neural Network Parameters</span>
                             <i class="fas fa-chevron-down nn-params-chevron"></i>

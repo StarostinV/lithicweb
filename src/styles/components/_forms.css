@@ -554,3 +554,113 @@
 .btn-reset-inline i {
     font-size: 9px;
 }
+
+/* ============================================================
+   In-browser inference: precision picker + progress bar
+   ============================================================ */
+
+.precision-row {
+    margin-top: 10px;
+}
+
+.precision-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray-600);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.precision-segment {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+}
+
+.precision-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 6px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--gray-600);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.precision-btn:hover {
+    color: var(--gray-700);
+}
+
+.precision-btn.active {
+    background: white;
+    color: var(--purple);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.precision-hint {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--gray-400, #9ca3af);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.precision-btn.active .precision-hint {
+    color: var(--primary-light);
+}
+
+/* Progress bar */
+.inference-progress {
+    margin-top: 12px;
+}
+
+.inference-progress[hidden] {
+    display: none;
+}
+
+.inference-progress-label {
+    font-size: 11px;
+    color: var(--gray-600);
+    margin-bottom: 5px;
+    min-height: 14px;
+}
+
+.inference-progress-track {
+    height: 8px;
+    background: var(--gray-200);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.inference-progress-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--purple) 0%, #7c3aed 100%);
+    transition: width 0.25s ease;
+}
+
+/* Indeterminate: animated moving stripe */
+.inference-progress.indeterminate .inference-progress-fill {
+    width: 40% !important;
+    background: linear-gradient(90deg, transparent, var(--purple), #7c3aed, transparent);
+    animation: inferenceIndeterminate 1.1s ease-in-out infinite;
+    transition: none;
+}
+
+@keyframes inferenceIndeterminate {
+    0%   { transform: translateX(-120%); }
+    100% { transform: translateX(320%); }
+}

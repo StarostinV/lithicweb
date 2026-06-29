@@ -24,6 +24,18 @@ node_modules/
 
 dist/
 
+# onnxruntime-web wasm/mjs runtime. Copied from node_modules by webpack
+# (see webpack.config.js CopyPlugin). Reproducible — do not commit.
+/ort/
+
+# -----------------------------------------------------------------------------
+# Spike / Prototype Scratch
+# -----------------------------------------------------------------------------
+# Throwaway experiments plus large ONNX models and binary fixtures.
+# Not part of the build; kept locally only.
+
+/spike/
+
 # -----------------------------------------------------------------------------
 # Test Coverage
 # -----------------------------------------------------------------------------
