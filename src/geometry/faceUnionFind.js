@@ -54,9 +54,12 @@ function ufUnion(parent, rank, size, x, y) {
  * Flatten all parents to roots (matches Numba _uf_find_all).
  * @param {Int32Array} parent
  */
-function ufFindAll(parent) {
+export function ufFindAll(parent) {
+    // ufFind uses path halving, which does not leave every node pointing at its
+    // root after one pass: assign the root explicitly, otherwise remapByFrequency
+    // turns intermediate nodes into phantom segments (bug fixed 2026-11-04).
     for (let i = 0; i < parent.length; i++) {
-        ufFind(parent, i);
+        parent[i] = ufFind(parent, i);
     }
 }
 
