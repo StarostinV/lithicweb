@@ -19,7 +19,8 @@ describe('Model Panel Defaults', () => {
         });
 
         test('should have expected default values', () => {
-            expect(DEFAULT_INFERENCE_CONFIG.n_angles).toBe(6);
+            // (n_x, n_y, n_z) rotations -> 10 distinct views (same as the server and the paper)
+            expect(DEFAULT_INFERENCE_CONFIG.n_angles).toEqual([6, 6, 6]);
             expect(DEFAULT_INFERENCE_CONFIG.zoom).toBe(1.0);
             expect(DEFAULT_INFERENCE_CONFIG.union_find_max_merge_cost).toBe(0.45);
             expect(DEFAULT_INFERENCE_CONFIG.min_segment_size).toBe(50);
@@ -64,8 +65,11 @@ describe('Model Panel Defaults', () => {
                     expect(meta).toHaveProperty('options');
                     expect(Array.isArray(meta.options)).toBe(true);
                     expect(meta.options.length).toBeGreaterThan(0);
-                    // Default value should be in options
-                    expect(meta.options).toContain(DEFAULT_INFERENCE_CONFIG[key]);
+                    // Default value should be in options; options are primitives or
+                    // { value, label } objects (value may be a tuple, e.g. n_angles)
+                    const values = meta.options.map(o =>
+                        (o && typeof o === 'object' && 'value' in o) ? o.value : o);
+                    expect(values).toContainEqual(DEFAULT_INFERENCE_CONFIG[key]);
                 }
             }
         });
@@ -85,12 +89,12 @@ describe('Model Panel Defaults', () => {
             config.zoom = 5.0;
 
             // Original should be unchanged
-            expect(DEFAULT_INFERENCE_CONFIG.n_angles).toBe(6);
+            expect(DEFAULT_INFERENCE_CONFIG.n_angles).toEqual([6, 6, 6]);
             expect(DEFAULT_INFERENCE_CONFIG.zoom).toBe(1.0);
 
             // Reset by re-spreading
             const reset = { ...DEFAULT_INFERENCE_CONFIG };
-            expect(reset.n_angles).toBe(6);
+            expect(reset.n_angles).toEqual([6, 6, 6]);
             expect(reset.zoom).toBe(1.0);
             expect(reset.union_find_max_merge_cost).toBe(0.45);
         });
@@ -107,8 +111,8 @@ describe('Model Panel Defaults', () => {
         });
 
         test('default hint text for numeric values should show the number', () => {
-            const hintText = `Default: ${DEFAULT_INFERENCE_CONFIG.n_angles}`;
-            expect(hintText).toBe('Default: 6');
+            const hintText = `Default: ${DEFAULT_INFERENCE_CONFIG.min_segment_size}`;
+            expect(hintText).toBe('Default: 50');
         });
 
         test('default hint text for string values should show the string', () => {
