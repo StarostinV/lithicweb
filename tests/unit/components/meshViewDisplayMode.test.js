@@ -87,4 +87,19 @@ describe('MeshView display mode', () => {
         view.updateSegments();
         expectOnlyObjectAndEdge(view, { edgesVisible: false });
     });
+
+    test('edges are visible while an edge tool is active, even if the mode hides them', () => {
+        const view = makeView();
+        view.setDisplayMode({ showEdges: false, showSegments: false });
+        view.setEdgeEditing(true);
+        view.addEdgeVertices([2, 7]);
+        view.updateSegments();
+        expectOnlyObjectAndEdge(view, { edgesVisible: true });
+
+        // Leaving the tool returns to the chosen mode
+        view.setEdgeEditing(false);
+        expectOnlyObjectAndEdge(view, { edgesVisible: false });
+        view.setEdgeEditing(true);
+        expectOnlyObjectAndEdge(view, { edgesVisible: true });
+    });
 });

@@ -234,9 +234,11 @@ export class DualViewManager {
         
         console.log('[DualViewManager] Disabling dual-view mode');
         
-        // In general mode, restore the active view's colors to the mesh
+        // In general mode the two halves are only color snapshots; MeshView
+        // holds a single annotation, so repaint from it rather than restoring
+        // a snapshot that may show a different annotation or display mode.
         if (this.mode === DUAL_VIEW_MODES.GENERAL) {
-            this._restoreActiveViewColors();
+            this.meshView.repaintAnnotation();
         }
         
         this.enabled = false;
@@ -283,27 +285,6 @@ export class DualViewManager {
         
         // Emit event
         eventBus.emit(Events.DUAL_VIEW_CHANGED, { enabled: false, mode: this.mode });
-    }
-    
-    /**
-     * Restore the active view's colors to the mesh when disabling.
-     * This ensures the single-view shows the state of the active view.
-     * @private
-     */
-    _restoreActiveViewColors() {
-        const meshColors = this.meshView.meshColors;
-        if (!meshColors) return;
-        
-        const sourceBuffer = this.activeView === 'left' ? this.leftViewColors : this.rightViewColors;
-        // Only restore if buffer sizes match (they won't match if a new mesh was loaded)
-        if (sourceBuffer && sourceBuffer.length === meshColors.length) {
-            meshColors.set(sourceBuffer);
-            
-            const mesh = this.meshView.mesh;
-            if (mesh?.geometry?.attributes?.color) {
-                mesh.geometry.attributes.color.needsUpdate = true;
-            }
-        }
     }
     
     /**

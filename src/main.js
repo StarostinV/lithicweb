@@ -3,7 +3,7 @@ import './styles/main.css';
 
 import * as THREE from 'three';
 import { exportAnnotations, exportAnnotationsToMAT, exportMetadataToJSON, exportMetadataToCSV } from './loaders/meshExporter.js';
-import { MODES, Mode } from './utils/mode.js';
+import { MODES, Mode, EDGE_EDITING_MODES } from './utils/mode.js';
 import { eventBus, Events } from './utils/EventBus.js';
 import {ArrowDrawer} from './components/arrow.js';
 import { BasicMesh } from './geometry/BasicMesh.js';
@@ -377,6 +377,7 @@ function syncAnnotationTabWithMode(mode) {
 // Hook into mode changes to sync tabs using EventBus
 eventBus.on(Events.MODE_CHANGED, (data) => {
     syncAnnotationTabWithMode(data.mode);
+    meshView.setEdgeEditing(EDGE_EDITING_MODES.has(data.mode));
 }, 'main');
 
 // Handle panel switch requests from other components (e.g., cloud storage -> library)

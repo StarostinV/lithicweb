@@ -67,6 +67,16 @@ const MODE_LABELS = {
  * ```
  */
 /**
+ * Modes that edit annotation edges; edges are kept visible while one is active.
+ */
+export const EDGE_EDITING_MODES = new Set([
+    MODES.DRAW,
+    MODES.ERASE,
+    MODES.DRAWLINES,
+    MODES.RIDGE
+]);
+
+/**
  * Drawing modes that support the erase toggle button.
  * When in these modes, the erase toggle button is visible.
  */
@@ -527,6 +537,8 @@ export class Mode {
         console.log('toPreviousMode', this.currentMode, this.previousMode);
         this.currentMode = this.previousMode;
         this.update();
+        // Listeners must see the return from a temporary (Alt) VIEW switch too
+        this._notifyModeChangeListeners(this.currentMode, false);
     }
 
     toString() {

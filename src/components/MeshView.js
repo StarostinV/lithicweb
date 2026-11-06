@@ -73,6 +73,9 @@ export class MeshView {
         // these, so drawing or recomputing segments never overrides the mode.
         this.showEdges = true;
         this.showSegments = true;
+        // True while an edge-drawing tool is active: edges are then always
+        // visible, whatever showEdges says.
+        this.edgeEditing = false;
         
         // Edit tracking
         this.pendingAction = null;
@@ -1144,7 +1147,7 @@ export class MeshView {
      * @returns {THREE.Color}
      */
     _edgeDisplayColor() {
-        return this.showEdges ? this.edgeColor : this.objectColor;
+        return this.showEdges || this.edgeEditing ? this.edgeColor : this.objectColor;
     }
 
     /**
@@ -1170,6 +1173,19 @@ export class MeshView {
         this.showEdges = showEdges;
         this.showSegments = showSegments;
         this.repaintAnnotation();
+    }
+
+    /**
+     * Mark whether an edge-drawing tool is active. Edges are always shown
+     * while drawing, even when the display mode hides them.
+     *
+     * @param {boolean} active
+     */
+    setEdgeEditing(active) {
+        active = !!active;
+        if (active === this.edgeEditing) return;
+        this.edgeEditing = active;
+        if (!this.showEdges) this.repaintAnnotation();
     }
 
     /**
