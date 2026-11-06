@@ -744,49 +744,14 @@ export class RenderingPanel {
     updateAnnotationDisplay() {
         if (this.meshView.isNull()) return;
         
-        const mesh = this.meshView.mesh;
-        if (!mesh?.geometry?.attributes?.color) return;
-        
-        const colors = mesh.geometry.attributes.color.array;
-        const edgeLabels = this.meshView.edgeLabels;
-        const faceLabels = this.meshView.faceLabels;
-        const faceColors = this.meshView.faceColors;
-        
-        const edgeColor = new THREE.Color(this.edgeColor);
-        const objectColor = new THREE.Color(this.objectColor);
-        
         const showEdges = this.annotationMode === ANNOTATION_MODES.FULL || 
                           this.annotationMode === ANNOTATION_MODES.EDGES;
         const showSegments = this.annotationMode === ANNOTATION_MODES.FULL || 
                              this.annotationMode === ANNOTATION_MODES.SEGMENTS;
         
-        // Update meshView's internal showSegments state to stay in sync
-        this.meshView.showSegments = showSegments;
-        
-        // First pass: set base colors for all vertices
-        for (let i = 0; i < edgeLabels.length; i++) {
-            // Default to object color
-            let color = objectColor;
-            
-            // Apply segment color if segments are shown
-            if (showSegments && faceLabels[i] > 0) {
-                const segmentColor = faceColors.get(faceLabels[i]);
-                if (segmentColor) {
-                    color = segmentColor;
-                }
-            }
-            
-            // Apply edge color on top if edges are shown and vertex is an edge
-            if (showEdges && edgeLabels[i] === 1) {
-                color = edgeColor;
-            }
-            
-            colors[i * 3] = color.r;
-            colors[i * 3 + 1] = color.g;
-            colors[i * 3 + 2] = color.b;
-        }
-        
-        mesh.geometry.attributes.color.needsUpdate = true;
+        // MeshView owns the mode so that drawing, segment updates and undo
+        // keep honouring it after this call.
+        this.meshView.setDisplayMode({ showEdges, showSegments });
     }
     
     /**

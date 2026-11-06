@@ -68,6 +68,10 @@ export class MeshView {
         this.history = new ActionHistory();
         this.edgeColor = options.edgeColor || new THREE.Color(1, 0.6, 0.2);
         this.objectColor = options.objectColor || new THREE.Color(0.8, 0.8, 0.8);
+        // Display mode: whether edge vertices and segment interiors are
+        // painted in their annotation colors. Every repaint path consults
+        // these, so drawing or recomputing segments never overrides the mode.
+        this.showEdges = true;
         this.showSegments = true;
         
         // Edit tracking
@@ -351,7 +355,7 @@ export class MeshView {
         if (this.edgeLabels?.length) {
             this.edgeLabels[vertexIndex] = 1;
         }
-        this.colorVertex(vertexIndex, this.edgeColor);
+        this.colorVertex(vertexIndex, this._edgeDisplayColor());
         
         // Clear face label for this vertex
         if (this.faceLabels[vertexIndex]) {
@@ -374,7 +378,7 @@ export class MeshView {
             if (this.edgeLabels?.length) {
                 this.edgeLabels[index] = 1;
             }
-            this.colorVertex(index, this.edgeColor);
+            this.colorVertex(index, this._edgeDisplayColor());
             if (this.faceLabels[index]) {
                 this.faceLabels[index] = 0;
             }
@@ -816,7 +820,7 @@ export class MeshView {
             if (this.edgeLabels?.length) {
                 this.edgeLabels[index] = 1;
             }
-            this.colorVertex(index, this.edgeColor);
+            this.colorVertex(index, this._edgeDisplayColor());
         }
         
         this.isRestoringState = false;
@@ -878,7 +882,7 @@ export class MeshView {
         for (let v = 0; v < cleanEdgeLabels.length; v++) {
             if (cleanEdgeLabels[v] === 1) {
                 this.edgeLabels[v] = 1;
-                this.colorVertex(v, this.edgeColor);
+                this.colorVertex(v, this._edgeDisplayColor());
                 this.currentEdgeIndices.add(v);
             }
         }
@@ -994,9 +998,10 @@ export class MeshView {
             
             usedColors.add(color);
             newFaceColors.set(segmentId, color);
+            const displayColor = this._segmentDisplayColor(color);
             segment.forEach(vertexIndex => {
                 this.faceLabels[vertexIndex] = segmentId;
-                this.colorVertex(vertexIndex, color);
+                this.colorVertex(vertexIndex, displayColor);
             });
         });
         
@@ -1055,7 +1060,7 @@ export class MeshView {
         this._updateSegmentColors([]); // empty previous → all fresh colors
         // Re-apply edge colors on top
         for (const index of this.currentEdgeIndices) {
-            this.colorVertex(index, this.edgeColor);
+            this.colorVertex(index, this._edgeDisplayColor());
         }
     }
 
@@ -1119,7 +1124,7 @@ export class MeshView {
         
         // Then color edges
         for (const index of this.currentEdgeIndices) {
-            this.colorVertex(index, this.edgeColor);
+            this.colorVertex(index, this._edgeDisplayColor());
         }
     }
     
@@ -1133,46 +1138,74 @@ export class MeshView {
     }
     
     /**
+     * Color an edge vertex should be painted with under the current display mode.
+     *
+     * @private
+     * @returns {THREE.Color}
+     */
+    _edgeDisplayColor() {
+        return this.showEdges ? this.edgeColor : this.objectColor;
+    }
+
+    /**
+     * Color a segment vertex should be painted with under the current display mode.
+     *
+     * @private
+     * @param {THREE.Color} segmentColor - The segment's assigned color
+     * @returns {THREE.Color}
+     */
+    _segmentDisplayColor(segmentColor) {
+        return this.showSegments && segmentColor ? segmentColor : this.objectColor;
+    }
+
+    /**
+     * Set which annotation layers are painted. Persists across drawing,
+     * segment recomputation, undo/redo and annotation loads.
+     *
+     * @param {Object} mode
+     * @param {boolean} [mode.showEdges] - Paint edge vertices in the edge color
+     * @param {boolean} [mode.showSegments] - Paint segments in their colors
+     */
+    setDisplayMode({ showEdges = this.showEdges, showSegments = this.showSegments } = {}) {
+        this.showEdges = showEdges;
+        this.showSegments = showSegments;
+        this.repaintAnnotation();
+    }
+
+    /**
      * Toggle segment color display.
      * 
      * @param {boolean} show - Whether to show segment colors
      */
     setShowSegments(show) {
-        this.showSegments = show;
-        
-        if (show) {
-            this._colorSegmentsFaceColor();
-        } else {
-            this._colorSegmentsObjectColor();
+        this.setDisplayMode({ showSegments: show });
+    }
+
+    /**
+     * Repaint every vertex from the current edges, segments and display mode.
+     */
+    repaintAnnotation() {
+        const meshColors = this._meshColors;
+        if (!meshColors) return;
+
+        const edgeColor = this._edgeDisplayColor();
+        const n = this.vertexCount;
+        for (let i = 0; i < n; i++) {
+            let color;
+            if (this.currentEdgeIndices.has(i)) {
+                color = edgeColor;
+            } else {
+                const label = this.faceLabels[i];
+                color = this._segmentDisplayColor(label > 0 ? this.faceColors.get(label) : null);
+            }
+            meshColors[i * 3] = color.r;
+            meshColors[i * 3 + 1] = color.g;
+            meshColors[i * 3 + 2] = color.b;
         }
-    }
-    
-    /**
-     * Color segments with their face colors.
-     * 
-     * @private
-     */
-    _colorSegmentsFaceColor() {
-        this.segments.forEach((segment, index) => {
-            const segmentId = index + 1;
-            const color = this.faceColors.get(segmentId) || this.objectColor;
-            segment.forEach(vertexIndex => {
-                this.colorVertex(vertexIndex, color);
-            });
-        });
-    }
-    
-    /**
-     * Color all segments with object color.
-     * 
-     * @private
-     */
-    _colorSegmentsObjectColor() {
-        this.segments.forEach(segment => {
-            segment.forEach(vertexIndex => {
-                this.colorVertex(vertexIndex, this.objectColor);
-            });
-        });
+
+        if (this._threeMesh?.geometry?.attributes?.color) {
+            this._threeMesh.geometry.attributes.color.needsUpdate = true;
+        }
     }
     
     /**
@@ -1205,8 +1238,9 @@ export class MeshView {
             usedColors.add(color);
             newFaceColors.set(segmentId, color);
             
+            const displayColor = this._segmentDisplayColor(color);
             segment.forEach(vertexIndex => {
-                this.colorVertex(vertexIndex, color);
+                this.colorVertex(vertexIndex, displayColor);
             });
         });
         

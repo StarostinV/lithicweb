@@ -954,22 +954,7 @@ export class ScarOrderPanel {
      * Called when leaving the order panel to bring back the drawn edges.
      */
     _restoreNormalView() {
-        if (!this.meshView.showSegments) {
-            this.meshView.setShowSegments(false);
-        } else {
-            // Re-apply segment colors for interior vertices
-            this.meshView.segments.forEach((segment, index) => {
-                const segmentId = index + 1;
-                const color = this.meshView.faceColors.get(segmentId) || this.meshView.objectColor;
-                segment.forEach(vertexIndex => {
-                    this.meshView.colorVertex(vertexIndex, color);
-                });
-            });
-        }
-        // Re-apply edge colors
-        for (const index of this.meshView.currentEdgeIndices) {
-            this.meshView.colorVertex(index, this.meshView.edgeColor);
-        }
+        this.meshView.repaintAnnotation();
     }
 
     _getColormapHex(scarId) {
