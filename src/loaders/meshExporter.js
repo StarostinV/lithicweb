@@ -79,12 +79,12 @@ export function serializeMetadata(metadata) {
  * - Metadata stored as PLY comments
  * 
  * @param {THREE.Mesh} mesh - The Three.js mesh to export
- * @param {Float32Array} meshColors - Vertex colors array (used to determine labels)
+ * @param {Set<number>} edgeIndices - Indices of edge vertices (written as label 1)
  * @param {Object} arrowDrawer - Arrow drawer containing arrows array
  * @param {MeshLoader} meshLoader - Mesh loader containing filename and metadata
  * @param {Object} [additionalMetadata={}] - Optional additional metadata to include
  */
-export function exportAnnotations(mesh, meshColors, arrowDrawer, meshLoader, additionalMetadata = {}) {
+export function exportAnnotations(mesh, edgeIndices, arrowDrawer, meshLoader, additionalMetadata = {}) {
     if (!mesh) {
         console.error("No mesh to export.");
         return;
@@ -152,7 +152,8 @@ end_header
         const x = positions[i * 3];
         const y = positions[i * 3 + 1];
         const z = positions[i * 3 + 2];
-        const label = meshColors[i * 3] === 1 ? 1 : 0; // Check if red component is 1 for the label
+        // Labels come from the annotation state, never from display colors
+        const label = edgeIndices.has(i) ? 1 : 0;
 
         dataView.setFloat32(offset, x, true); offset += 4;
         dataView.setFloat32(offset, y, true); offset += 4;

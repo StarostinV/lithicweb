@@ -194,7 +194,7 @@ document.getElementById('exportAnnotations').addEventListener('click', () => {
     const additionalMetadata = Object.keys(stateMetadata).length > 0
         ? { 'state-metadata': stateMetadata }
         : {};
-    exportAnnotations(meshView.mesh, meshView.meshColors, arrowDrawer, meshLoader, additionalMetadata);
+    exportAnnotations(meshView.mesh, meshView.currentEdgeIndices, arrowDrawer, meshLoader, additionalMetadata);
 });
 
 // Export dropdown
@@ -215,7 +215,7 @@ function doExportPLY() {
     const additionalMetadata = Object.keys(stateMetadata).length > 0
         ? { 'state-metadata': stateMetadata }
         : {};
-    exportAnnotations(meshView.mesh, meshView.meshColors, arrowDrawer, meshLoader, additionalMetadata);
+    exportAnnotations(meshView.mesh, meshView.currentEdgeIndices, arrowDrawer, meshLoader, additionalMetadata);
 }
 
 document.querySelectorAll('.export-option').forEach(btn => {
