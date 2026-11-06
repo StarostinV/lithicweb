@@ -1884,6 +1884,61 @@
         </div>
     </div>
 
+    <!-- Export PLY Modal -->
+    <div id="exportPlyModal" class="modal">
+        <div class="settings-modal" style="max-width: 440px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-download"></i> Export PLY</h2>
+                <button class="modal-close" id="exportPlyModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Preset</label>
+                    <div class="precision-segment" id="exportPlyPresets" role="tablist">
+                        <button type="button" class="precision-btn" data-preset="neurolithic">
+                            Neurolithic <span class="precision-hint">labels · arrows · metadata</span>
+                        </button>
+                        <button type="button" class="precision-btn" data-preset="meshlab">
+                            MeshLab <span class="precision-hint">displayed colors</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="toggle-row">
+                        <label class="toggle-switch"><input type="checkbox" data-export-option="labels"><span class="toggle-slider"></span></label>
+                        <span>Edge labels</span>
+                    </div>
+                    <div class="toggle-row">
+                        <label class="toggle-switch"><input type="checkbox" data-export-option="arrows"><span class="toggle-slider"></span></label>
+                        <span>Arrows</span>
+                    </div>
+                    <div class="toggle-row">
+                        <label class="toggle-switch"><input type="checkbox" data-export-option="metadata"><span class="toggle-slider"></span></label>
+                        <span>Metadata</span>
+                    </div>
+                    <div class="toggle-row">
+                        <label class="toggle-switch"><input type="checkbox" data-export-option="colors"><span class="toggle-slider"></span></label>
+                        <span>Vertex colors, as currently displayed</span>
+                    </div>
+                    <div class="toggle-row">
+                        <label class="toggle-switch"><input type="checkbox" data-export-option="quality"><span class="toggle-slider"></span></label>
+                        <span>Edge label as vertex quality</span>
+                    </div>
+                    <p class="form-help">Neurolithic is the format lithicserver and the Python pipelines read.
+                        MeshLab ignores labels and arrows, and cannot open files with long metadata.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="exportPlyCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="exportPlyConfirmBtn">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Save Annotation Modal -->
     <div id="saveAnnotationModal" class="modal">
         <div class="settings-modal">

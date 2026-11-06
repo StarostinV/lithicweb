@@ -72,6 +72,11 @@ const DEFAULT_CONFIG = {
     ui: {
         sidebarWidth: 380,
     },
+
+    // Export settings (last-used PLY options)
+    export: {
+        plyOptions: { labels: true, arrows: true, metadata: true, colors: false, quality: false },
+    },
 };
 
 export class UserConfig {

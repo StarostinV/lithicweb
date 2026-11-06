@@ -2,6 +2,7 @@
 import './styles/main.css';
 
 import * as THREE from 'three';
+import { ExportDialog } from './components/exportDialog.js';
 import { exportAnnotations, exportAnnotationsToMAT, exportMetadataToJSON, exportMetadataToCSV } from './loaders/meshExporter.js';
 import { MODES, Mode, EDGE_EDITING_MODES } from './utils/mode.js';
 import { eventBus, Events } from './utils/EventBus.js';
@@ -115,6 +116,7 @@ cloudStoragePanel.setLibraryPanel(libraryPanel);
 
 // Rendering panel (view mode controls) - with userConfig for persistence
 const renderingPanel = new RenderingPanel(scene, meshView, userConfig);
+const exportDialog = new ExportDialog(userConfig);
 renderingPanel.setDualViewManager(dualViewManager);
 
 // Settings panel (settings management)
@@ -188,14 +190,7 @@ document.getElementById('invertNormals').addEventListener('click', () => {
     window._runNormalize = runNormalize;
 }
 
-document.getElementById('exportAnnotations').addEventListener('click', () => {
-    // Include current state's metadata under the 'state-metadata' key
-    const stateMetadata = meshView.getCurrentStateMetadata();
-    const additionalMetadata = Object.keys(stateMetadata).length > 0
-        ? { 'state-metadata': stateMetadata }
-        : {};
-    exportAnnotations(meshView.mesh, meshView.currentEdgeIndices, arrowDrawer, meshLoader, additionalMetadata);
-});
+document.getElementById('exportAnnotations').addEventListener('click', () => doExportPLY());
 
 // Export dropdown
 const exportDropdownMenu = document.getElementById('exportDropdownMenu');
@@ -210,12 +205,17 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') exportDropdownMenu.classList.remove('open');
 });
 
-function doExportPLY() {
+async function doExportPLY() {
+    if (meshView.isNull()) return;
+    const options = await exportDialog.open();
+    if (!options) return;
+    // Include current state's metadata under the 'state-metadata' key
     const stateMetadata = meshView.getCurrentStateMetadata();
     const additionalMetadata = Object.keys(stateMetadata).length > 0
         ? { 'state-metadata': stateMetadata }
         : {};
-    exportAnnotations(meshView.mesh, meshView.currentEdgeIndices, arrowDrawer, meshLoader, additionalMetadata);
+    exportAnnotations(meshView.mesh, meshView.currentEdgeIndices, arrowDrawer, meshLoader,
+                      additionalMetadata, options, meshView.meshColors);
 }
 
 document.querySelectorAll('.export-option').forEach(btn => {

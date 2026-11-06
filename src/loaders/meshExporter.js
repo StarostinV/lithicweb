@@ -70,36 +70,138 @@ export function serializeMetadata(metadata) {
 }
 
 /**
+ * What an annotation PLY contains. Presets:
+ * - neurolithic: the canonical format read by lithicserver and the Python
+ *   pipelines (labels + arrows + metadata). Never change its layout.
+ * - meshlab: display colors only, for viewers such as MeshLab, which ignore
+ *   custom properties and reject header lines longer than ~509 characters.
+ */
+export const PLY_EXPORT_PRESETS = Object.freeze({
+    neurolithic: Object.freeze({ labels: true, arrows: true, metadata: true, colors: false, quality: false }),
+    meshlab: Object.freeze({ labels: false, arrows: false, metadata: false, colors: true, quality: false }),
+});
+
+/**
+ * Name of the preset matching `options` exactly, or 'custom'.
+ * @param {Object} options
+ * @returns {string}
+ */
+export function plyPresetName(options) {
+    for (const [name, preset] of Object.entries(PLY_EXPORT_PRESETS)) {
+        if (Object.keys(preset).every(k => !!options[k] === preset[k])) return name;
+    }
+    return 'custom';
+}
+
+/** Linear-light channel (three.js working space) -> 8-bit sRGB. */
+function linearToSRGBByte(c) {
+    const v = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+    return Math.max(0, Math.min(255, Math.round(v * 255)));
+}
+
+/**
+ * Build an annotation PLY (binary little endian).
+ *
+ * Vertex properties, in order: x y z, [int labels], [uchar red green blue],
+ * [float quality]; then triangular faces; then, if requested, the custom
+ * arrow element.
+ *
+ * @param {Object} data
+ * @param {ArrayLike<number>} data.positions - Flat xyz positions
+ * @param {ArrayLike<number>} data.indices - Flat triangle indices
+ * @param {Set<number>} data.edgeIndices - Edge vertices (label 1)
+ * @param {Array<{startIndex:number,endIndex:number}>} [data.arrows=[]]
+ * @param {Object} [data.metadata={}] - Written as comments when options.metadata
+ * @param {ArrayLike<number>} [data.colors] - Linear RGB per vertex in [0,1]; required when options.colors
+ * @param {Object} [options=PLY_EXPORT_PRESETS.neurolithic]
+ * @returns {ArrayBuffer}
+ */
+export function buildAnnotationPLY(
+    { positions, indices, edgeIndices, arrows = [], metadata = {}, colors = null },
+    options = PLY_EXPORT_PRESETS.neurolithic
+) {
+    const { labels, arrows: withArrows, metadata: withMetadata, colors: withColors, quality } = options;
+    if (withColors && !colors) throw new Error('Color export requested without vertex colors');
+
+    const vertexCount = positions.length / 3;
+    const faceCount = indices.length / 3;
+    const arrowCount = withArrows ? arrows.length : 0;
+
+    let header = 'ply\nformat binary_little_endian 1.0\n';
+    if (withMetadata) header += serializeMetadata(metadata);
+    header += `element vertex ${vertexCount}\nproperty float x\nproperty float y\nproperty float z\n`;
+    if (labels) header += 'property int labels\n';
+    if (withColors) header += 'property uchar red\nproperty uchar green\nproperty uchar blue\n';
+    if (quality) header += 'property float quality\n';
+    header += `element face ${faceCount}\nproperty list uchar int vertex_indices\n`;
+    if (withArrows) header += `element arrow ${arrowCount}\nproperty int start_index\nproperty int end_index\n`;
+    header += 'end_header\n';
+
+    const headerBytes = new TextEncoder().encode(header);
+    const vertexElementSize = 12 + (labels ? 4 : 0) + (withColors ? 3 : 0) + (quality ? 4 : 0);
+    const faceElementSize = 1 + 3 * 4;
+    const totalSize = headerBytes.length + vertexCount * vertexElementSize
+        + faceCount * faceElementSize + arrowCount * 8;
+
+    const buffer = new ArrayBuffer(totalSize);
+    new Uint8Array(buffer).set(headerBytes);
+    const dataView = new DataView(buffer);
+    let offset = headerBytes.length;
+
+    for (let i = 0; i < vertexCount; i++) {
+        dataView.setFloat32(offset, positions[i * 3], true); offset += 4;
+        dataView.setFloat32(offset, positions[i * 3 + 1], true); offset += 4;
+        dataView.setFloat32(offset, positions[i * 3 + 2], true); offset += 4;
+        // Labels come from the annotation state, never from display colors
+        const label = edgeIndices.has(i) ? 1 : 0;
+        if (labels) { dataView.setInt32(offset, label, true); offset += 4; }
+        if (withColors) {
+            dataView.setUint8(offset++, linearToSRGBByte(colors[i * 3]));
+            dataView.setUint8(offset++, linearToSRGBByte(colors[i * 3 + 1]));
+            dataView.setUint8(offset++, linearToSRGBByte(colors[i * 3 + 2]));
+        }
+        if (quality) { dataView.setFloat32(offset, label, true); offset += 4; }
+    }
+
+    for (let i = 0; i < faceCount; i++) {
+        dataView.setUint8(offset, 3); offset += 1;
+        dataView.setInt32(offset, indices[i * 3], true); offset += 4;
+        dataView.setInt32(offset, indices[i * 3 + 1], true); offset += 4;
+        dataView.setInt32(offset, indices[i * 3 + 2], true); offset += 4;
+    }
+
+    for (let i = 0; i < arrowCount; i++) {
+        dataView.setInt32(offset, arrows[i].startIndex, true); offset += 4;
+        dataView.setInt32(offset, arrows[i].endIndex, true); offset += 4;
+    }
+
+    return buffer;
+}
+
+/**
  * Export mesh with annotations, arrows, and metadata to a PLY file.
- * 
- * The exported PLY file contains:
- * - Vertex positions (x, y, z) and labels
- * - Face indices (triangles)
- * - Arrow elements (start_index, end_index)
- * - Metadata stored as PLY comments
+ *
+ * With the default (neurolithic) options the file contains vertex positions
+ * and labels, triangular faces, the arrow element and metadata comments.
  * 
  * @param {THREE.Mesh} mesh - The Three.js mesh to export
  * @param {Set<number>} edgeIndices - Indices of edge vertices (written as label 1)
  * @param {Object} arrowDrawer - Arrow drawer containing arrows array
  * @param {MeshLoader} meshLoader - Mesh loader containing filename and metadata
  * @param {Object} [additionalMetadata={}] - Optional additional metadata to include
+ * @param {Object} [options=PLY_EXPORT_PRESETS.neurolithic] - What to include (see buildAnnotationPLY)
+ * @param {ArrayLike<number>} [colors=null] - Linear vertex colors, needed when options.colors
  */
-export function exportAnnotations(mesh, edgeIndices, arrowDrawer, meshLoader, additionalMetadata = {}) {
+export function exportAnnotations(mesh, edgeIndices, arrowDrawer, meshLoader, additionalMetadata = {},
+                                  options = PLY_EXPORT_PRESETS.neurolithic, colors = null) {
     if (!mesh) {
         console.error("No mesh to export.");
         return;
     }
 
-    // Get filename
-    const fileName = (meshLoader.currentFileName || 'mesh') + '.ply';
-
-    // Extract vertex data
-    const positions = mesh.geometry.attributes.position.array;
-    const indices = mesh.geometry.index.array;
-
-    const vertexCount = positions.length / 3;
-    const faceCount = indices.length / 3;
-    const arrowCount = arrowDrawer.arrows.length;
+    const preset = plyPresetName(options);
+    const baseName = meshLoader.currentFileName || 'mesh';
+    const fileName = preset === 'neurolithic' ? `${baseName}.ply` : `${baseName}-${preset}.ply`;
 
     // Merge metadata from meshLoader with additional metadata
     // Additional metadata takes precedence over loaded metadata
@@ -110,77 +212,15 @@ export function exportAnnotations(mesh, edgeIndices, arrowDrawer, meshLoader, ad
         exportedAt: new Date().toISOString()
     };
 
-    // Serialize metadata to PLY comment lines
-    const metadataComments = serializeMetadata(metadata);
+    const buffer = buildAnnotationPLY({
+        positions: mesh.geometry.attributes.position.array,
+        indices: mesh.geometry.index.array,
+        edgeIndices,
+        arrows: arrowDrawer.arrows,
+        metadata,
+        colors,
+    }, options);
 
-    // PLY file header with metadata comments
-    const header = `ply
-format binary_little_endian 1.0
-${metadataComments}element vertex ${vertexCount}
-property float x
-property float y
-property float z
-property int labels
-element face ${faceCount}
-property list uchar int vertex_indices
-element arrow ${arrowCount}
-property int start_index
-property int end_index
-end_header
-`;
-
-    // Calculate the size of the binary buffer
-    const vertexElementSize = 4 * (3 + 1); // 3 floats (x, y, z) + 1 int (label)
-    const faceElementSize = 1 + 3 * 4; // 1 uchar (vertex count) + 3 ints (vertex indices)
-    const arrowElementSize = 2 * 4; // 2 ints (start_index, end_index)
-    const headerSize = new TextEncoder().encode(header).length;
-    const totalSize = headerSize + vertexCount * vertexElementSize + faceCount * faceElementSize + arrowCount * arrowElementSize;
-
-    // Create the binary buffer
-    const buffer = new ArrayBuffer(totalSize);
-    const dataView = new DataView(buffer);
-    let offset = 0;
-
-    // Write the header
-    const headerBytes = new TextEncoder().encode(header);
-    for (let i = 0; i < headerBytes.length; i++) {
-        dataView.setUint8(offset++, headerBytes[i]);
-    }
-
-    // Write the vertex data
-    for (let i = 0; i < vertexCount; i++) {
-        const x = positions[i * 3];
-        const y = positions[i * 3 + 1];
-        const z = positions[i * 3 + 2];
-        // Labels come from the annotation state, never from display colors
-        const label = edgeIndices.has(i) ? 1 : 0;
-
-        dataView.setFloat32(offset, x, true); offset += 4;
-        dataView.setFloat32(offset, y, true); offset += 4;
-        dataView.setFloat32(offset, z, true); offset += 4;
-        dataView.setInt32(offset, label, true); offset += 4;
-    }
-
-    // Write the face data
-    for (let i = 0; i < faceCount; i++) {
-        const i1 = indices[i * 3];
-        const i2 = indices[i * 3 + 1];
-        const i3 = indices[i * 3 + 2];
-
-        dataView.setUint8(offset, 3); offset += 1; // Number of vertices per face
-        dataView.setInt32(offset, i1, true); offset += 4;
-        dataView.setInt32(offset, i2, true); offset += 4;
-        dataView.setInt32(offset, i3, true); offset += 4;
-    }
-
-    // Write the arrow data
-    for (let i = 0; i < arrowCount; i++) {
-        const arrow = arrowDrawer.arrows[i];
-        dataView.setInt32(offset, arrow.startIndex, true); offset += 4;
-        dataView.setInt32(offset, arrow.endIndex, true); offset += 4;
-    }
-
-    // Create a Blob and trigger the download
     const blob = new Blob([buffer], { type: 'application/octet-stream' });
     triggerDownload(blob, fileName);
 }
