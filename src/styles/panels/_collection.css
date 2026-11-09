@@ -374,3 +374,157 @@ body.sidebar-collapsed .collection-map-overlay {
     margin-top: 4px;
     color: var(--primary-600);
 }
+
+/* While the map is open, the 3D view's floating tools are irrelevant */
+body.collection-map-open .mode-indicator,
+body.collection-map-open .transform-mode-indicator,
+body.collection-map-open .erase-toggle-indicator,
+body.collection-map-open .scar-order-toggle-indicator,
+body.collection-map-open .floating-controls,
+body.collection-map-open .floating-action-pill {
+    display: none !important;
+}
+
+.collection-map-overlay.labels-hidden .collection-site-label {
+    display: none;
+}
+
+/* Bottom-left map controls: timeline + label switch */
+.collection-map-controls {
+    position: absolute;
+    left: 12px;
+    bottom: 24px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(440px, calc(100% - 24px));
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    font-size: 12px;
+    color: var(--gray-700, #374151);
+}
+
+.collection-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.collection-timeline-title {
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--gray-800, #1f2937);
+    margin-bottom: 2px;
+}
+
+.collection-timeline-title span {
+    font-weight: 500;
+    color: var(--gray-500);
+    margin-left: 4px;
+}
+
+.collection-timeline-row,
+.collection-timeline-axis {
+    display: grid;
+    grid-template-columns: 128px 1fr;
+    align-items: center;
+    gap: 8px;
+}
+
+.collection-timeline-row {
+    width: 100%;
+    padding: 2px 4px;
+    margin: 0 -4px;
+    border: none;
+    border-radius: 5px;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+}
+
+.collection-timeline-row:hover,
+.collection-timeline-row.hover {
+    background: var(--gray-100);
+}
+
+.collection-timeline-row.dimmed {
+    opacity: 0.45;
+}
+
+.collection-timeline-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.collection-timeline-row.selected .collection-timeline-name {
+    font-weight: 700;
+}
+
+.collection-timeline-track {
+    position: relative;
+    height: 12px;
+    border-radius: 6px;
+    background: var(--gray-100);
+}
+
+.collection-timeline-axis .collection-timeline-track {
+    background: none;
+    height: 14px;
+}
+
+.collection-timeline-bar {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    border-radius: 5px;
+    background: var(--primary);
+    transition: background 0.15s;
+}
+
+.collection-timeline-row.hover .collection-timeline-bar,
+.collection-timeline-row.selected .collection-timeline-bar {
+    background: #10b981;
+}
+
+.collection-timeline-undated {
+    position: absolute;
+    left: 6px;
+    top: -1px;
+    font-size: 10px;
+    font-style: italic;
+    color: var(--gray-500);
+}
+
+.collection-timeline-tick {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--gray-500);
+}
+
+.collection-timeline-tick::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -4px;
+    height: 3px;
+    border-left: 1px solid var(--gray-400, #9ca3af);
+}
+
+.collection-label-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--gray-200);
+    cursor: pointer;
+    user-select: none;
+}

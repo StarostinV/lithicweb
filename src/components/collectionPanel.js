@@ -94,6 +94,8 @@ export class CollectionPanel {
             mapDiv: document.getElementById('collectionMap'),
             showMap: document.getElementById('collectionShowMapBtn'),
             hideMap: document.getElementById('collectionHideMapBtn'),
+            timeline: document.getElementById('collectionTimeline'),
+            labelsToggle: document.getElementById('collectionLabelsToggle'),
         };
 
         this.el.search?.addEventListener('input', () => {
@@ -107,6 +109,10 @@ export class CollectionPanel {
         });
         this.el.showMap?.addEventListener('click', () => this._setMapVisible(true));
         this.el.hideMap?.addEventListener('click', () => this._setMapVisible(false));
+        this.el.labelsToggle?.addEventListener('change', () => {
+            this.el.overlay?.classList.toggle('labels-hidden', !this.el.labelsToggle.checked);
+            if (this.el.labelsToggle.checked) this._layoutLabels();
+        });
     }
 
     /** Called when the Collection tab is opened. */
@@ -145,6 +151,7 @@ export class CollectionPanel {
         this._renderSources();
         this._renderList();
         this._buildMap();
+        this._renderTimeline();
     }
 
     _fillFilters() {
@@ -177,6 +184,7 @@ export class CollectionPanel {
         if (this.el.site) this.el.site.value = siteId;
         this._renderList();
         this._updateMarkers();
+        this._updateTimeline();
     }
 
     // ------------------------------------------------------------------
@@ -342,11 +350,72 @@ export class CollectionPanel {
         const marker = this.markers.get(siteId);
         marker?.getElement()?.classList.toggle('hover', on);
         marker?.getTooltip()?.getElement()?.classList.toggle('hover', on);
+        this.el.timeline?.querySelector(`.collection-timeline-row[data-site="${CSS.escape(siteId)}"]`)
+            ?.classList.toggle('hover', on);
+    }
+
+    // ------------------------------------------------------------------
+    // Timeline
+    // ------------------------------------------------------------------
+
+    /** Dating bars per site on a ka cal BP axis (older on the left). */
+    _renderTimeline() {
+        const el = this.el.timeline;
+        if (!el || !this.catalogue) return;
+        const sites = this.catalogue.sites;
+        const dated = sites.filter(s => Array.isArray(s.datingKa));
+        if (!dated.length) {
+            el.hidden = true;
+            return;
+        }
+        const step = 5;
+        const oldest = Math.ceil(Math.max(...dated.map(s => s.datingKa[0])) / step) * step;
+        const youngest = Math.floor(Math.min(...dated.map(s => s.datingKa[1])) / step) * step;
+        const pct = ka => ((oldest - ka) / (oldest - youngest)) * 100;
+
+        const ticks = [];
+        for (let ka = oldest; ka >= youngest; ka -= step) {
+            ticks.push(`<span class="collection-timeline-tick" style="left:${pct(ka)}%">${ka}</span>`);
+        }
+        const rows = sites.map(s => {
+            const bar = Array.isArray(s.datingKa)
+                ? `<span class="collection-timeline-bar" style="left:${pct(s.datingKa[0])}%;width:${Math.max(1.5, pct(s.datingKa[1]) - pct(s.datingKa[0]))}%"
+                         title="${escapeHtml(s.dating || '')}"></span>`
+                : '<span class="collection-timeline-undated">undated</span>';
+            return `
+                <button type="button" class="collection-timeline-row" data-site="${escapeHtml(s.id)}">
+                    <span class="collection-timeline-name">${escapeHtml(s.name)}</span>
+                    <span class="collection-timeline-track">${bar}</span>
+                </button>`;
+        }).join('');
+        el.innerHTML = `
+            <div class="collection-timeline-title">Dating <span>ka cal BP</span></div>
+            ${rows}
+            <div class="collection-timeline-axis">
+                <span class="collection-timeline-name"></span>
+                <span class="collection-timeline-track">${ticks.join('')}</span>
+            </div>`;
+        el.querySelectorAll('.collection-timeline-row').forEach(row => {
+            const id = row.dataset.site;
+            row.addEventListener('click', () => this._setSite(this.filters.site === id ? '' : id));
+            row.addEventListener('mouseenter', () => this._highlightSite(id, true));
+            row.addEventListener('mouseleave', () => this._highlightSite(id, false));
+        });
+        this._updateTimeline();
+    }
+
+    _updateTimeline() {
+        this.el.timeline?.querySelectorAll('.collection-timeline-row').forEach(row => {
+            row.classList.toggle('selected', row.dataset.site === this.filters.site);
+            row.classList.toggle('dimmed', !!this.filters.site && row.dataset.site !== this.filters.site);
+        });
     }
 
     _setMapVisible(show) {
         const show_ = show && this.visible;
         this.el.overlay?.classList.toggle('visible', show_);
+        // Hide the 3D view's floating tools while the map covers it
+        document.body.classList.toggle('collection-map-open', show_);
         this.el.showMap?.classList.toggle('hidden', show_ || !this.visible);
         if (show_ && this.map) {
             // The container was hidden; Leaflet must re-measure it, and the

@@ -61,6 +61,7 @@ SITES = {
         lat=45.5925, lon=10.9058, coordinates="approximate (not given in the source record)",
         period="Aurignacian and Gravettian",
         dating="c. 41–33 ky cal BP (Higham et al. 2009)",
+        datingKa=[41.0, 33.0],
         source=dict(title="The Open Aurignacian Project. Volume 1: Grotta di Fumane in northeastern Italy",
                     authors="Falcucci, A.; Peresani, M.", doi="10.5281/zenodo.15382869", license="CC-BY-4.0"),
     ),
@@ -70,6 +71,7 @@ SITES = {
         lat=40.49563600, lon=15.20922177, coordinates="as published in the source record",
         period="Protoaurignacian and Early Aurignacian",
         dating="c. 41,000–39,800 years ago (Douka et al. 2014)",
+        datingKa=[41.0, 39.8],
         source=dict(title="The Open Aurignacian Project. Volume 2: Grotta di Castelcivita in southern Italy",
                     authors="Falcucci, A.; Moroni, A.", doi="10.5281/zenodo.15383157", license="CC-BY-4.0"),
     ),
@@ -79,6 +81,7 @@ SITES = {
         lat=40.00108243, lon=15.38095416, coordinates="as published in the source record",
         period="Early Aurignacian",
         dating="after c. 40,000 years ago (spit AU12 OSL 38,390–34,682 cal BP; AU10 14C 38,840–37,637 cal BP)",
+        datingKa=[38.84, 34.68],   # span of the two quoted dates
         source=dict(title="The Open Aurignacian Project. Volume 3: Grotta della Cala in southern Italy",
                     authors="Falcucci, A.; Moroni, A.", doi="10.5281/zenodo.15383121", license="CC-BY-4.0"),
     ),
@@ -88,6 +91,7 @@ SITES = {
         lat=43.783222, lon=7.535444, coordinates="as published in the source record",
         period="Protoaurignacian (A2, A1) and Early Aurignacian (A0)",
         dating=None,
+        datingKa=None,             # no numeric date in the source record
         source=dict(title="The Open Aurignacian Project. Volume 4: Riparo Bombrini in northwestern Italy",
                     authors="Falcucci, A.; Negrino, F.; Riel-Salvatore, J.", doi="10.5281/zenodo.15383190",
                     license="CC-BY-4.0"),
