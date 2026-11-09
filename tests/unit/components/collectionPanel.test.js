@@ -56,3 +56,22 @@ test('annotation kind: explicit field, else derived from the label source', asyn
     expect(ids(filterItems(mixed, { annotation: 'semi-automatic' }))).toEqual(['b']);
     expect(ids(filterItems(mixed, { annotation: 'manual' }))).toEqual(['a']);
 });
+
+test('parseCollectionSource accepts repo ids, revisions, HF URLs and plain URLs', async () => {
+    const { parseCollectionSource, hfDatasetBaseUrl } = await import('../../../src/components/collectionPanel.js');
+    expect(parseCollectionSource('neurolithic/auto-labelled')).toEqual({ kind: 'hf', repo: 'neurolithic/auto-labelled', revision: 'main' });
+    expect(parseCollectionSource(' a/b@v2 ')).toEqual({ kind: 'hf', repo: 'a/b', revision: 'v2' });
+    expect(parseCollectionSource('https://huggingface.co/datasets/a/b')).toEqual({ kind: 'hf', repo: 'a/b', revision: 'main' });
+    expect(parseCollectionSource('https://huggingface.co/datasets/a/b/tree/0860fb7')).toEqual({ kind: 'hf', repo: 'a/b', revision: '0860fb7' });
+    expect(parseCollectionSource('http://localhost:5084')).toEqual({ kind: 'url', url: 'http://localhost:5084/' });
+    expect(parseCollectionSource('')).toBeNull();
+    expect(parseCollectionSource('not a source')).toBeNull();
+    expect(hfDatasetBaseUrl('a/b', 'abc123')).toBe('https://huggingface.co/datasets/a/b/resolve/abc123/');
+});
+
+test('automatic (unreviewed) annotations are their own kind', async () => {
+    const { annotationKind } = await import('../../../src/components/collectionPanel.js');
+    const set = [{ id: 'm', annotation: 'manual' }, { id: 's', annotation: 'semi-automatic' }, { id: 'a', annotation: 'automatic' }];
+    expect(set.map(annotationKind)).toEqual(['manual', 'semi-automatic', 'automatic']);
+    expect(ids(filterItems(set, { annotation: 'automatic' }))).toEqual(['a']);
+});

@@ -896,6 +896,7 @@
                 <div class="panel-header-text">
                     <h2>Collection</h2>
                     <span class="panel-subtitle">Annotated artifacts from published datasets</span>
+                    <span id="collectionCustomSource" class="collection-custom-source" hidden></span>
                 </div>
             </div>
 
@@ -927,9 +928,25 @@
                     </div>
                     <div class="section-content">
                         <ul id="collectionSources" class="collection-sources"></ul>
-                        <p class="help-text">Raw scans from the cited datasets; edge annotations by the Neurolithic team.</p>
+                        <p class="help-text">Raw scans from the cited datasets. Edge annotations are manual unless tagged Semi-auto or Auto.</p>
                     </div>
                 </div>
+
+                <details class="collection-advanced">
+                    <summary>Data source</summary>
+                    <div class="collection-advanced-body">
+                        <p class="help-text">Current: <span id="collectionSourceCurrent">Official collection</span></p>
+                        <input type="text" id="collectionSourceInput" class="form-input"
+                               placeholder="owner/dataset, owner/dataset@revision, or URL" spellcheck="false">
+                        <div class="collection-advanced-actions">
+                            <button type="button" id="collectionSourceLoad" class="btn btn-secondary btn-sm">Load</button>
+                            <button type="button" id="collectionSourceReset" class="btn btn-secondary btn-sm">Official collection</button>
+                        </div>
+                        <div id="collectionSourceStatus" class="collection-source-status"></div>
+                        <p class="help-text">For prescreening other collections, e.g. automatically labelled meshes.
+                            A public Hugging Face dataset with a catalogue.json in the same format.</p>
+                    </div>
+                </details>
             </div>
         </div>
 

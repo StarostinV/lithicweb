@@ -11,8 +11,45 @@ export const DEFAULT_COLLECTION_URL =
     'https://huggingface.co/datasets/StarostinV/lithic-collection-preview/resolve/0860fb7d4e2171331448ca0560a76186e0248b9a/';
 
 const CACHE_NAME = 'lithic-collection-v1';
+const SOURCE_KEY = 'lithicjs_collection_source';
 const TIMELINE_COLLAPSED_KEY = 'lithicjs_collection_timeline_collapsed';
-const SEMI_AUTO_TITLE = 'Semi-automatic annotation: model prediction reviewed by an expert, usually with manual corrections';
+/** Tag shown for each non-manual annotation kind: [label, CSS modifier, tooltip] */
+const ANNOTATION_TAGS = {
+    'semi-automatic': ['Semi-auto', 'semi', 'Semi-automatic annotation: model prediction reviewed by an expert, usually with manual corrections'],
+    'automatic': ['Auto', 'auto', 'Automatic annotation: model prediction, not reviewed by an expert'],
+};
+const ANNOTATION_LABELS = { manual: 'Manual', 'semi-automatic': 'Semi-automatic', automatic: 'Automatic' };
+
+/**
+ * Parse a user-entered collection source.
+ *
+ * Accepts 'owner/dataset', 'owner/dataset@revision', a Hugging Face dataset
+ * URL (optionally with /tree|/resolve|/blob/<revision>), or any other http(s)
+ * base URL that serves catalogue.json.
+ *
+ * @param {string} input
+ * @returns {{kind: 'hf', repo: string, revision: string}|{kind: 'url', url: string}|null}
+ */
+export function parseCollectionSource(input) {
+    const s = String(input || '').trim();
+    if (!s) return null;
+    const hf = s.match(/^https?:\/\/huggingface\.co\/datasets\/([\w.-]+\/[\w.-]+)(?:\/(?:tree|resolve|blob)\/([^/?#]+))?/);
+    if (hf) return { kind: 'hf', repo: hf[1], revision: decodeURIComponent(hf[2] || 'main') };
+    if (/^https?:\/\//.test(s)) return { kind: 'url', url: s.replace(/\/?$/, '/') };
+    const short = s.match(/^([\w.-]+\/[\w.-]+)(?:@([\w.\-/]+))?$/);
+    if (short) return { kind: 'hf', repo: short[1], revision: short[2] || 'main' };
+    return null;
+}
+
+/**
+ * Base URL of a Hugging Face dataset at a given revision (ideally a commit).
+ * @param {string} repo - 'owner/dataset'
+ * @param {string} revision
+ * @returns {string}
+ */
+export function hfDatasetBaseUrl(repo, revision) {
+    return `https://huggingface.co/datasets/${repo}/resolve/${encodeURIComponent(revision)}/`;
+}
 
 /**
  * Filter catalogue items by free text, site and type.
@@ -23,7 +60,7 @@ const SEMI_AUTO_TITLE = 'Semi-automatic annotation: model prediction reviewed by
  * @param {string} [filters.site] - Site id, or '' for all
  * @param {string} [filters.type] - Artifact type, or '' for all
  * @param {number|null} [filters.timeKa] - Keep sites whose dating range contains this age
- * @param {string} [filters.annotation] - 'manual', 'semi-automatic', or '' for all
+ * @param {string} [filters.annotation] - 'manual', 'semi-automatic', 'automatic', or '' for all
  * @param {Map<string,Object>} [sites] - Site id -> site, for name matching
  * @returns {Array<Object>}
  */
@@ -42,8 +79,9 @@ export function filterItems(items, { text = '', site = '', type = '', timeKa = n
 }
 
 /**
- * How an item's edge labels were made: 'manual' (drawn by an annotator) or
- * 'semi-automatic' (model prediction reviewed by an expert, usually corrected by hand).
+ * How an item's edge labels were made: 'manual' (drawn by an annotator),
+ * 'semi-automatic' (model prediction reviewed by an expert, usually corrected by
+ * hand) or 'automatic' (model prediction, not reviewed; prescreening catalogues).
  * Older catalogues only carry labelSource.
  * @param {Object} item
  * @returns {string}
@@ -99,8 +137,22 @@ export class CollectionPanel {
         this.meshView = meshView;
         this.libraryPanel = libraryPanel;
 
+        // Source: ?collection=<url> wins, then a source saved from the
+        // "Data source" section, then the official collection
+        this.baseUrl = DEFAULT_COLLECTION_URL;
+        this.sourceLabel = null;              // null = official collection
+        this.pendingSource = null;
         const param = new URLSearchParams(window.location.search).get('collection');
-        this.baseUrl = (param || DEFAULT_COLLECTION_URL).replace(/\/?$/, '/');
+        if (param) {
+            this.baseUrl = param.replace(/\/?$/, '/');
+            this.sourceLabel = this.baseUrl;
+        } else {
+            try {
+                this.pendingSource = localStorage.getItem(SOURCE_KEY);
+            } catch {
+                // Storage unavailable: official collection
+            }
+        }
 
         this.catalogue = null;
         this.sites = new Map();
@@ -132,6 +184,12 @@ export class CollectionPanel {
             hideMap: document.getElementById('collectionHideMapBtn'),
             timeline: document.getElementById('collectionTimeline'),
             labelsToggle: document.getElementById('collectionLabelsToggle'),
+            sourceInput: document.getElementById('collectionSourceInput'),
+            sourceLoad: document.getElementById('collectionSourceLoad'),
+            sourceReset: document.getElementById('collectionSourceReset'),
+            sourceStatus: document.getElementById('collectionSourceStatus'),
+            sourceCurrent: document.getElementById('collectionSourceCurrent'),
+            customNote: document.getElementById('collectionCustomSource'),
         };
 
         this.el.search?.addEventListener('input', () => {
@@ -149,6 +207,11 @@ export class CollectionPanel {
         });
         this.el.showMap?.addEventListener('click', () => this._setMapVisible(true));
         this.el.hideMap?.addEventListener('click', () => this._setMapVisible(false));
+        this.el.sourceLoad?.addEventListener('click', () => this.setSource(this.el.sourceInput.value));
+        this.el.sourceInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') this.setSource(this.el.sourceInput.value);
+        });
+        this.el.sourceReset?.addEventListener('click', () => this.setSource(null));
         this.el.labelsToggle?.addEventListener('change', () => {
             this.el.overlay?.classList.toggle('labels-hidden', !this.el.labelsToggle.checked);
             if (this.el.labelsToggle.checked) this._layoutLabels();
@@ -159,7 +222,15 @@ export class CollectionPanel {
     async onShow() {
         this.visible = true;
         if (!this.catalogue) {
-            await this._loadCatalogue();
+            if (this.pendingSource) {
+                const saved = this.pendingSource;
+                this.pendingSource = null;
+                if (!(await this.setSource(saved, { quiet: true }))) {
+                    await this._loadCatalogue();     // saved source unusable: official collection
+                }
+            } else {
+                await this._loadCatalogue();
+            }
         }
         // Open on the map until a mesh has been loaded from the collection
         this._setMapVisible(!this.activeId);
@@ -178,20 +249,113 @@ export class CollectionPanel {
     async _loadCatalogue() {
         this._setStatus('Loading catalogue…');
         try {
-            const res = await fetch(this.baseUrl + 'catalogue.json');
-            if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-            this.catalogue = await res.json();
+            this._applyCatalogue(await this._fetchCatalogue(this.baseUrl));
         } catch (err) {
             this._setStatus(`Could not load the collection catalogue (${err.message}).`, 'error');
-            return;
         }
-        this.sites = new Map(this.catalogue.sites.map(s => [s.id, s]));
+        this._showSource();
+    }
+
+    async _fetchCatalogue(baseUrl) {
+        const res = await fetch(baseUrl + 'catalogue.json');
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const catalogue = await res.json();
+        if (!Array.isArray(catalogue?.items) || !Array.isArray(catalogue?.sites)) {
+            throw new Error('catalogue.json has no items/sites');
+        }
+        return catalogue;
+    }
+
+    /** Show a (new) catalogue: reset filters, list, markers and timeline. */
+    _applyCatalogue(catalogue) {
+        this.catalogue = catalogue;
+        this.sites = new Map(catalogue.sites.map(s => [s.id, s]));
+        this.filters = { text: '', site: '', type: '', timeKa: null, annotation: '' };
+        if (this.el.search) this.el.search.value = '';
+        this.activeId = null;
         this._setStatus('');
         this._fillFilters();
         this._renderSources();
         this._renderList();
         this._buildMap();
         this._renderTimeline();
+    }
+
+    /**
+     * Switch to another collection (e.g. a dataset of automatically labelled
+     * meshes to prescreen), or back to the official one with null. A Hugging
+     * Face branch is resolved to its commit, so cached files never go stale.
+     * The current collection stays if the new one cannot be loaded.
+     *
+     * @param {string|null} input - See parseCollectionSource; null = official
+     * @param {{quiet?: boolean}} [opts]
+     * @returns {Promise<boolean>} Whether the source was switched
+     */
+    async setSource(input, { quiet = false } = {}) {
+        let baseUrl = DEFAULT_COLLECTION_URL;
+        let label = null;
+        if (input) {
+            const src = parseCollectionSource(input);
+            if (!src) {
+                this._setSourceStatus('Enter owner/dataset, owner/dataset@revision, or a URL.', 'error');
+                return false;
+            }
+            if (!quiet) this._setSourceStatus('Checking…');
+            try {
+                if (src.kind === 'hf') {
+                    const res = await fetch(`https://huggingface.co/api/datasets/${src.repo}/revision/${encodeURIComponent(src.revision)}`);
+                    if (!res.ok) throw new Error(res.status === 404 || res.status === 401
+                        ? 'dataset or revision not found (or private)' : `${res.status} ${res.statusText}`);
+                    const sha = (await res.json()).sha;
+                    baseUrl = hfDatasetBaseUrl(src.repo, sha);
+                    label = `${src.repo}@${src.revision}` + (sha && sha !== src.revision ? ` (${sha.slice(0, 7)})` : '');
+                } else {
+                    baseUrl = src.url;
+                    label = src.url;
+                }
+            } catch (err) {
+                this._setSourceStatus(`Could not open ${input}: ${err.message}`, 'error');
+                return false;
+            }
+        }
+        let catalogue;
+        try {
+            catalogue = await this._fetchCatalogue(baseUrl);
+        } catch (err) {
+            this._setSourceStatus(`No usable catalogue.json at ${label || 'the official collection'}: ${err.message}`, 'error');
+            return false;
+        }
+        this.baseUrl = baseUrl;
+        this.sourceLabel = label;
+        try {
+            if (input) localStorage.setItem(SOURCE_KEY, input.trim());
+            else localStorage.removeItem(SOURCE_KEY);
+        } catch {
+            // Not remembered; the switch still applies to this session
+        }
+        this._applyCatalogue(catalogue);
+        this._showSource();
+        this._setSourceStatus(quiet ? '' : `Loaded ${catalogue.items.length} artifacts.`, 'ok');
+        if (this.visible) this._setMapVisible(true);
+        return true;
+    }
+
+    _showSource() {
+        const custom = !!this.sourceLabel;
+        if (this.el.customNote) {
+            this.el.customNote.hidden = !custom;
+            this.el.customNote.textContent = custom ? `Custom source: ${this.sourceLabel}` : '';
+            this.el.customNote.title = custom ? 'Not the official collection. Reset it under "Data source".' : '';
+        }
+        if (this.el.sourceCurrent) {
+            this.el.sourceCurrent.textContent = custom ? this.sourceLabel : 'Official collection';
+        }
+    }
+
+    _setSourceStatus(message, kind = 'info') {
+        if (!this.el.sourceStatus) return;
+        this.el.sourceStatus.textContent = message;
+        this.el.sourceStatus.className = `collection-source-status ${kind}`;
     }
 
     _fillFilters() {
@@ -206,8 +370,8 @@ export class CollectionPanel {
             const kinds = items.map(annotationKind);
             const n = k => kinds.filter(x => x === k).length;
             this.el.annotation.innerHTML = '<option value="">Any annotation</option>'
-                + `<option value="manual">Manual (${n('manual')})</option>`
-                + `<option value="semi-automatic">Semi-automatic (${n('semi-automatic')})</option>`;
+                + Object.keys(ANNOTATION_LABELS).filter(k => n(k))
+                    .map(k => `<option value="${k}">${ANNOTATION_LABELS[k]} (${n(k)})</option>`).join('');
         }
         if (this.el.type) {
             const types = [...new Set(items.map(i => i.type))].sort();
@@ -283,8 +447,7 @@ export class CollectionPanel {
                     <div class="collection-item-title">
                         <span class="collection-item-id">${escapeHtml(item.id)}</span>
                         <span class="collection-tags">
-                            ${annotationKind(item) === 'semi-automatic'
-                                ? `<span class="collection-auto" title="${SEMI_AUTO_TITLE}">Semi-auto</span>` : ''}
+                            ${this._annotationTag(item)}
                             <span class="collection-type">${escapeHtml(item.type)}</span>
                         </span>
                     </div>
@@ -294,6 +457,11 @@ export class CollectionPanel {
                     <div class="collection-progress"><div class="collection-progress-fill"></div></div>
                 </div>
             </button>`;
+    }
+
+    _annotationTag(item) {
+        const tag = ANNOTATION_TAGS[annotationKind(item)];
+        return tag ? `<span class="collection-auto ${tag[1]}" title="${escapeHtml(tag[2])}">${tag[0]}</span>` : '';
     }
 
     _setStatus(message, kind = 'info') {
@@ -307,13 +475,18 @@ export class CollectionPanel {
     // ------------------------------------------------------------------
 
     _buildMap() {
-        if (!this.el.mapDiv || this.map) return;
-        this.map = L.map(this.el.mapDiv, { zoomControl: true, worldCopyJump: true, zoomSnap: 0.25 });
-        this.map.on('zoomend resize', () => this._layoutLabels());
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 18,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        }).addTo(this.map);
+        if (!this.el.mapDiv) return;
+        if (!this.map) {
+            this.map = L.map(this.el.mapDiv, { zoomControl: true, worldCopyJump: true, zoomSnap: 0.25 });
+            this.map.on('zoomend resize', () => this._layoutLabels());
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 18,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            }).addTo(this.map);
+        }
+        // Markers belong to the current catalogue
+        for (const marker of this.markers.values()) marker.remove();
+        this.markers.clear();
 
         const located = this.catalogue.sites.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lon));
         for (const site of located) {
@@ -429,8 +602,10 @@ export class CollectionPanel {
         if (!el || !this.catalogue) return;
         const sites = this.catalogue.sites;
         const dated = sites.filter(s => Array.isArray(s.datingKa));
+        el.hidden = !dated.length;
         if (!dated.length) {
-            el.hidden = true;
+            el.innerHTML = '';
+            this._axis = null;
             return;
         }
         const step = 5;
