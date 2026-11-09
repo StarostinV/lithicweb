@@ -20,3 +20,15 @@ and `catalogue.json`, published as a Hugging Face dataset.
 
 Only sets whose raw scans are published under an open license belong here;
 `SITES` in `build_collection.py` records each source, its DOI and license.
+
+## Prescreen collections (automatic labels)
+
+`build_prescreen.py --out OUT_DIR` builds a collection of meshes not yet
+reviewed in fast verification, labelled automatically from the stored model
+output with the client's own postprocessing (`postprocess_labels.mjs`, run
+with `node --experimental-detect-module`). Items carry `annotation:
+automatic` and show an Auto tag. Render thumbnails as above
+(`render_thumbs.mjs` skips images that already exist), then upload to a
+separate dataset repository, never the official one, and open it through the
+Collection tab's "Data source" box. Current set: neurolithic/fumane-prescreen-tier-a
+(202 Fumane meshes with at least 50k vertices).

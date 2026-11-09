@@ -8,6 +8,7 @@
  * then crop with crop_thumbs.py. Requires playwright-core and a local Chrome.
  */
 import { chromium } from 'playwright-core';
+import fs from 'fs';
 
 const [appUrl, collectionUrl, outDir] = process.argv.slice(2);
 if (!outDir) {
@@ -29,6 +30,7 @@ await page.waitForSelector('.collection-item', { timeout: 30000 });
 
 const ids = await page.$$eval('.collection-item', els => els.map(e => e.dataset.id));
 for (const id of ids) {
+    if (fs.existsSync(`${outDir}/${id}.png`)) continue;     // resumable
     const sel = `.collection-item[data-id="${id}"]`;
     await page.evaluate(s => document.querySelector(s).click(), sel);
     await page.waitForFunction(s => document.querySelector(s)?.classList.contains('active'), sel, { timeout: 120000 });
