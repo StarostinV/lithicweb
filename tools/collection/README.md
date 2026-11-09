@@ -13,7 +13,10 @@ and `catalogue.json`, published as a Hugging Face dataset.
    `python crop_thumbs.py RAW_DIR OUT_DIR`.
 3. Run step 1 again so the catalogue lists the thumbnails.
 4. Upload `OUT_DIR` to the dataset repository, then pin the client to that
-   commit (`DEFAULT_COLLECTION_URL`).
+   commit (`DEFAULT_COLLECTION_URL`). The repository's `.gitattributes` must
+   list `*.ply` and `*.webp` as large files, committed *before* the data:
+   Hugging Face rejects binary files sent as plain git content, and the
+   upload client reads those rules from the server, not from the folder.
 
 Only sets whose raw scans are published under an open license belong here;
 `SITES` in `build_collection.py` records each source, its DOI and license.

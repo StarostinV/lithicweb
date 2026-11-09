@@ -8,7 +8,7 @@ import { confirmUnsavedChanges } from '../utils/confirmUnsavedChanges.js';
  * Override with ?collection=<base url> for testing another build.
  */
 export const DEFAULT_COLLECTION_URL =
-    'https://huggingface.co/datasets/StarostinV/lithic-collection-preview/resolve/main/';
+    'https://huggingface.co/datasets/StarostinV/lithic-collection-preview/resolve/ea0e00613e9204bb22a70e6dcab5445add1e91f6/';
 
 const CACHE_NAME = 'lithic-collection-v1';
 
@@ -243,7 +243,8 @@ export class CollectionPanel {
 
     _buildMap() {
         if (!this.el.mapDiv || this.map) return;
-        this.map = L.map(this.el.mapDiv, { zoomControl: true, worldCopyJump: true });
+        this.map = L.map(this.el.mapDiv, { zoomControl: true, worldCopyJump: true, zoomSnap: 0.25 });
+        this.map.on('zoomend resize', () => this._layoutLabels());
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 18,
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -261,7 +262,11 @@ export class CollectionPanel {
                 }),
                 title: site.name,
             }).addTo(this.map);
-            marker.bindTooltip(site.name, { direction: 'top', offset: [0, -16] });
+            // Always-visible site label next to the marker
+            marker.bindTooltip(
+                `<strong>${escapeHtml(site.name)}</strong>${site.period ? `<span>${escapeHtml(site.period)}</span>` : ''}`,
+                { permanent: true, direction: 'right', offset: [20, 0], className: 'collection-site-label', interactive: true });
+            marker.getTooltip().on('click', () => marker.openPopup());
             marker.bindPopup(this._sitePopupHtml(site, n), { maxWidth: 300 });
             marker.on('click', () => this._setSite(site.id));
             this.markers.set(site.id, marker);
@@ -270,6 +275,39 @@ export class CollectionPanel {
         this._fitted = false;
         this.map.setView([45, 10], 4);
         this._updateMarkers();
+    }
+
+    /**
+     * Put each site label right of its marker, or left when that would
+     * overlap an already placed label or leave the map (top to bottom, greedy).
+     */
+    _layoutLabels() {
+        if (!this.map) return;
+        const size = this.map.getSize();
+        const placed = [];
+        const entries = [...this.markers.values()]
+            .map(marker => ({ marker, p: this.map.latLngToContainerPoint(marker.getLatLng()) }))
+            .sort((a, b) => a.p.y - b.p.y);
+        for (const { marker, p } of entries) {
+            const tip = marker.getTooltip();
+            const el = tip?.getElement();
+            if (!el || !el.offsetWidth) continue;
+            const w = el.offsetWidth, h = el.offsetHeight, gap = 20;
+            const rect = dir => ({
+                x0: dir === 'right' ? p.x + gap : p.x - gap - w,
+                x1: dir === 'right' ? p.x + gap + w : p.x - gap,
+                y0: p.y - h / 2, y1: p.y + h / 2,
+            });
+            const fits = r => r.x0 >= 0 && r.x1 <= size.x
+                && !placed.some(q => r.x0 < q.x1 && q.x0 < r.x1 && r.y0 < q.y1 && q.y0 < r.y1);
+            const dir = ['right', 'left'].find(d => fits(rect(d))) || 'right';
+            placed.push(rect(dir));
+            if (tip.options.direction !== dir) {
+                tip.options.direction = dir;
+                tip.options.offset = [dir === 'right' ? gap : -gap, 0];
+                tip.update();
+            }
+        }
     }
 
     _sitePopupHtml(site, n) {
@@ -291,14 +329,19 @@ export class CollectionPanel {
 
     _updateMarkers() {
         for (const [id, marker] of this.markers) {
-            const el = marker.getElement();
-            el?.classList.toggle('selected', id === this.filters.site);
-            el?.classList.toggle('dimmed', !!this.filters.site && id !== this.filters.site);
+            const selected = id === this.filters.site;
+            const dimmed = !!this.filters.site && !selected;
+            for (const el of [marker.getElement(), marker.getTooltip()?.getElement()]) {
+                el?.classList.toggle('selected', selected);
+                el?.classList.toggle('dimmed', dimmed);
+            }
         }
     }
 
     _highlightSite(siteId, on) {
-        this.markers.get(siteId)?.getElement()?.classList.toggle('hover', on);
+        const marker = this.markers.get(siteId);
+        marker?.getElement()?.classList.toggle('hover', on);
+        marker?.getTooltip()?.getElement()?.classList.toggle('hover', on);
     }
 
     _setMapVisible(show) {
@@ -311,9 +354,10 @@ export class CollectionPanel {
             requestAnimationFrame(() => {
                 this.map.invalidateSize();
                 if (!this._fitted && this._bounds) {
-                    this.map.fitBounds(this._bounds, { padding: [60, 60], maxZoom: 8 });
+                    this.map.fitBounds(this._bounds, { padding: [80, 80], maxZoom: 8 });
                     this._fitted = true;
                 }
+                this._layoutLabels();
             });
         }
     }

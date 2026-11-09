@@ -299,6 +299,60 @@ body.sidebar-collapsed .collection-map-overlay {
     opacity: 0.45;
 }
 
+/* Permanent site labels (Leaflet tooltips) */
+.leaflet-tooltip.collection-site-label {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 5px 10px;
+    border: none;
+    border-left: 3px solid var(--primary);
+    border-right: 3px solid transparent;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+    color: var(--gray-800, #1f2937);
+    font-family: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: opacity 0.15s, border-color 0.15s;
+}
+
+.leaflet-tooltip.collection-site-label::before {
+    display: none;   /* no pointer arrow */
+}
+
+.collection-site-label strong {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.collection-site-label span {
+    font-size: 11px;
+    color: var(--gray-500);
+}
+
+.leaflet-tooltip-left.collection-site-label {
+    border-left-color: transparent;
+    border-right-color: var(--primary);
+    align-items: flex-end;
+}
+
+.collection-site-label.hover,
+.collection-site-label.selected {
+    border-left-color: #10b981;
+}
+
+.leaflet-tooltip-left.collection-site-label.hover,
+.leaflet-tooltip-left.collection-site-label.selected {
+    border-left-color: transparent;
+    border-right-color: #10b981;
+}
+
+.collection-site-label.dimmed {
+    opacity: 0.55;
+}
+
 .collection-popup {
     display: flex;
     flex-direction: column;
