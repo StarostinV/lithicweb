@@ -8,7 +8,7 @@ import { confirmUnsavedChanges } from '../utils/confirmUnsavedChanges.js';
  * Override with ?collection=<base url> for testing another build.
  */
 export const DEFAULT_COLLECTION_URL =
-    'https://huggingface.co/datasets/neurolithic/neurolithic-corpus/resolve/dfad877e0404c30acdd21debc6fc58c7dffe3188/';
+    'https://huggingface.co/datasets/neurolithic/neurolithic-corpus/resolve/269302f7f8e02e7aa3163a34a6b0bf676b56cdd8/';
 
 const CACHE_NAME = 'lithic-collection-v1';
 const SOURCE_KEY = 'lithicjs_collection_source';

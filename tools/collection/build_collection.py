@@ -62,16 +62,17 @@ RAW_FUMANE = LITHIC / "data/zenodo_v301/RF_3D_Meshes"   # raw scans, for the han
 METRICS_CSV = LITHIC / "data/onedrive/scar_segmentation/full_run_metrics_546.csv"
 
 # Sites whose raw scans are published under CC-BY-4.0 (The Open Aurignacian
-# Project, Falcucci et al.). Coordinates and dating are quoted from the
-# Zenodo records, except where marked approximate.
+# Project, Falcucci et al.). Coordinates are quoted from the Zenodo records
+# (except where marked approximate); dating from Falcucci et al. 2025
+# (Sci. Data, 'The Open Aurignacian Project'), Table 1.
 SITES = {
     "fumane": dict(
         name="Grotta di Fumane", context="Grotta di Fumane",
         region="Veneto, northeastern Italy",
         lat=45.5925, lon=10.9058, coordinates="approximate (not given in the source record)",
         period="Aurignacian and Gravettian",
-        dating="c. 41–33 ky cal BP (Higham et al. 2009)",
-        datingKa=[41.0, 33.0],
+        dating="41.2–33.2 ky cal BP (Falcucci et al. 2025, Table 1)",
+        datingKa=[41.2, 33.2],
         source=dict(title="The Open Aurignacian Project. Volume 1: Grotta di Fumane in northeastern Italy",
                     authors="Falcucci, A.; Peresani, M.", doi="10.5281/zenodo.15382869", license="CC-BY-4.0"),
     ),
@@ -80,8 +81,8 @@ SITES = {
         region="Campania, southern Italy",
         lat=40.49563600, lon=15.20922177, coordinates="as published in the source record",
         period="Protoaurignacian and Early Aurignacian",
-        dating="c. 41,000–39,800 years ago (Douka et al. 2014)",
-        datingKa=[41.0, 39.8],
+        dating="41.8–39.9 ky cal BP (Falcucci et al. 2025, Table 1)",
+        datingKa=[41.8, 39.9],
         source=dict(title="The Open Aurignacian Project. Volume 2: Grotta di Castelcivita in southern Italy",
                     authors="Falcucci, A.; Moroni, A.", doi="10.5281/zenodo.15383157", license="CC-BY-4.0"),
     ),
@@ -90,8 +91,8 @@ SITES = {
         region="Marina di Camerota, Campania, southern Italy",
         lat=40.00108243, lon=15.38095416, coordinates="as published in the source record",
         period="Early Aurignacian",
-        dating="after c. 40,000 years ago (spit AU12 OSL 38,390–34,682 cal BP; AU10 14C 38,840–37,637 cal BP)",
-        datingKa=[38.84, 34.68],   # span of the two quoted dates
+        dating="39.9–37.4 ky cal BP (Falcucci et al. 2025, Table 1)",
+        datingKa=[39.9, 37.4],
         source=dict(title="The Open Aurignacian Project. Volume 3: Grotta della Cala in southern Italy",
                     authors="Falcucci, A.; Moroni, A.", doi="10.5281/zenodo.15383121", license="CC-BY-4.0"),
     ),
@@ -100,8 +101,8 @@ SITES = {
         region="Balzi Rossi, Liguria, northwestern Italy",
         lat=43.783222, lon=7.535444, coordinates="as published in the source record",
         period="Protoaurignacian (A2, A1) and Early Aurignacian (A0)",
-        dating=None,
-        datingKa=None,             # no numeric date in the source record
+        dating="41.2–35.9 ky cal BP (Falcucci et al. 2025, Table 1)",
+        datingKa=[41.2, 35.9],
         source=dict(title="The Open Aurignacian Project. Volume 4: Riparo Bombrini in northwestern Italy",
                     authors="Falcucci, A.; Negrino, F.; Riel-Salvatore, J.", doi="10.5281/zenodo.15383190",
                     license="CC-BY-4.0"),
@@ -460,7 +461,9 @@ Raw scans (each artifact's `source` in catalogue.json names its dataset):
 
 {sources}
 
-Site coordinates and dating are quoted from the source records where they give them.{note}
+Site coordinates are quoted from the source records where they give them; the
+dating of the Italian sites follows Falcucci et al. 2025 (The Open Aurignacian
+Project, Sci. Data), Table 1.{note}
 """
 
 
