@@ -20,19 +20,32 @@ const CACHE_NAME = 'lithic-collection-v1';
  * @param {string} [filters.text] - Matches id, type, site name, unit, raw material
  * @param {string} [filters.site] - Site id, or '' for all
  * @param {string} [filters.type] - Artifact type, or '' for all
+ * @param {number|null} [filters.timeKa] - Keep sites whose dating range contains this age
  * @param {Map<string,Object>} [sites] - Site id -> site, for name matching
  * @returns {Array<Object>}
  */
-export function filterItems(items, { text = '', site = '', type = '' } = {}, sites = new Map()) {
+export function filterItems(items, { text = '', site = '', type = '', timeKa = null } = {}, sites = new Map()) {
     const needle = text.trim().toLowerCase();
     return items.filter(item => {
         if (site && item.site !== site) return false;
         if (type && item.type !== type) return false;
+        if (timeKa != null && !siteCoversTime(sites.get(item.site), timeKa)) return false;
         if (!needle) return true;
         const hay = [item.id, item.type, sites.get(item.site)?.name, item.unit, item.rawMaterial, item.dataset]
             .filter(Boolean).join(' ').toLowerCase();
         return hay.includes(needle);
     });
+}
+
+/**
+ * Whether a site's dating range [older, younger] (ka) contains an age.
+ * @param {Object} site
+ * @param {number} timeKa
+ * @returns {boolean}
+ */
+export function siteCoversTime(site, timeKa) {
+    const r = site?.datingKa;
+    return Array.isArray(r) && timeKa <= r[0] && timeKa >= r[1];
 }
 
 /**
@@ -75,7 +88,7 @@ export class CollectionPanel {
 
         this.catalogue = null;
         this.sites = new Map();
-        this.filters = { text: '', site: '', type: '' };
+        this.filters = { text: '', site: '', type: '', timeKa: null };
         this.loadingId = null;
         this.activeId = null;
         this.map = null;
@@ -338,7 +351,8 @@ export class CollectionPanel {
     _updateMarkers() {
         for (const [id, marker] of this.markers) {
             const selected = id === this.filters.site;
-            const dimmed = !!this.filters.site && !selected;
+            const dimmed = (!!this.filters.site && !selected)
+                || (this.filters.timeKa != null && !siteCoversTime(this.sites.get(id), this.filters.timeKa));
             for (const el of [marker.getElement(), marker.getTooltip()?.getElement()]) {
                 el?.classList.toggle('selected', selected);
                 el?.classList.toggle('dimmed', dimmed);
@@ -350,7 +364,7 @@ export class CollectionPanel {
         const marker = this.markers.get(siteId);
         marker?.getElement()?.classList.toggle('hover', on);
         marker?.getTooltip()?.getElement()?.classList.toggle('hover', on);
-        this.el.timeline?.querySelector(`.collection-timeline-row[data-site="${CSS.escape(siteId)}"]`)
+        this.el.timeline?.querySelector(`.collection-timeline-band[data-site="${CSS.escape(siteId)}"]`)
             ?.classList.toggle('hover', on);
     }
 
@@ -358,7 +372,11 @@ export class CollectionPanel {
     // Timeline
     // ------------------------------------------------------------------
 
-    /** Dating bars per site on a ka cal BP axis (older on the left). */
+    /**
+     * One shared ka cal BP axis (older on the left) with a translucent band
+     * per dated site, so overlaps read as darker. Hovering shows which sites
+     * cover that age; clicking pins it as a filter.
+     */
     _renderTimeline() {
         const el = this.el.timeline;
         if (!el || !this.catalogue) return;
@@ -369,46 +387,109 @@ export class CollectionPanel {
             return;
         }
         const step = 5;
-        const oldest = Math.ceil(Math.max(...dated.map(s => s.datingKa[0])) / step) * step;
-        const youngest = Math.floor(Math.min(...dated.map(s => s.datingKa[1])) / step) * step;
-        const pct = ka => ((oldest - ka) / (oldest - youngest)) * 100;
-
+        this._axis = {
+            oldest: Math.ceil(Math.max(...dated.map(s => s.datingKa[0])) / step) * step,
+            youngest: Math.floor(Math.min(...dated.map(s => s.datingKa[1])) / step) * step,
+        };
+        const pct = ka => this._kaToPct(ka);
         const ticks = [];
-        for (let ka = oldest; ka >= youngest; ka -= step) {
+        for (let ka = this._axis.oldest; ka >= this._axis.youngest; ka -= step) {
             ticks.push(`<span class="collection-timeline-tick" style="left:${pct(ka)}%">${ka}</span>`);
         }
-        const rows = sites.map(s => {
-            const bar = Array.isArray(s.datingKa)
-                ? `<span class="collection-timeline-bar" style="left:${pct(s.datingKa[0])}%;width:${Math.max(1.5, pct(s.datingKa[1]) - pct(s.datingKa[0]))}%"
-                         title="${escapeHtml(s.dating || '')}"></span>`
-                : '<span class="collection-timeline-undated">undated</span>';
-            return `
-                <button type="button" class="collection-timeline-row" data-site="${escapeHtml(s.id)}">
-                    <span class="collection-timeline-name">${escapeHtml(s.name)}</span>
-                    <span class="collection-timeline-track">${bar}</span>
-                </button>`;
-        }).join('');
+        const bands = dated.map(s => `
+            <span class="collection-timeline-band" data-site="${escapeHtml(s.id)}"
+                  style="left:${pct(s.datingKa[0])}%;width:${Math.max(0.8, pct(s.datingKa[1]) - pct(s.datingKa[0]))}%"></span>`).join('');
+        const undated = sites.filter(s => !Array.isArray(s.datingKa)).map(s => s.name);
         el.innerHTML = `
-            <div class="collection-timeline-title">Dating <span>ka cal BP</span></div>
-            ${rows}
-            <div class="collection-timeline-axis">
-                <span class="collection-timeline-name"></span>
-                <span class="collection-timeline-track">${ticks.join('')}</span>
-            </div>`;
-        el.querySelectorAll('.collection-timeline-row').forEach(row => {
-            const id = row.dataset.site;
-            row.addEventListener('click', () => this._setSite(this.filters.site === id ? '' : id));
-            row.addEventListener('mouseenter', () => this._highlightSite(id, true));
-            row.addEventListener('mouseleave', () => this._highlightSite(id, false));
+            <div class="collection-timeline-head">
+                <span class="collection-timeline-title">Dating <span>ka cal BP</span></span>
+                <span class="collection-timeline-readout"></span>
+            </div>
+            <div class="collection-timeline-plot">
+                ${bands}
+                <span class="collection-timeline-cursor hover-cursor"></span>
+                <span class="collection-timeline-cursor pinned-cursor"></span>
+            </div>
+            <div class="collection-timeline-ticks">${ticks.join('')}</div>
+            ${undated.length ? `<div class="collection-timeline-note">Undated: ${escapeHtml(undated.join(', '))}</div>` : ''}`;
+
+        const plot = el.querySelector('.collection-timeline-plot');
+        const kaAt = ev => {
+            const r = plot.getBoundingClientRect();
+            const f = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
+            return Math.round((this._axis.oldest - f * (this._axis.oldest - this._axis.youngest)) * 10) / 10;
+        };
+        plot.addEventListener('mousemove', ev => this._previewTime(kaAt(ev)));
+        plot.addEventListener('mouseleave', () => this._previewTime(null));
+        plot.addEventListener('click', ev => this._setTime(kaAt(ev)));
+        el.querySelector('.collection-timeline-readout').addEventListener('click', ev => {
+            if (ev.target.closest('.collection-timeline-clear')) this._setTime(null);
         });
         this._updateTimeline();
     }
 
+    _kaToPct(ka) {
+        const { oldest, youngest } = this._axis;
+        return ((oldest - ka) / (oldest - youngest)) * 100;
+    }
+
+    _sitesAt(timeKa) {
+        return this.catalogue.sites.filter(s => siteCoversTime(s, timeKa));
+    }
+
+    /** Hover preview: cursor, readout, and highlighted sites. */
+    _previewTime(timeKa) {
+        const el = this.el.timeline;
+        if (!el) return;
+        const cursor = el.querySelector('.hover-cursor');
+        for (const s of this.catalogue.sites) this._highlightSite(s.id, false);
+        if (timeKa == null) {
+            cursor.style.display = 'none';
+            this._updateTimeline();
+            return;
+        }
+        cursor.style.display = 'block';
+        cursor.style.left = `${this._kaToPct(timeKa)}%`;
+        const here = this._sitesAt(timeKa);
+        here.forEach(s => this._highlightSite(s.id, true));
+        this._setReadout(timeKa, here, false);
+    }
+
+    /** Pin (or clear, with null) an age as a filter. */
+    _setTime(timeKa) {
+        this.filters.timeKa = timeKa;
+        this._renderList();
+        this._updateMarkers();
+        this._updateTimeline();
+    }
+
+    _setReadout(timeKa, sites, pinned) {
+        const readout = this.el.timeline?.querySelector('.collection-timeline-readout');
+        if (!readout) return;
+        if (timeKa == null) {
+            readout.innerHTML = '';
+            return;
+        }
+        const names = sites.length ? sites.map(s => s.name.replace(/^(Grotta|Riparo) (di |della |del )?/, '')).join(', ') : 'no dated site';
+        readout.innerHTML = `≈${timeKa.toFixed(1)} ka · ${escapeHtml(names)}`
+            + (pinned ? ' <button type="button" class="collection-timeline-clear" title="Clear time filter">×</button>' : '');
+    }
+
     _updateTimeline() {
-        this.el.timeline?.querySelectorAll('.collection-timeline-row').forEach(row => {
-            row.classList.toggle('selected', row.dataset.site === this.filters.site);
-            row.classList.toggle('dimmed', !!this.filters.site && row.dataset.site !== this.filters.site);
+        const el = this.el.timeline;
+        if (!el || !this._axis) return;
+        const t = this.filters.timeKa;
+        el.querySelectorAll('.collection-timeline-band').forEach(band => {
+            const id = band.dataset.site;
+            const site = this.sites.get(id);
+            band.classList.toggle('selected', id === this.filters.site);
+            band.classList.toggle('dimmed', (!!this.filters.site && id !== this.filters.site)
+                || (t != null && !siteCoversTime(site, t)));
         });
+        const pinned = el.querySelector('.pinned-cursor');
+        pinned.style.display = t == null ? 'none' : 'block';
+        if (t != null) pinned.style.left = `${this._kaToPct(t)}%`;
+        this._setReadout(t, t == null ? [] : this._sitesAt(t), true);
     }
 
     _setMapVisible(show) {
@@ -423,7 +504,12 @@ export class CollectionPanel {
             requestAnimationFrame(() => {
                 this.map.invalidateSize();
                 if (!this._fitted && this._bounds) {
-                    this.map.fitBounds(this._bounds, { padding: [80, 80], maxZoom: 8 });
+                    // Keep sites clear of the timeline panel in the bottom-left corner
+                    const panel = this.el.overlay?.querySelector('.collection-map-controls');
+                    const below = panel ? panel.offsetHeight + 40 : 80;
+                    this.map.fitBounds(this._bounds, {
+                        paddingTopLeft: [80, 80], paddingBottomRight: [80, below], maxZoom: 8,
+                    });
                     this._fitted = true;
                 }
                 this._layoutLabels();

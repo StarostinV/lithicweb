@@ -34,3 +34,15 @@ test('formatBytes', () => {
     expect(formatBytes(62100000)).toBe('62 MB');
     expect(formatBytes(undefined)).toBe('');
 });
+
+test('time filter keeps sites whose dating range contains the age; undated sites drop out', () => {
+    const dated = new Map([
+        ['fumane', { name: 'Grotta di Fumane', datingKa: [41, 33] }],
+        ['castelcivita', { name: 'Grotta di Castelcivita', datingKa: [41, 39.8] }],
+    ]);
+    expect(ids(filterItems(items, { timeKa: 40.5 }, dated))).toEqual(['RF.b_1', 'RF.c_2', 'CTC_3']);
+    expect(ids(filterItems(items, { timeKa: 35 }, dated))).toEqual(['RF.b_1', 'RF.c_2']);
+    expect(ids(filterItems(items, { timeKa: 30 }, dated))).toEqual([]);
+    const oneUndated = new Map([['fumane', { name: 'F', datingKa: [41, 33] }], ['castelcivita', { name: 'C' }]]);
+    expect(ids(filterItems(items, { timeKa: 40 }, oneUndated))).toEqual(['RF.b_1', 'RF.c_2']);
+});

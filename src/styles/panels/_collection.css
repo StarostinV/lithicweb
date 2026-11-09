@@ -398,7 +398,7 @@ body.collection-map-open .floating-action-pill {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    width: min(440px, calc(100% - 24px));
+    width: min(380px, calc(100% - 24px));
     padding: 12px 14px;
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.95);
@@ -410,14 +410,21 @@ body.collection-map-open .floating-action-pill {
 .collection-timeline {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
+}
+
+.collection-timeline-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 18px;
 }
 
 .collection-timeline-title {
+    flex: none;
     font-weight: 700;
-    font-size: 12px;
     color: var(--gray-800, #1f2937);
-    margin-bottom: 2px;
 }
 
 .collection-timeline-title span {
@@ -426,85 +433,79 @@ body.collection-map-open .floating-action-pill {
     margin-left: 4px;
 }
 
-.collection-timeline-row,
-.collection-timeline-axis {
-    display: grid;
-    grid-template-columns: 128px 1fr;
-    align-items: center;
-    gap: 8px;
-}
-
-.collection-timeline-row {
-    width: 100%;
-    padding: 2px 4px;
-    margin: 0 -4px;
-    border: none;
-    border-radius: 5px;
-    background: none;
-    font: inherit;
-    color: inherit;
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.15s, opacity 0.15s;
-}
-
-.collection-timeline-row:hover,
-.collection-timeline-row.hover {
-    background: var(--gray-100);
-}
-
-.collection-timeline-row.dimmed {
-    opacity: 0.45;
-}
-
-.collection-timeline-name {
+.collection-timeline-readout {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: var(--gray-600, #4b5563);
 }
 
-.collection-timeline-row.selected .collection-timeline-name {
-    font-weight: 700;
+.collection-timeline-clear {
+    margin-left: 4px;
+    padding: 0 6px;
+    border: none;
+    border-radius: 999px;
+    background: var(--gray-200);
+    color: var(--gray-700, #374151);
+    font-size: 12px;
+    line-height: 16px;
+    cursor: pointer;
 }
 
-.collection-timeline-track {
+/* One shared track: translucent band per site, overlaps read darker */
+.collection-timeline-plot {
     position: relative;
-    height: 12px;
+    height: 22px;
     border-radius: 6px;
     background: var(--gray-100);
+    cursor: crosshair;
 }
 
-.collection-timeline-axis .collection-timeline-track {
-    background: none;
+.collection-timeline-band {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    border-radius: 4px;
+    background: rgba(99, 102, 241, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(79, 70, 229, 0.55);
+    pointer-events: none;
+    transition: background 0.15s, opacity 0.15s;
+}
+
+.collection-timeline-band.hover,
+.collection-timeline-band.selected {
+    background: rgba(16, 185, 129, 0.45);
+    box-shadow: inset 0 0 0 1px rgba(5, 150, 105, 0.8);
+}
+
+.collection-timeline-band.dimmed {
+    opacity: 0.25;
+}
+
+.collection-timeline-cursor {
+    display: none;
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 0;
+    border-left: 2px solid var(--gray-700, #374151);
+    pointer-events: none;
+}
+
+.collection-timeline-cursor.hover-cursor {
+    border-left-style: dashed;
+    border-left-color: var(--gray-500);
+}
+
+.collection-timeline-ticks {
+    position: relative;
     height: 14px;
-}
-
-.collection-timeline-bar {
-    position: absolute;
-    top: 1px;
-    bottom: 1px;
-    border-radius: 5px;
-    background: var(--primary);
-    transition: background 0.15s;
-}
-
-.collection-timeline-row.hover .collection-timeline-bar,
-.collection-timeline-row.selected .collection-timeline-bar {
-    background: #10b981;
-}
-
-.collection-timeline-undated {
-    position: absolute;
-    left: 6px;
-    top: -1px;
-    font-size: 10px;
-    font-style: italic;
-    color: var(--gray-500);
 }
 
 .collection-timeline-tick {
     position: absolute;
-    top: 0;
+    top: 2px;
     transform: translateX(-50%);
     font-size: 10px;
     color: var(--gray-500);
@@ -517,6 +518,12 @@ body.collection-map-open .floating-action-pill {
     top: -4px;
     height: 3px;
     border-left: 1px solid var(--gray-400, #9ca3af);
+}
+
+.collection-timeline-note {
+    font-size: 11px;
+    font-style: italic;
+    color: var(--gray-500);
 }
 
 .collection-label-toggle {
