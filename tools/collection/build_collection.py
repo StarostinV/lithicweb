@@ -21,9 +21,11 @@ The h5 vertices are PCA-aligned, and for about half of the meshes that
 alignment is a reflection (determinant -1): the artifact is mirrored and its
 triangles are inside-out, so viewers show the far side through the near one.
 Such meshes are un-mirrored by negating the third PCA axis, which keeps the
-alignment and the vertex order (and therefore the labels). Every published
-mesh must have a positive signed volume, and where the raw scan is available
-(Fumane) the published mesh must be a proper rotation of it.
+alignment and the vertex order (and therefore the labels). Some meshes are
+mirrored with their triangle order also reversed, so their volume is positive;
+only the raw scan reveals those, and it is used wherever available (Fumane).
+Every published mesh must have a positive signed volume and, where the raw
+scan exists, be a proper rotation of it.
 
 Usage
 -----
@@ -195,22 +197,37 @@ def signed_volume(V, F):
 
 
 def unmirror(sid, V, F):
-    """Return (vertices with positive handedness, whether they were flipped)."""
-    flipped = signed_volume(V.astype(np.float64), F) < 0
-    if flipped:
+    """Return (vertices, faces, whether anything was changed) with the
+    artifact's true handedness and outward-facing triangles.
+
+    Two upstream defects are repaired: a reflected PCA alignment (mirror
+    image, inside-out triangles: negative volume), and a mirror image whose
+    triangle order was also reversed (positive volume, so only a comparison
+    with the raw scan reveals it). The third PCA axis is negated, which keeps
+    the alignment and the vertex order, so the vertex labels stay valid."""
+    changed = False
+    if signed_volume(V.astype(np.float64), F) < 0:
         V = V.copy()
         V[:, 2] *= -1
-    if signed_volume(V.astype(np.float64), F) <= 0:
-        raise RuntimeError(f"{sid}: signed volume not positive after un-mirroring")
+        changed = True
     raw = RAW_FUMANE / f"{sid}.ply"
     if raw.exists():
         r = PlyData.read(str(raw))["vertex"]
         R = np.stack([r["x"], r["y"], r["z"]], 1).astype(np.float64)
         if len(R) == len(V):
-            M, *_ = np.linalg.lstsq(R - R.mean(0), V.astype(np.float64) - V.mean(0), rcond=None)
-            if np.linalg.det(M) < 0:
+            def det_to_raw(W):
+                M, *_ = np.linalg.lstsq(R - R.mean(0), W.astype(np.float64) - W.mean(0), rcond=None)
+                return np.linalg.det(M)
+            if det_to_raw(V) < 0:
+                V = V.copy()
+                V[:, 2] *= -1
+                F = F[:, [0, 2, 1]]          # mirroring flips winding; restore outward triangles
+                changed = True
+            if det_to_raw(V) < 0:
                 raise RuntimeError(f"{sid}: published mesh is a mirror image of the raw scan")
-    return V, flipped
+    if signed_volume(V.astype(np.float64), F) <= 0:
+        raise RuntimeError(f"{sid}: signed volume not positive after un-mirroring")
+    return V, F, changed
 
 
 def vertex_segments(n, F, labels):
@@ -385,7 +402,7 @@ def build_item(job):
         V = g["vertices"][:].astype(np.float32)
         F = g["faces"][:].astype(np.int32)
         labels, label_source = edge_labels_for(sid, len(V), F, g["labels"][:], _W["states"])
-        V, flipped = unmirror(sid, V, F)
+        V, F, flipped = unmirror(sid, V, F)
     except RuntimeError as err:
         return dict(error=str(err), id=sid)
 
