@@ -432,7 +432,7 @@ export class CollectionPanel {
             </div>
             <div class="collection-timeline-plot" style="height:${plotHeight}px">
                 ${plotHtml}
-                <span class="collection-timeline-empty">Select a site to show its range</span>
+                <span class="collection-timeline-empty">Select a site to see its dating</span>
                 <span class="collection-timeline-cursor hover-cursor"></span>
                 <span class="collection-timeline-cursor pinned-cursor"></span>
             </div>
@@ -542,7 +542,7 @@ export class CollectionPanel {
         const empty = el.querySelector('.collection-timeline-empty');
         if (empty) {
             empty.style.display = collapsed && !Array.isArray(selected?.datingKa) ? 'block' : 'none';
-            empty.textContent = selected ? `${selected.name}: undated` : 'Select a site to show its range';
+            empty.textContent = selected ? `${selected.name}: undated` : 'Select a site to see its dating';
         }
         // Full mode names an undated site only when it is the selected one
         const note = el.querySelector('.collection-timeline-note');
@@ -554,7 +554,7 @@ export class CollectionPanel {
         const toggle = el.querySelector('.collection-timeline-collapse');
         if (toggle) {
             toggle.innerHTML = `<i class="fas fa-chevron-${collapsed ? 'up' : 'down'}"></i>`;
-            toggle.title = collapsed ? 'Show all site ranges' : 'Show only the selected site';
+            toggle.title = collapsed ? 'Show the dating of all sites' : 'Show only the selected site';
         }
         const pinned = el.querySelector('.pinned-cursor');
         pinned.style.display = t == null ? 'none' : 'block';
