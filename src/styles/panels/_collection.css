@@ -434,6 +434,8 @@ body.collection-map-open .floating-action-pill {
 }
 
 .collection-timeline-readout {
+    flex: 1;
+    text-align: right;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -534,4 +536,52 @@ body.collection-map-open .floating-action-pill {
     border-top: 1px solid var(--gray-200);
     cursor: pointer;
     user-select: none;
+}
+
+.collection-timeline-collapse {
+    flex: none;
+    margin-left: auto;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 6px;
+    background: var(--gray-100);
+    color: var(--gray-600, #4b5563);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.collection-timeline-collapse:hover {
+    background: var(--gray-200);
+    color: var(--gray-800, #1f2937);
+}
+
+.collection-timeline-empty {
+    display: none;
+    position: absolute;
+    inset: 0;
+    font-size: 10.5px;
+    font-style: italic;
+    line-height: 14px;
+    text-align: center;
+    color: var(--gray-500);
+    pointer-events: none;
+}
+
+/* Compact mode: a single track showing only the selected site's line */
+.timeline-collapsed .collection-timeline-plot {
+    height: 14px !important;
+}
+
+.timeline-collapsed .collection-timeline-line {
+    display: none;
+}
+
+.timeline-collapsed .collection-timeline-line.selected {
+    display: block;
+    top: 5px !important;
+}
+
+.timeline-collapsed .collection-timeline-note {
+    display: none;
 }
