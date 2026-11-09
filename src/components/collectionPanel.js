@@ -85,6 +85,8 @@ export class CollectionPanel {
 
         const param = new URLSearchParams(window.location.search).get('collection');
         this.baseUrl = (param || DEFAULT_COLLECTION_URL).replace(/\/?$/, '/');
+        // Timeline variant under evaluation: 'tags' (default) or 'lines'
+        this.timelineVariant = new URLSearchParams(window.location.search).get('timeline') === 'lines' ? 'lines' : 'tags';
 
         this.catalogue = null;
         this.sites = new Map();
@@ -277,7 +279,9 @@ export class CollectionPanel {
             const marker = L.marker([site.lat, site.lon], {
                 icon: L.divIcon({
                     className: 'collection-marker',
-                    html: `<span>${n}</span>`,
+                    html: this.timelineVariant === 'lines'
+                        ? `<span style="background:${this._siteColor(site.id)}">${n}</span>`
+                        : `<span>${n}</span>`,
                     iconSize: [34, 34],
                     iconAnchor: [17, 17],
                 }),
@@ -364,8 +368,8 @@ export class CollectionPanel {
         const marker = this.markers.get(siteId);
         marker?.getElement()?.classList.toggle('hover', on);
         marker?.getTooltip()?.getElement()?.classList.toggle('hover', on);
-        this.el.timeline?.querySelector(`.collection-timeline-band[data-site="${CSS.escape(siteId)}"]`)
-            ?.classList.toggle('hover', on);
+        this.el.timeline?.querySelectorAll(`[data-site="${CSS.escape(siteId)}"]`)
+            .forEach(e => e.classList.toggle('hover', on));
     }
 
     // ------------------------------------------------------------------
@@ -373,9 +377,14 @@ export class CollectionPanel {
     // ------------------------------------------------------------------
 
     /**
-     * One shared ka cal BP axis (older on the left) with a translucent band
-     * per dated site, so overlaps read as darker. Hovering shows which sites
-     * cover that age; clicking pins it as a filter.
+     * Dating timeline on one shared ka cal BP axis (older on the left).
+     * Two variants, chosen with ?timeline=tags|lines while we compare them:
+     * - tags: a translucent band per dated site, overlaps read darker, and a
+     *   small name tag above each band's midpoint (stacked when they collide);
+     * - lines: a thin coloured line per site, packed into lanes that are
+     *   reused when ranges do not overlap; map markers take the same colours.
+     * Hovering an age highlights the sites covering it; clicking pins the age
+     * as a filter.
      */
     _renderTimeline() {
         const el = this.el.timeline;
@@ -392,21 +401,49 @@ export class CollectionPanel {
             youngest: Math.floor(Math.min(...dated.map(s => s.datingKa[1])) / step) * step,
         };
         const pct = ka => this._kaToPct(ka);
+        const left = s => pct(s.datingKa[0]);
+        const width = s => Math.max(0.8, pct(s.datingKa[1]) - pct(s.datingKa[0]));
         const ticks = [];
         for (let ka = this._axis.oldest; ka >= this._axis.youngest; ka -= step) {
             ticks.push(`<span class="collection-timeline-tick" style="left:${pct(ka)}%">${ka}</span>`);
         }
-        const bands = dated.map(s => `
-            <span class="collection-timeline-band" data-site="${escapeHtml(s.id)}"
-                  style="left:${pct(s.datingKa[0])}%;width:${Math.max(0.8, pct(s.datingKa[1]) - pct(s.datingKa[0]))}%"></span>`).join('');
+
+        let plotHtml;
+        let tagsHtml = '';
+        if (this.timelineVariant === 'lines') {
+            // Greedy lane packing, left (older) to right; a lane is free once
+            // its last range has ended (with a small gap)
+            const lanes = [];
+            const laneOf = new Map();
+            for (const s of [...dated].sort((x, y) => y.datingKa[0] - x.datingKa[0])) {
+                let lane = lanes.findIndex(end => end - 0.3 >= s.datingKa[0]);
+                if (lane < 0) { lane = lanes.length; lanes.push(0); }
+                lanes[lane] = s.datingKa[1];
+                laneOf.set(s.id, lane);
+            }
+            plotHtml = dated.map(s => `
+                <span class="collection-timeline-range collection-timeline-line" data-site="${escapeHtml(s.id)}"
+                      style="left:${left(s)}%;width:${width(s)}%;top:${4 + laneOf.get(s.id) * 9}px;--site-color:${this._siteColor(s.id)}"></span>`).join('');
+            this._plotHeight = 8 + lanes.length * 9;
+        } else {
+            plotHtml = dated.map(s => `
+                <span class="collection-timeline-range collection-timeline-band" data-site="${escapeHtml(s.id)}"
+                      style="left:${left(s)}%;width:${width(s)}%"></span>`).join('');
+            tagsHtml = `<div class="collection-timeline-tags">${dated.map(s => `
+                <button type="button" class="collection-timeline-tag" data-site="${escapeHtml(s.id)}"
+                        style="left:${left(s) + width(s) / 2}%">${escapeHtml(this._shortName(s))}</button>`).join('')}</div>`;
+            this._plotHeight = 22;
+        }
+
         const undated = sites.filter(s => !Array.isArray(s.datingKa)).map(s => s.name);
         el.innerHTML = `
             <div class="collection-timeline-head">
                 <span class="collection-timeline-title">Dating <span>ka cal BP</span></span>
                 <span class="collection-timeline-readout"></span>
             </div>
-            <div class="collection-timeline-plot">
-                ${bands}
+            ${tagsHtml}
+            <div class="collection-timeline-plot collection-timeline-${this.timelineVariant}" style="height:${this._plotHeight}px">
+                ${plotHtml}
                 <span class="collection-timeline-cursor hover-cursor"></span>
                 <span class="collection-timeline-cursor pinned-cursor"></span>
             </div>
@@ -422,10 +459,47 @@ export class CollectionPanel {
         plot.addEventListener('mousemove', ev => this._previewTime(kaAt(ev)));
         plot.addEventListener('mouseleave', () => this._previewTime(null));
         plot.addEventListener('click', ev => this._setTime(kaAt(ev)));
+        el.querySelectorAll('.collection-timeline-tag').forEach(tag => {
+            const id = tag.dataset.site;
+            tag.addEventListener('mouseenter', () => this._highlightSite(id, true));
+            tag.addEventListener('mouseleave', () => this._highlightSite(id, false));
+            tag.addEventListener('click', () => this._setSite(this.filters.site === id ? '' : id));
+        });
         el.querySelector('.collection-timeline-readout').addEventListener('click', ev => {
             if (ev.target.closest('.collection-timeline-clear')) this._setTime(null);
         });
+        this._layoutTags();
         this._updateTimeline();
+    }
+
+    /** Stack tags that would overlap into rows above the band track. */
+    _layoutTags() {
+        const box = this.el.timeline?.querySelector('.collection-timeline-tags');
+        if (!box) return;
+        const tags = [...box.querySelectorAll('.collection-timeline-tag')];
+        const width = box.clientWidth;
+        if (!width) return;   // not laid out yet (map hidden); redone on show
+        const rows = [];
+        tags.map(tag => {
+            const center = parseFloat(tag.style.left) / 100 * width;
+            return { tag, x0: center - tag.offsetWidth / 2 - 3, x1: center + tag.offsetWidth / 2 + 3 };
+        }).sort((p, q) => p.x0 - q.x0).forEach(t => {
+            let row = rows.findIndex(end => end <= t.x0);
+            if (row < 0) { row = rows.length; rows.push(0); }
+            rows[row] = t.x1;
+            t.tag.style.bottom = `${row * 18}px`;
+        });
+        box.style.height = `${Math.max(1, rows.length) * 18}px`;
+    }
+
+    _shortName(site) {
+        return site.name.replace(/^(Grotta|Riparo) (di |della |del |dei )?/, '');
+    }
+
+    _siteColor(siteId) {
+        const palette = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#8b5cf6'];
+        const i = this.catalogue.sites.findIndex(s => s.id === siteId);
+        return palette[(i < 0 ? 0 : i) % palette.length];
     }
 
     _kaToPct(ka) {
@@ -470,7 +544,7 @@ export class CollectionPanel {
             readout.innerHTML = '';
             return;
         }
-        const names = sites.length ? sites.map(s => s.name.replace(/^(Grotta|Riparo) (di |della |del )?/, '')).join(', ') : 'no dated site';
+        const names = sites.length ? sites.map(s => this._shortName(s)).join(', ') : 'no dated site';
         readout.innerHTML = `≈${timeKa.toFixed(1)} ka · ${escapeHtml(names)}`
             + (pinned ? ' <button type="button" class="collection-timeline-clear" title="Clear time filter">×</button>' : '');
     }
@@ -479,7 +553,7 @@ export class CollectionPanel {
         const el = this.el.timeline;
         if (!el || !this._axis) return;
         const t = this.filters.timeKa;
-        el.querySelectorAll('.collection-timeline-band').forEach(band => {
+        el.querySelectorAll('.collection-timeline-range, .collection-timeline-tag').forEach(band => {
             const id = band.dataset.site;
             const site = this.sites.get(id);
             band.classList.toggle('selected', id === this.filters.site);
@@ -513,6 +587,7 @@ export class CollectionPanel {
                     this._fitted = true;
                 }
                 this._layoutLabels();
+                this._layoutTags();
             });
         }
     }

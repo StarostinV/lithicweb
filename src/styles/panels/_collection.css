@@ -483,6 +483,63 @@ body.collection-map-open .floating-action-pill {
     opacity: 0.25;
 }
 
+/* Variant "tags": name tags above the band midpoints, stacked on collision */
+.collection-timeline-tags {
+    position: relative;
+    margin-top: 2px;
+}
+
+.collection-timeline-tag {
+    position: absolute;
+    transform: translateX(-50%);
+    padding: 1px 7px;
+    border: 1px solid rgba(79, 70, 229, 0.45);
+    border-radius: 999px;
+    background: white;
+    color: var(--gray-700, #374151);
+    font: inherit;
+    font-size: 10.5px;
+    line-height: 14px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.collection-timeline-tag.hover,
+.collection-timeline-tag.selected {
+    background: #10b981;
+    border-color: #059669;
+    color: white;
+}
+
+.collection-timeline-tag.dimmed {
+    opacity: 0.4;
+}
+
+/* Variant "lines": thin coloured line per site, lanes reused */
+.collection-timeline-plot.collection-timeline-lines {
+    background: var(--gray-50, #f9fafb);
+}
+
+.collection-timeline-line {
+    position: absolute;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--site-color);
+    pointer-events: none;
+    transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
+}
+
+.collection-timeline-line.hover,
+.collection-timeline-line.selected {
+    transform: scaleY(1.75);
+    box-shadow: 0 0 0 1px white, 0 0 0 2px var(--site-color);
+}
+
+.collection-timeline-line.dimmed {
+    opacity: 0.25;
+}
+
 .collection-timeline-cursor {
     display: none;
     position: absolute;
