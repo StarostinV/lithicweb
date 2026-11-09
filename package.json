@@ -21,6 +21,7 @@
         "copy-webpack-plugin": "^13.0.1",
         "css-loader": "^7.1.2",
         "html-webpack-plugin": "^5.6.0",
+        "leaflet": "1.9",
         "mat-for-js": "^1.1.0",
         "mini-css-extract-plugin": "^2.9.2",
         "nouislider": "^15.8.1",

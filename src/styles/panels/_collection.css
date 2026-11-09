@@ -1,0 +1,322 @@
+/* ==========================================================================
+   Collection Panel
+   ========================================================================== */
+
+.panel-header-icon.collection-icon {
+    background: linear-gradient(135deg, #10b981, #0d9488);
+}
+
+.collection-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.collection-filter-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.collection-filter-row .control-select {
+    width: 100%;
+    min-width: 0;
+}
+
+.collection-count-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--gray-500);
+}
+
+.collection-count-row .hidden {
+    display: none;
+}
+
+.collection-status {
+    font-size: 12px;
+    color: var(--gray-600);
+}
+
+.collection-status:empty {
+    display: none;
+}
+
+.collection-status.error {
+    color: #dc2626;
+}
+
+/* List */
+
+.collection-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 12px 12px;
+}
+
+.collection-empty {
+    font-size: 13px;
+    color: var(--gray-500);
+    text-align: center;
+    padding: 16px 0;
+}
+
+.collection-item {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    background: white;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.collection-item:hover {
+    border-color: var(--primary-light);
+    box-shadow: 0 1px 4px rgba(99, 102, 241, 0.15);
+}
+
+.collection-item.active {
+    border-color: var(--primary);
+    background: #eef2ff;
+}
+
+.collection-item.loading {
+    cursor: progress;
+}
+
+.collection-thumb {
+    flex: 0 0 64px;
+    height: 64px;
+    border-radius: 8px;
+    background: var(--gray-100);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    color: var(--gray-400, #9ca3af);
+    font-size: 20px;
+}
+
+.collection-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.collection-item-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.collection-item-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.collection-item-id {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--gray-800, #1f2937);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.collection-type {
+    flex: none;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.collection-item-site,
+.collection-item-details,
+.collection-item-extra {
+    font-size: 11px;
+    color: var(--gray-500);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.collection-item-site {
+    color: var(--gray-700, #374151);
+}
+
+.collection-progress {
+    display: none;
+    height: 3px;
+    margin-top: 4px;
+    border-radius: 2px;
+    background: var(--gray-200);
+    overflow: hidden;
+}
+
+.collection-item.loading .collection-progress {
+    display: block;
+}
+
+.collection-progress-fill {
+    height: 100%;
+    width: 0;
+    background: var(--primary);
+    transition: width 0.1s linear;
+}
+
+/* Sources */
+
+.collection-sources {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.collection-sources a {
+    color: var(--primary-600);
+    text-decoration: none;
+}
+
+.collection-sources a:hover {
+    text-decoration: underline;
+}
+
+.collection-sources span {
+    display: block;
+    color: var(--gray-500);
+    font-size: 11px;
+}
+
+/* Map overlay over the 3D view */
+
+.collection-map-overlay {
+    display: none;
+    /* Same geometry as .canvas-container, but above the viewer's floating
+       controls (z-index <= 100) and below modals */
+    position: fixed;
+    top: var(--navbar-height);
+    left: 0;
+    right: var(--sidebar-width);
+    bottom: 0;
+    z-index: 110;
+    background: var(--gray-100);
+}
+
+body.sidebar-collapsed .collection-map-overlay {
+    right: 0;
+}
+
+@media (max-width: 1024px) {
+    .collection-map-overlay {
+        right: 340px;
+    }
+}
+
+@media (max-width: 768px) {
+    /* The sidebar slides over the canvas here (z-index 50): stay below it */
+    .collection-map-overlay {
+        right: 0;
+        z-index: 49;
+    }
+}
+
+.collection-map-overlay.visible {
+    display: block;
+}
+
+.collection-map {
+    width: 100%;
+    height: 100%;
+}
+
+.collection-hide-map {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 1000;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    background: white;
+    color: var(--gray-700, #374151);
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+}
+
+.collection-hide-map:hover {
+    color: var(--primary);
+}
+
+.collection-marker {
+    background: none;
+    border: none;
+}
+
+.collection-marker span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    border: 3px solid white;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+    box-sizing: border-box;
+    transition: transform 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.collection-marker.hover span,
+.collection-marker.selected span {
+    transform: scale(1.25);
+    background: #10b981;
+}
+
+.collection-marker.dimmed span {
+    opacity: 0.45;
+}
+
+.collection-popup {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 12px;
+    color: var(--gray-700, #374151);
+}
+
+.collection-popup strong {
+    font-size: 14px;
+    color: var(--gray-800, #1f2937);
+}
+
+.collection-popup-note {
+    color: #b45309;
+}
+
+.collection-popup a {
+    margin-top: 4px;
+    color: var(--primary-600);
+}

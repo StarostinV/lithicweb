@@ -3,6 +3,7 @@ import './styles/main.css';
 
 import * as THREE from 'three';
 import { ExportDialog } from './components/exportDialog.js';
+import { CollectionPanel } from './components/collectionPanel.js';
 import { exportAnnotations, exportAnnotationsToMAT, exportMetadataToJSON, exportMetadataToCSV } from './loaders/meshExporter.js';
 import { MODES, Mode, EDGE_EDITING_MODES } from './utils/mode.js';
 import { eventBus, Events } from './utils/EventBus.js';
@@ -87,6 +88,7 @@ const historyPanel = new HistoryPanel(meshView);
 
 // Library panel (saved annotations management, GT/Pred tags)
 const libraryPanel = new LibraryPanel(meshView, annotationLibrary);
+const collectionPanel = new CollectionPanel({ meshLoader, meshView, libraryPanel });
 libraryPanel.setEvaluationManager(evaluationManager);
 
 // Connection manager (shared across app for server connection)
@@ -254,6 +256,9 @@ function showHidePanel(panelId, callbacks = {}) {
     if (currentPanelId === 'analysisPanel' && panelId !== 'analysisPanel') {
         analysisPanel.onHide();
     }
+    if (currentPanelId === 'collectionPanel' && panelId !== 'collectionPanel') {
+        collectionPanel.onHide();
+    }
     if (currentPanelId === 'evaluationPanel' && panelId !== 'evaluationPanel') {
         // Exiting evaluation panel - restore normal state
         evaluationPanel.onHide();
@@ -392,6 +397,7 @@ eventBus.on(Events.SWITCH_PANEL, (data) => {
         'modelPanel': { btnId: 'modelPanelBtn', onShow: null },
         'historyPanel': { btnId: 'historyPanelBtn', onShow: null },
         'libraryPanel': { btnId: 'libraryPanelBtn', onShow: null },
+        'collectionPanel': { btnId: 'collectionPanelBtn', onShow: () => collectionPanel.onShow() },
         'metadataPanel': { btnId: 'metadataPanelBtn', onShow: () => metadataPanel.onShow() },
         'evaluationPanel': { btnId: 'evaluationPanelBtn', onShow: null },
         'cloudStoragePanel': { btnId: 'cloudStoragePanelBtn', onShow: () => cloudStoragePanel.onShow() },
@@ -425,6 +431,14 @@ document.getElementById('modelPanelBtn').addEventListener('click', () => {
 document.getElementById('historyPanelBtn').addEventListener('click', () => {
     showHidePanel('historyPanel');
     setActiveNavBtn('historyPanelBtn');
+    mode.setMode(MODES.VIEW, true);
+});
+
+document.getElementById('collectionPanelBtn').addEventListener('click', () => {
+    showHidePanel('collectionPanel', {
+        onShow: () => collectionPanel.onShow()
+    });
+    setActiveNavBtn('collectionPanelBtn');
     mode.setMode(MODES.VIEW, true);
 });
 

@@ -103,6 +103,10 @@
             <div class="nav-group">
                 <span class="nav-group-label">Data</span>
                 <div class="nav-group-buttons">
+                    <button id="collectionPanelBtn" class="nav-btn" title="Browse the public mesh collection">
+                        <i class="fas fa-map-marked-alt"></i>
+                        <span>Collection</span>
+                    </button>
                     <button id="metadataPanelBtn" class="nav-btn" title="View/Edit Metadata">
                         <i class="fas fa-tags"></i>
                         <span>Metadata</span>
@@ -192,6 +196,10 @@
     <div class="nav-group">
         <span class="nav-group-label">Data</span>
         <div class="nav-group-buttons">
+            <button class="nav-btn mobile-nav-btn" data-panel="collectionPanel" title="Browse the public mesh collection">
+                <i class="fas fa-map-marked-alt"></i>
+                <span>Collection</span>
+            </button>
             <button class="nav-btn mobile-nav-btn" data-panel="metadataPanel" title="View/Edit Metadata">
                 <i class="fas fa-tags"></i>
                 <span>Metadata</span>
@@ -254,6 +262,14 @@
     </div>
 
     <!-- Mode Indicator (clickable: toggles between view and previous tool) -->
+    <!-- Collection map: covers the 3D view (and its floating controls) while the Collection tab is open -->
+    <div id="collectionMapOverlay" class="collection-map-overlay">
+        <div id="collectionMap" class="collection-map"></div>
+        <button type="button" id="collectionHideMapBtn" class="collection-hide-map" title="Show the 3D view">
+            <i class="fas fa-cube"></i> 3D view
+        </button>
+    </div>
+
     <div id="modeIndicator" class="mode-indicator" title="Click to toggle View mode">
         <i class="fas fa-eye"></i> View
     </div>
@@ -864,6 +880,48 @@
         </div>
         
         <!-- ===== ANNOTATION LIBRARY PANEL ===== -->
+        <div id="collectionPanel" class="panel hidden">
+            <div class="panel-header">
+                <div class="panel-header-icon collection-icon"><i class="fas fa-map-marked-alt"></i></div>
+                <div class="panel-header-text">
+                    <h2>Collection</h2>
+                    <span class="panel-subtitle">Annotated artifacts from published datasets</span>
+                </div>
+            </div>
+
+            <div class="panel-content">
+                <div class="panel-section">
+                    <div class="section-content collection-filters">
+                        <input type="search" id="collectionSearch" class="form-input" placeholder="Search id, unit, raw material…">
+                        <div class="collection-filter-row">
+                            <select id="collectionSiteFilter" class="control-select"><option value="">All sites</option></select>
+                            <select id="collectionTypeFilter" class="control-select"><option value="">All types</option></select>
+                        </div>
+                        <div class="collection-count-row">
+                            <span id="collectionCount"></span>
+                            <button type="button" id="collectionShowMapBtn" class="btn btn-secondary btn-sm hidden">
+                                <i class="fas fa-map"></i> Map
+                            </button>
+                        </div>
+                        <div id="collectionStatus" class="collection-status"></div>
+                    </div>
+                </div>
+
+                <div id="collectionList" class="collection-list"></div>
+
+                <div class="panel-section">
+                    <div class="section-header">
+                        <i class="fas fa-book"></i>
+                        <span>Sources</span>
+                    </div>
+                    <div class="section-content">
+                        <ul id="collectionSources" class="collection-sources"></ul>
+                        <p class="help-text">Raw scans from the cited datasets; edge annotations by the Neurolithic team.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="libraryPanel" class="panel hidden">
             <div class="panel-header">
                 <div class="panel-header-icon library-icon"><i class="fas fa-bookmark"></i></div>

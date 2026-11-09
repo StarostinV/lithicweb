@@ -1,0 +1,413 @@
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { confirmUnsavedChanges } from '../utils/confirmUnsavedChanges.js';
+
+/**
+ * Base URL of the published collection (catalogue.json + meshes + thumbs),
+ * pinned to a repository revision so the catalogue and its files never drift.
+ * Override with ?collection=<base url> for testing another build.
+ */
+export const DEFAULT_COLLECTION_URL =
+    'https://huggingface.co/datasets/StarostinV/lithic-collection-preview/resolve/main/';
+
+const CACHE_NAME = 'lithic-collection-v1';
+
+/**
+ * Filter catalogue items by free text, site and type.
+ *
+ * @param {Array<Object>} items - Catalogue items
+ * @param {Object} filters
+ * @param {string} [filters.text] - Matches id, type, site name, unit, raw material
+ * @param {string} [filters.site] - Site id, or '' for all
+ * @param {string} [filters.type] - Artifact type, or '' for all
+ * @param {Map<string,Object>} [sites] - Site id -> site, for name matching
+ * @returns {Array<Object>}
+ */
+export function filterItems(items, { text = '', site = '', type = '' } = {}, sites = new Map()) {
+    const needle = text.trim().toLowerCase();
+    return items.filter(item => {
+        if (site && item.site !== site) return false;
+        if (type && item.type !== type) return false;
+        if (!needle) return true;
+        const hay = [item.id, item.type, sites.get(item.site)?.name, item.unit, item.rawMaterial, item.dataset]
+            .filter(Boolean).join(' ').toLowerCase();
+        return hay.includes(needle);
+    });
+}
+
+/**
+ * Human-readable byte size.
+ * @param {number} bytes
+ * @returns {string}
+ */
+export function formatBytes(bytes) {
+    if (!bytes && bytes !== 0) return '';
+    if (bytes < 1e6) return `${Math.max(1, Math.round(bytes / 1e3))} kB`;
+    return `${(bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0)} MB`;
+}
+
+function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/**
+ * CollectionPanel - browse a published collection of annotated meshes on a
+ * map and in a filterable list, and load any of them into the viewer.
+ *
+ * The map is shown over the 3D view while the panel is open; loading a mesh
+ * switches back to the 3D view (the map can be reopened from the panel).
+ */
+export class CollectionPanel {
+    /**
+     * @param {Object} deps
+     * @param {MeshLoader} deps.meshLoader
+     * @param {MeshView} deps.meshView
+     * @param {LibraryPanel} [deps.libraryPanel] - Used to save unsaved work first
+     */
+    constructor({ meshLoader, meshView, libraryPanel = null }) {
+        this.meshLoader = meshLoader;
+        this.meshView = meshView;
+        this.libraryPanel = libraryPanel;
+
+        const param = new URLSearchParams(window.location.search).get('collection');
+        this.baseUrl = (param || DEFAULT_COLLECTION_URL).replace(/\/?$/, '/');
+
+        this.catalogue = null;
+        this.sites = new Map();
+        this.filters = { text: '', site: '', type: '' };
+        this.loadingId = null;
+        this.activeId = null;
+        this.map = null;
+        this.markers = new Map();
+        this.visible = false;
+
+        this.el = {
+            list: document.getElementById('collectionList'),
+            count: document.getElementById('collectionCount'),
+            status: document.getElementById('collectionStatus'),
+            search: document.getElementById('collectionSearch'),
+            site: document.getElementById('collectionSiteFilter'),
+            type: document.getElementById('collectionTypeFilter'),
+            sources: document.getElementById('collectionSources'),
+            overlay: document.getElementById('collectionMapOverlay'),
+            mapDiv: document.getElementById('collectionMap'),
+            showMap: document.getElementById('collectionShowMapBtn'),
+            hideMap: document.getElementById('collectionHideMapBtn'),
+        };
+
+        this.el.search?.addEventListener('input', () => {
+            this.filters.text = this.el.search.value;
+            this._renderList();
+        });
+        this.el.site?.addEventListener('change', () => this._setSite(this.el.site.value));
+        this.el.type?.addEventListener('change', () => {
+            this.filters.type = this.el.type.value;
+            this._renderList();
+        });
+        this.el.showMap?.addEventListener('click', () => this._setMapVisible(true));
+        this.el.hideMap?.addEventListener('click', () => this._setMapVisible(false));
+    }
+
+    /** Called when the Collection tab is opened. */
+    async onShow() {
+        this.visible = true;
+        if (!this.catalogue) {
+            await this._loadCatalogue();
+        }
+        // Open on the map until a mesh has been loaded from the collection
+        this._setMapVisible(!this.activeId);
+    }
+
+    /** Called when another tab is opened. */
+    onHide() {
+        this.visible = false;
+        this._setMapVisible(false);
+    }
+
+    // ------------------------------------------------------------------
+    // Catalogue
+    // ------------------------------------------------------------------
+
+    async _loadCatalogue() {
+        this._setStatus('Loading catalogue…');
+        try {
+            const res = await fetch(this.baseUrl + 'catalogue.json');
+            if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+            this.catalogue = await res.json();
+        } catch (err) {
+            this._setStatus(`Could not load the collection catalogue (${err.message}).`, 'error');
+            return;
+        }
+        this.sites = new Map(this.catalogue.sites.map(s => [s.id, s]));
+        this._setStatus('');
+        this._fillFilters();
+        this._renderSources();
+        this._renderList();
+        this._buildMap();
+    }
+
+    _fillFilters() {
+        const items = this.catalogue.items;
+        const count = (key, value) => items.filter(i => i[key] === value).length;
+        if (this.el.site) {
+            this.el.site.innerHTML = '<option value="">All sites</option>' + this.catalogue.sites
+                .map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} (${count('site', s.id)})</option>`)
+                .join('');
+        }
+        if (this.el.type) {
+            const types = [...new Set(items.map(i => i.type))].sort();
+            this.el.type.innerHTML = '<option value="">All types</option>' + types
+                .map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)} (${count('type', t)})</option>`)
+                .join('');
+        }
+    }
+
+    _renderSources() {
+        if (!this.el.sources) return;
+        this.el.sources.innerHTML = this.catalogue.sites.map(s => `
+            <li>
+                <a href="https://doi.org/${escapeHtml(s.source.doi)}" target="_blank" rel="noopener">${escapeHtml(s.source.title)}</a>
+                <span>${escapeHtml(s.source.authors)} · ${escapeHtml(s.source.license)}</span>
+            </li>`).join('');
+    }
+
+    _setSite(siteId) {
+        this.filters.site = siteId;
+        if (this.el.site) this.el.site.value = siteId;
+        this._renderList();
+        this._updateMarkers();
+    }
+
+    // ------------------------------------------------------------------
+    // List
+    // ------------------------------------------------------------------
+
+    _renderList() {
+        if (!this.catalogue || !this.el.list) return;
+        const items = filterItems(this.catalogue.items, this.filters, this.sites);
+        if (this.el.count) {
+            this.el.count.textContent = `${items.length} of ${this.catalogue.items.length} artifacts`;
+        }
+        this.el.list.innerHTML = items.map(item => this._itemHtml(item)).join('')
+            || '<p class="collection-empty">No artifacts match these filters.</p>';
+        this.el.list.querySelectorAll('.collection-item').forEach(card => {
+            const id = card.dataset.id;
+            card.addEventListener('click', () => this.load(id));
+            card.addEventListener('mouseenter', () => this._highlightSite(card.dataset.site, true));
+            card.addEventListener('mouseleave', () => this._highlightSite(card.dataset.site, false));
+        });
+    }
+
+    _itemHtml(item) {
+        const site = this.sites.get(item.site);
+        const details = [
+            item.scars != null ? `${item.scars} scars` : null,
+            `${Math.round(item.vertices / 1000)}k vertices`,
+            formatBytes(item.bytes),
+        ].filter(Boolean).join(' · ');
+        const extra = [
+            item.unit ? `unit ${item.unit}` : null,
+            item.rawMaterial, item.blank && item.blank !== item.type ? item.blank : null,
+            item.dimensionsMm?.length === 3 ? `${item.dimensionsMm.map(v => v.toFixed(1)).join(' × ')} mm` : null,
+        ].filter(Boolean).join(' · ');
+        const thumb = item.thumb
+            ? `<img src="${escapeHtml(this.baseUrl + item.thumb)}" alt="" loading="lazy">`
+            : '<i class="fas fa-cube"></i>';
+        const state = item.id === this.loadingId ? ' loading' : item.id === this.activeId ? ' active' : '';
+        return `
+            <button type="button" class="collection-item${state}" data-id="${escapeHtml(item.id)}" data-site="${escapeHtml(item.site)}">
+                <div class="collection-thumb">${thumb}</div>
+                <div class="collection-item-body">
+                    <div class="collection-item-title">
+                        <span class="collection-item-id">${escapeHtml(item.id)}</span>
+                        <span class="collection-type">${escapeHtml(item.type)}</span>
+                    </div>
+                    <div class="collection-item-site">${escapeHtml(site?.name || item.site)}</div>
+                    <div class="collection-item-details">${escapeHtml(details)}</div>
+                    ${extra ? `<div class="collection-item-extra">${escapeHtml(extra)}</div>` : ''}
+                    <div class="collection-progress"><div class="collection-progress-fill"></div></div>
+                </div>
+            </button>`;
+    }
+
+    _setStatus(message, kind = 'info') {
+        if (!this.el.status) return;
+        this.el.status.textContent = message;
+        this.el.status.className = `collection-status ${message ? kind : ''}`;
+    }
+
+    // ------------------------------------------------------------------
+    // Map
+    // ------------------------------------------------------------------
+
+    _buildMap() {
+        if (!this.el.mapDiv || this.map) return;
+        this.map = L.map(this.el.mapDiv, { zoomControl: true, worldCopyJump: true });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(this.map);
+
+        const located = this.catalogue.sites.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lon));
+        for (const site of located) {
+            const n = this.catalogue.items.filter(i => i.site === site.id).length;
+            const marker = L.marker([site.lat, site.lon], {
+                icon: L.divIcon({
+                    className: 'collection-marker',
+                    html: `<span>${n}</span>`,
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 17],
+                }),
+                title: site.name,
+            }).addTo(this.map);
+            marker.bindTooltip(site.name, { direction: 'top', offset: [0, -16] });
+            marker.bindPopup(this._sitePopupHtml(site, n), { maxWidth: 300 });
+            marker.on('click', () => this._setSite(site.id));
+            this.markers.set(site.id, marker);
+        }
+        this._bounds = located.length ? L.latLngBounds(located.map(s => [s.lat, s.lon])) : null;
+        this._fitted = false;
+        this.map.setView([45, 10], 4);
+        this._updateMarkers();
+    }
+
+    _sitePopupHtml(site, n) {
+        const rows = [
+            site.region,
+            site.period,
+            site.dating,
+            `${n} artifact${n === 1 ? '' : 's'} in this collection`,
+        ].filter(Boolean).map(r => `<div>${escapeHtml(r)}</div>`).join('');
+        const approx = site.coordinates?.startsWith('approximate')
+            ? '<div class="collection-popup-note">Location approximate</div>' : '';
+        return `
+            <div class="collection-popup">
+                <strong>${escapeHtml(site.name)}</strong>
+                ${rows}${approx}
+                <a href="https://doi.org/${escapeHtml(site.source.doi)}" target="_blank" rel="noopener">Source data (${escapeHtml(site.source.license)})</a>
+            </div>`;
+    }
+
+    _updateMarkers() {
+        for (const [id, marker] of this.markers) {
+            const el = marker.getElement();
+            el?.classList.toggle('selected', id === this.filters.site);
+            el?.classList.toggle('dimmed', !!this.filters.site && id !== this.filters.site);
+        }
+    }
+
+    _highlightSite(siteId, on) {
+        this.markers.get(siteId)?.getElement()?.classList.toggle('hover', on);
+    }
+
+    _setMapVisible(show) {
+        const show_ = show && this.visible;
+        this.el.overlay?.classList.toggle('visible', show_);
+        this.el.showMap?.classList.toggle('hidden', show_ || !this.visible);
+        if (show_ && this.map) {
+            // The container was hidden; Leaflet must re-measure it, and the
+            // first fit can only happen once it has a size
+            requestAnimationFrame(() => {
+                this.map.invalidateSize();
+                if (!this._fitted && this._bounds) {
+                    this.map.fitBounds(this._bounds, { padding: [60, 60], maxZoom: 8 });
+                    this._fitted = true;
+                }
+            });
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Loading
+    // ------------------------------------------------------------------
+
+    /**
+     * Download (or take from cache) one artifact and open it in the viewer.
+     * @param {string} id - Catalogue item id
+     */
+    async load(id) {
+        const item = this.catalogue?.items.find(i => i.id === id);
+        if (!item || this.loadingId) return;
+
+        const unsaved = await confirmUnsavedChanges(this.meshView);
+        if (unsaved === 'cancel') return;
+        if (unsaved === 'save' && this.libraryPanel) {
+            await this.libraryPanel.saveCurrentAnnotation();
+        }
+
+        this.loadingId = id;
+        this._renderList();
+        this._setStatus(`Loading ${id} (${formatBytes(item.bytes)})…`);
+        try {
+            const blob = await this._fetchWithCache(this.baseUrl + item.file, item.bytes,
+                fraction => this._setProgress(id, fraction));
+            const fileName = `${item.id}.ply`;
+            await this.meshLoader.loadFile(new File([blob], fileName, { type: 'application/octet-stream' }));
+            const fileNameSpan = document.getElementById('fileName');
+            if (fileNameSpan) {
+                fileNameSpan.textContent = fileName;
+                fileNameSpan.title = fileName;
+            }
+            this.activeId = id;
+            this._setStatus('');
+            this._setMapVisible(false);
+        } catch (err) {
+            console.error('[Collection] Failed to load', id, err);
+            this._setStatus(`Could not load ${id} (${err.message}).`, 'error');
+        } finally {
+            this.loadingId = null;
+            this._renderList();
+        }
+    }
+
+    _setProgress(id, fraction) {
+        const fill = this.el.list?.querySelector(`.collection-item[data-id="${CSS.escape(id)}"] .collection-progress-fill`);
+        if (fill) fill.style.width = `${Math.round(Math.min(1, fraction) * 100)}%`;
+    }
+
+    /**
+     * Fetch a file, reporting progress, and keep it in the browser cache.
+     * The base URL is pinned to a revision, so cached files never go stale.
+     */
+    async _fetchWithCache(url, expectedBytes, onProgress) {
+        let cache = null;
+        try {
+            cache = await caches.open(CACHE_NAME);
+            const hit = await cache.match(url);
+            if (hit) {
+                onProgress(1);
+                return await hit.blob();
+            }
+        } catch {
+            cache = null;   // Cache API unavailable (private window, insecure origin)
+        }
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const total = Number(res.headers.get('content-length')) || expectedBytes || 0;
+        const reader = res.body?.getReader();
+        let blob;
+        if (!reader) {
+            blob = await res.blob();
+        } else {
+            const chunks = [];
+            let received = 0;
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                received += value.length;
+                if (total) onProgress(received / total);
+            }
+            blob = new Blob(chunks);
+        }
+        onProgress(1);
+        try {
+            await cache?.put(url, new Response(blob));
+        } catch {
+            // Quota exceeded or similar: loading still succeeded
+        }
+        return blob;
+    }
+}

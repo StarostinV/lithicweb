@@ -62,6 +62,12 @@ module.exports = (env, argv) => {
                     }
                 },
                 {
+                    // Images referenced from CSS (e.g. Leaflet's marker icons)
+                    test: /\.(png|svg|jpe?g|gif)$/,
+                    type: 'asset/resource',
+                    generator: { filename: 'assets/[name].[contenthash][ext]' },
+                },
+                {
                     test: /\.css$/,
                     use: [
                         isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
