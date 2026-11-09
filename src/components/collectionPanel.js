@@ -398,6 +398,10 @@ export class CollectionPanel {
 
     _setSite(siteId) {
         this.filters.site = siteId;
+        // An explicit site choice wins over a pinned age that excludes the site
+        if (siteId && this.filters.timeKa != null && !siteCoversTime(this.sites.get(siteId), this.filters.timeKa)) {
+            this.filters.timeKa = null;
+        }
         if (this.el.site) this.el.site.value = siteId;
         this._renderList();
         this._updateMarkers();
@@ -412,16 +416,46 @@ export class CollectionPanel {
         if (!this.catalogue || !this.el.list) return;
         const items = filterItems(this.catalogue.items, this.filters, this.sites);
         if (this.el.count) {
-            this.el.count.textContent = `${items.length} of ${this.catalogue.items.length} artifacts`;
+            // A pinned age is set on the map; show it here too, where the list is
+            const t = this.filters.timeKa;
+            this.el.count.innerHTML = `${items.length} of ${this.catalogue.items.length} artifacts`
+                + (t != null ? ` <button type="button" class="collection-filter-chip" data-clear="time"
+                    title="Clear the age filter">≈${t.toFixed(1)} ka ×</button>` : '');
         }
-        this.el.list.innerHTML = items.map(item => this._itemHtml(item)).join('')
-            || '<p class="collection-empty">No artifacts match these filters.</p>';
+        this.el.list.innerHTML = items.map(item => this._itemHtml(item)).join('') || `
+            <div class="collection-empty">
+                <p>No artifacts match these filters${this._activeFilterText() ? `: ${escapeHtml(this._activeFilterText())}` : ''}.</p>
+                <button type="button" class="btn btn-secondary btn-sm" data-clear="all">Clear filters</button>
+            </div>`;
+        this.el.count?.querySelector('[data-clear="time"]')?.addEventListener('click', () => this._setTime(null));
+        this.el.list.querySelector('[data-clear="all"]')?.addEventListener('click', () => this._clearFilters());
         this.el.list.querySelectorAll('.collection-item').forEach(card => {
             const id = card.dataset.id;
             card.addEventListener('click', () => this.load(id));
             card.addEventListener('mouseenter', () => this._highlightSite(card.dataset.site, true));
             card.addEventListener('mouseleave', () => this._highlightSite(card.dataset.site, false));
         });
+    }
+
+    /** Human-readable list of the active filters, for the empty state. */
+    _activeFilterText() {
+        const f = this.filters;
+        return [
+            f.text.trim() ? `"${f.text.trim()}"` : null,
+            f.site ? (this.sites.get(f.site)?.name || f.site) : null,
+            f.type || null,
+            f.annotation ? f.annotation : null,
+            f.timeKa != null ? `≈${f.timeKa.toFixed(1)} ka` : null,
+        ].filter(Boolean).join(', ');
+    }
+
+    _clearFilters() {
+        this.filters = { text: '', site: '', type: '', timeKa: null, annotation: '' };
+        if (this.el.search) this.el.search.value = '';
+        for (const el of [this.el.site, this.el.type, this.el.annotation]) if (el) el.value = '';
+        this._renderList();
+        this._updateMarkers();
+        this._updateTimeline();
     }
 
     _itemHtml(item) {
