@@ -18,6 +18,10 @@
     gap: 8px;
 }
 
+#collectionAnnotationFilter {
+    width: 100%;
+}
+
 .collection-filter-row .control-select {
     width: 100%;
     min-width: 0;
@@ -132,6 +136,22 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.collection-tags {
+    flex: none;
+    display: flex;
+    gap: 4px;
+}
+
+.collection-auto {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #fef3c7;
+    color: #92400e;
+    cursor: help;
 }
 
 .collection-type {

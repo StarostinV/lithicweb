@@ -128,14 +128,18 @@ PUBLIC_SITES = {
     "experimental": dict(name="Experimental", context="Experimental", region=None,
                          lat=None, lon=None, coordinates="none (experimental replicas)", period=None,
                          dating=None, datingKa=None, source=None),
+    "open_air": dict(name="Open-air site, Africa (Hallinan & Cascalheira)", context="Open air", region="Africa",
+                     lat=None, lon=None, coordinates="unknown (site not given)", period="Middle Stone Age",
+                     dating=None, datingKa=None, source=None),
 }
 
 # Rights per source dataset (the h5 'Dataset' attribute). Only datasets with
 # publish=True go into the public collection; each published artifact cites
 # its dataset. Cleared on 9 Nov 2026: A. Falcucci's sets and those he co-authors
 # (Lombao et al. 2023), Liu et al. and Muller & Grosman (public CC-BY-4.0 Zenodo
-# releases containing all our pieces, verified by file list). Excluded until
-# cleared: Hallinan & Cascalheira (release not identified).
+# releases containing all our pieces, verified by file list); Hallinan &
+# Cascalheira cleared via A. Falcucci on 9 Nov 2026 (their OSF project is
+# CC-BY-4.0, but our 10 pieces are not among its public files).
 _OAP = {k: s["source"] for k, s in SITES.items()}
 DATASETS = {
     "Falcucci et al. 2023 + Linsel et al": dict(publish=True, label="Falcucci & Peresani (Open Aurignacian Project, vol. 1)", source=_OAP["fumane"]),
@@ -159,7 +163,10 @@ DATASETS = {
               "of the early Protoaurignacian assemblage from Fumane Cave' (meshes released here with the authors' "
               "permission; research compendium cited)",
         authors="Lombao, D.; Falcucci, A.; Moos, E.; Peresani, M.", doi="10.5281/zenodo.10066814", license="CC-BY-4.0")),
-    "Hallinan and Cascalheira": dict(publish=False, label="Hallinan & Cascalheira", source=None),
+    "Hallinan and Cascalheira": dict(publish=True, label="Hallinan & Cascalheira", source=dict(
+        title="NUBIAN: Nubian Levallois technology, behavioural innovation and adaptation (OSF project; these meshes "
+              "are not in its public files and are released here with the authors' permission)",
+        authors="Hallinan, E.; Cascalheira, J.", doi="10.17605/OSF.IO/XZ7CB", license="CC-BY-4.0")),
 }
 
 # Everything else in all_data.h5, for the local --all mock only: these sets are
@@ -423,6 +430,13 @@ def dataset_card(catalogue):
         + f" ({s['license']}; {s['count']} meshes)" for s in catalogue["sources"])
     approx = [s["name"] for s in catalogue["sites"] if s["coordinates"].startswith("approximate")]
     n_sites = sum(1 for s in catalogue["sites"] if s["id"] != "experimental")
+    kinds = [i.get("annotation") for i in catalogue["items"] if i.get("annotation")]
+    annotation_note = ("" if not kinds else
+        f"""Each artifact's `annotation` says how its edges were made: `manual` ({kinds.count('manual')}),
+drawn by an annotator, or `semi-automatic` ({kinds.count('semi-automatic')}), a model prediction
+reviewed by an expert in the NeuroLithic fast-verification tool and in most cases
+corrected by hand before acceptance.
+""")
     experimental = " and an experimental set" if any(s["id"] == "experimental" for s in catalogue["sites"]) else ""
     note = f" Approximate locations: {', '.join(approx)}." if approx else ""
     return f"""---
@@ -435,10 +449,11 @@ tags: [archaeology, lithics, 3d, mesh, segmentation]
 
 {len(catalogue['items'])} annotated 3D meshes of lithic artifacts ({n_sites} sites{experimental}), browsed by the
 Collection tab of the NeuroLithic web client. Each mesh is a binary PLY with
-per-vertex scar-boundary labels (`labels`, 1 = edge) drawn by the NeuroLithic
-team; `catalogue.json` lists artifacts, sites and metadata; `thumbs/` holds
+per-vertex scar-boundary labels (`labels`, 1 = edge) from the NeuroLithic team;
+`catalogue.json` lists artifacts, sites and metadata; `thumbs/` holds
 preview images.
 
+{annotation_note}
 ## Sources
 
 Raw scans (each artifact's `source` in catalogue.json names its dataset):
@@ -506,6 +521,8 @@ def build_item(job):
         vertices=int(len(V)), faces=int(len(F)), edgeVertices=int(labels.sum()),
         scars=_W["scars"].get(sid), surfaceArea=a.get("surface_area"), volume=a.get("raw_volume"),
         labelSource=label_source,
+        # Hand-drawn labels vs model predictions accepted in fast verification
+        annotation="manual" if label_source == "labelled PLY" else "semi-automatic",
         view=best_view(V, F, labels),
     )
     # Thumbnails are rendered with the app afterwards (see README); include if present

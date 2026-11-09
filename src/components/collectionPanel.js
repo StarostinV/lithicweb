@@ -8,10 +8,11 @@ import { confirmUnsavedChanges } from '../utils/confirmUnsavedChanges.js';
  * Override with ?collection=<base url> for testing another build.
  */
 export const DEFAULT_COLLECTION_URL =
-    'https://huggingface.co/datasets/StarostinV/lithic-collection-preview/resolve/fb8d5bf89f3dacf9a243534a169096053abb4606/';
+    'https://huggingface.co/datasets/StarostinV/lithic-collection-preview/resolve/0860fb7d4e2171331448ca0560a76186e0248b9a/';
 
 const CACHE_NAME = 'lithic-collection-v1';
 const TIMELINE_COLLAPSED_KEY = 'lithicjs_collection_timeline_collapsed';
+const SEMI_AUTO_TITLE = 'Semi-automatic annotation: model prediction reviewed by an expert, usually with manual corrections';
 
 /**
  * Filter catalogue items by free text, site and type.
@@ -22,13 +23,15 @@ const TIMELINE_COLLAPSED_KEY = 'lithicjs_collection_timeline_collapsed';
  * @param {string} [filters.site] - Site id, or '' for all
  * @param {string} [filters.type] - Artifact type, or '' for all
  * @param {number|null} [filters.timeKa] - Keep sites whose dating range contains this age
+ * @param {string} [filters.annotation] - 'manual', 'semi-automatic', or '' for all
  * @param {Map<string,Object>} [sites] - Site id -> site, for name matching
  * @returns {Array<Object>}
  */
-export function filterItems(items, { text = '', site = '', type = '', timeKa = null } = {}, sites = new Map()) {
+export function filterItems(items, { text = '', site = '', type = '', timeKa = null, annotation = '' } = {}, sites = new Map()) {
     const needle = text.trim().toLowerCase();
     return items.filter(item => {
         if (site && item.site !== site) return false;
+        if (annotation && annotationKind(item) !== annotation) return false;
         if (type && item.type !== type) return false;
         if (timeKa != null && !siteCoversTime(sites.get(item.site), timeKa)) return false;
         if (!needle) return true;
@@ -36,6 +39,18 @@ export function filterItems(items, { text = '', site = '', type = '', timeKa = n
             .filter(Boolean).join(' ').toLowerCase();
         return hay.includes(needle);
     });
+}
+
+/**
+ * How an item's edge labels were made: 'manual' (drawn by an annotator) or
+ * 'semi-automatic' (model prediction reviewed by an expert, usually corrected by hand).
+ * Older catalogues only carry labelSource.
+ * @param {Object} item
+ * @returns {string}
+ */
+export function annotationKind(item) {
+    if (item.annotation) return item.annotation;
+    return item.labelSource === 'accepted verification state' ? 'semi-automatic' : 'manual';
 }
 
 /**
@@ -89,7 +104,7 @@ export class CollectionPanel {
 
         this.catalogue = null;
         this.sites = new Map();
-        this.filters = { text: '', site: '', type: '', timeKa: null };
+        this.filters = { text: '', site: '', type: '', timeKa: null, annotation: '' };
         this.loadingId = null;
         this.activeId = null;
         this.map = null;
@@ -109,6 +124,7 @@ export class CollectionPanel {
             search: document.getElementById('collectionSearch'),
             site: document.getElementById('collectionSiteFilter'),
             type: document.getElementById('collectionTypeFilter'),
+            annotation: document.getElementById('collectionAnnotationFilter'),
             sources: document.getElementById('collectionSources'),
             overlay: document.getElementById('collectionMapOverlay'),
             mapDiv: document.getElementById('collectionMap'),
@@ -125,6 +141,10 @@ export class CollectionPanel {
         this.el.site?.addEventListener('change', () => this._setSite(this.el.site.value));
         this.el.type?.addEventListener('change', () => {
             this.filters.type = this.el.type.value;
+            this._renderList();
+        });
+        this.el.annotation?.addEventListener('change', () => {
+            this.filters.annotation = this.el.annotation.value;
             this._renderList();
         });
         this.el.showMap?.addEventListener('click', () => this._setMapVisible(true));
@@ -181,6 +201,13 @@ export class CollectionPanel {
             this.el.site.innerHTML = '<option value="">All sites</option>' + this.catalogue.sites
                 .map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} (${count('site', s.id)})</option>`)
                 .join('');
+        }
+        if (this.el.annotation) {
+            const kinds = items.map(annotationKind);
+            const n = k => kinds.filter(x => x === k).length;
+            this.el.annotation.innerHTML = '<option value="">Any annotation</option>'
+                + `<option value="manual">Manual (${n('manual')})</option>`
+                + `<option value="semi-automatic">Semi-automatic (${n('semi-automatic')})</option>`;
         }
         if (this.el.type) {
             const types = [...new Set(items.map(i => i.type))].sort();
@@ -255,7 +282,11 @@ export class CollectionPanel {
                 <div class="collection-item-body">
                     <div class="collection-item-title">
                         <span class="collection-item-id">${escapeHtml(item.id)}</span>
-                        <span class="collection-type">${escapeHtml(item.type)}</span>
+                        <span class="collection-tags">
+                            ${annotationKind(item) === 'semi-automatic'
+                                ? `<span class="collection-auto" title="${SEMI_AUTO_TITLE}">Semi-auto</span>` : ''}
+                            <span class="collection-type">${escapeHtml(item.type)}</span>
+                        </span>
                     </div>
                     <div class="collection-item-site">${escapeHtml(site?.name || item.site)}</div>
                     <div class="collection-item-details">${escapeHtml(details)}</div>

@@ -46,3 +46,13 @@ test('time filter keeps sites whose dating range contains the age; undated sites
     const oneUndated = new Map([['fumane', { name: 'F', datingKa: [41, 33] }], ['castelcivita', { name: 'C' }]]);
     expect(ids(filterItems(items, { timeKa: 40 }, oneUndated))).toEqual(['RF.b_1', 'RF.c_2']);
 });
+
+test('annotation kind: explicit field, else derived from the label source', async () => {
+    const { annotationKind } = await import('../../../src/components/collectionPanel.js');
+    expect(annotationKind({ annotation: 'manual', labelSource: 'accepted verification state' })).toBe('manual');
+    expect(annotationKind({ labelSource: 'accepted verification state' })).toBe('semi-automatic');
+    expect(annotationKind({ labelSource: 'labelled PLY' })).toBe('manual');
+    const mixed = [{ id: 'a', labelSource: 'labelled PLY' }, { id: 'b', labelSource: 'accepted verification state' }];
+    expect(ids(filterItems(mixed, { annotation: 'semi-automatic' }))).toEqual(['b']);
+    expect(ids(filterItems(mixed, { annotation: 'manual' }))).toEqual(['a']);
+});
