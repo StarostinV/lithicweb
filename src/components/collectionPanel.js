@@ -424,7 +424,6 @@ export class CollectionPanel {
                   style="left:${left(s)}%;width:${width(s)}%;top:${4 + laneOf.get(s.id) * 9}px;--site-color:${this._siteColor(s.id)}"></span>`).join('');
         const plotHeight = 8 + lanes.length * 9;
 
-        const undated = sites.filter(s => !Array.isArray(s.datingKa)).map(s => s.name);
         el.innerHTML = `
             <div class="collection-timeline-head">
                 <span class="collection-timeline-title">Dating <span>ka cal BP</span></span>
@@ -438,7 +437,7 @@ export class CollectionPanel {
                 <span class="collection-timeline-cursor pinned-cursor"></span>
             </div>
             <div class="collection-timeline-ticks">${ticks.join('')}</div>
-            ${undated.length ? `<div class="collection-timeline-note">Undated: ${escapeHtml(undated.join(', '))}</div>` : ''}`;
+            <div class="collection-timeline-note"></div>`;
 
         const plot = el.querySelector('.collection-timeline-plot');
         const kaAt = ev => {
@@ -544,6 +543,13 @@ export class CollectionPanel {
         if (empty) {
             empty.style.display = collapsed && !Array.isArray(selected?.datingKa) ? 'block' : 'none';
             empty.textContent = selected ? `${selected.name}: undated` : 'Select a site to show its range';
+        }
+        // Full mode names an undated site only when it is the selected one
+        const note = el.querySelector('.collection-timeline-note');
+        if (note) {
+            const undatedSelected = selected && !Array.isArray(selected.datingKa);
+            note.textContent = undatedSelected ? `${selected.name}: undated` : '';
+            note.style.display = !collapsed && undatedSelected ? 'block' : 'none';
         }
         const toggle = el.querySelector('.collection-timeline-collapse');
         if (toggle) {
