@@ -15,6 +15,16 @@ Sources
   the three vertex labels, so the chosen vertex labels must reproduce them
   exactly, or the build fails.
 
+Orientation
+-----------
+The h5 vertices are PCA-aligned, and for about half of the meshes that
+alignment is a reflection (determinant -1): the artifact is mirrored and its
+triangles are inside-out, so viewers show the far side through the near one.
+Such meshes are un-mirrored by negating the third PCA axis, which keeps the
+alignment and the vertex order (and therefore the labels). Every published
+mesh must have a positive signed volume, and where the raw scan is available
+(Fumane) the published mesh must be a proper rotation of it.
+
 Usage
 -----
     python build_collection.py --out OUT_DIR [--per-site N] [--sites a,b]
@@ -38,6 +48,7 @@ H5 = LITHIC / "neurolithic_light/data/all_data.h5"
 LABELED_DIR = LITHIC / "data/data-dec-2025/LABELED_DATA_ALL"
 STATES_DIR = LITHIC / "neurolithic_light/server_storage/armando/datasets"
 FUMANE_CSV = LITHIC / "data/zenodo_v301/Fumane_3D_metadata.csv"
+RAW_FUMANE = LITHIC / "data/zenodo_v301/RF_3D_Meshes"   # raw scans, for the handedness check
 METRICS_CSV = LITHIC / "data/onedrive/scar_segmentation/full_run_metrics_546.csv"
 
 # Sites whose raw scans are published under CC-BY-4.0 (The Open Aurignacian
@@ -152,6 +163,30 @@ def edge_labels_for(sid, n_vertices, faces, h5_face_labels, states):
                        f"({[s for _, s in candidates] or 'none found'})")
 
 
+def signed_volume(V, F):
+    a, b, c = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]
+    return float(np.einsum("ij,ij->i", a, np.cross(b, c)).sum() / 6)
+
+
+def unmirror(sid, V, F):
+    """Return (vertices with positive handedness, whether they were flipped)."""
+    flipped = signed_volume(V.astype(np.float64), F) < 0
+    if flipped:
+        V = V.copy()
+        V[:, 2] *= -1
+    if signed_volume(V.astype(np.float64), F) <= 0:
+        raise RuntimeError(f"{sid}: signed volume not positive after un-mirroring")
+    raw = RAW_FUMANE / f"{sid}.ply"
+    if raw.exists():
+        r = PlyData.read(str(raw))["vertex"]
+        R = np.stack([r["x"], r["y"], r["z"]], 1).astype(np.float64)
+        if len(R) == len(V):
+            M, *_ = np.linalg.lstsq(R - R.mean(0), V.astype(np.float64) - V.mean(0), rcond=None)
+            if np.linalg.det(M) < 0:
+                raise RuntimeError(f"{sid}: published mesh is a mirror image of the raw scan")
+    return V, flipped
+
+
 def write_ply(path, vertices, faces, labels, comments):
     header = "ply\nformat binary_little_endian 1.0\n"
     header += "".join(f"comment metadata {k} {v}\n" for k, v in comments.items() if v not in (None, ""))
@@ -244,6 +279,7 @@ def main():
         V = g["vertices"][:].astype(np.float32)
         F = g["faces"][:].astype(np.int32)
         labels, label_source = edge_labels_for(sid, len(V), F, g["labels"][:], states)
+        V, flipped = unmirror(sid, V, F)
 
         rel = f"meshes/{site}/{sid}.ply"
         out_path = args.out / rel
@@ -273,7 +309,8 @@ def main():
         else:
             item.update(rawMaterial=a.get("Raw-Material"), technology=a.get("Technology"))
         items.append({k: v for k, v in item.items() if v not in (None, "", [])})
-        print(f"{sid:14s} {site:12s} {a['Type']:14s} {len(V):8d} v  {int(labels.sum()):6d} edges  ({label_source})")
+        print(f"{sid:14s} {site:12s} {a['Type']:14s} {len(V):8d} v  {int(labels.sum()):6d} edges  "
+              f"({label_source}{', un-mirrored' if flipped else ''})")
 
     catalogue = dict(
         name="Lithic collection (preview)",
