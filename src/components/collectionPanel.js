@@ -8,7 +8,7 @@ import { confirmUnsavedChanges } from '../utils/confirmUnsavedChanges.js';
  * Override with ?collection=<base url> for testing another build.
  */
 export const DEFAULT_COLLECTION_URL =
-    'https://huggingface.co/datasets/StarostinV/lithic-collection-preview/resolve/9c230c61ab9c7179cf442018791b03f79ad62984/';
+    'https://huggingface.co/datasets/StarostinV/lithic-collection-preview/resolve/459bead1b3648128e0ca4b0ecbb8d899ffca1944/';
 
 const CACHE_NAME = 'lithic-collection-v1';
 const TIMELINE_COLLAPSED_KEY = 'lithicjs_collection_timeline_collapsed';
