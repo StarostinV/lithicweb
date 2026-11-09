@@ -94,14 +94,16 @@ export default class Scene {
 
     /**
      * Resets the camera to default viewing position.
+     * @param {number[]} [direction] - Optional direction from the mesh towards
+     *   the camera, in mesh coordinates (default: diagonal view)
      */
-    resetCamera() {
+    resetCamera(direction = null) {
         if (this._meshDiagonal) {
             const fovRad = this.camera.fov * Math.PI / 180;
             const fitDistance = (this._meshDiagonal / 2) / Math.tan(fovRad / 2);
-            this.rotationController.resetCamera(fitDistance * 1.5, this._meshCenter);
+            this.rotationController.resetCamera(fitDistance * 1.5, this._meshCenter, direction);
         } else {
-            this.rotationController.resetCamera(50);
+            this.rotationController.resetCamera(50, null, direction);
         }
     }
 

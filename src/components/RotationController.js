@@ -431,18 +431,23 @@ export default class RotationController {
      * Resets camera to default position looking at target.
      * @param {number} distance - Distance from target (default: 50)
      * @param {THREE.Vector3} [target] - Optional orbit target center
+     * @param {{x:number,y:number,z:number}|number[]} [direction] - Optional
+     *   direction from the target towards the camera (default: diagonal)
      */
-    resetCamera(distance = 50, target = null) {
+    resetCamera(distance = 50, target = null, direction = null) {
         if (target) {
             this.orbitControls.target.copy(target);
         }
         const center = this.orbitControls.target;
-        const angle = Math.PI / 4;
-        this.camera.position.set(
-            center.x + distance * Math.sin(angle),
-            center.y + distance * Math.sin(angle),
-            center.z + distance * Math.cos(angle)
-        );
+        let dir = direction
+            ? new THREE.Vector3().fromArray(Array.isArray(direction) ? direction : [direction.x, direction.y, direction.z])
+            : null;
+        if (!dir || dir.lengthSq() === 0) {
+            const angle = Math.PI / 4;
+            dir = new THREE.Vector3(Math.sin(angle), Math.sin(angle), Math.cos(angle));
+        }
+        dir.normalize();
+        this.camera.position.copy(center).addScaledVector(dir, distance);
         this.orbitControls.update();
     }
 

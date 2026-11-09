@@ -187,6 +187,85 @@ def unmirror(sid, V, F):
     return V, flipped
 
 
+def vertex_segments(n, F, labels):
+    """Segment id per vertex as the client computes them: connected regions of
+    non-edge vertices (edge vertices get -1)."""
+    parent = np.arange(n)
+    e = np.concatenate([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
+    e = e[(labels[e[:, 0]] == 0) & (labels[e[:, 1]] == 0)]
+    a, b = e[:, 0], e[:, 1]
+    while True:
+        pa, pb = parent[a], parent[b]
+        if np.array_equal(pa, pb):
+            break
+        m = np.minimum(pa, pb)
+        np.minimum.at(parent, pa, m)
+        np.minimum.at(parent, pb, m)
+        while True:                      # pointer jumping
+            nxt = parent[parent]
+            if np.array_equal(nxt, parent):
+                break
+            parent = nxt
+    seg = parent.copy()
+    seg[labels != 0] = -1
+    return seg
+
+
+def fibonacci_sphere(k):
+    i = np.arange(k) + 0.5
+    phi = np.arccos(1 - 2 * i / k)
+    theta = np.pi * (1 + 5 ** 0.5) * i
+    return np.stack([np.cos(theta) * np.sin(phi), np.cos(phi), np.sin(theta) * np.sin(phi)], 1)
+
+
+def best_view(V, F, labels, n_dirs=200, res=160, min_silhouette=0.75):
+    """Camera direction (from the object towards the camera) that shows the
+    most annotation: for each candidate direction, a depth buffer of face
+    centroids finds the visible faces, and the score is the sum over visible
+    scars, except the largest segment (drawn in the plain object colour), of
+    sqrt(visible pixels): many visible scars count more than one huge one.
+    Only views whose silhouette is at least `min_silhouette` of the largest
+    one compete, so flat pieces are seen face-on, never edge-on."""
+    V = V.astype(np.float64) - V.mean(0)          # the client centres the mesh the same way
+    seg = vertex_segments(len(V), F, labels)
+    ids, counts = np.unique(seg[seg >= 0], return_counts=True)
+    plain = ids[np.argmax(counts)] if len(ids) else -2
+    # face -> segment: majority of its non-edge vertices (ties: first)
+    fs = seg[F]
+    face_seg = np.where(fs[:, 0] >= 0, fs[:, 0], np.where(fs[:, 1] >= 0, fs[:, 1], fs[:, 2]))
+    informative = (face_seg >= 0) & (face_seg != plain)
+
+    cent = V[F].mean(1)
+    normal = np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]])
+    radius = np.linalg.norm(V, axis=1).max() * 1.01
+    views = []
+    for d in fibonacci_sphere(n_dirs):
+        # orthonormal image axes
+        up = np.array([0.0, 1.0, 0.0]) if abs(d[1]) < 0.9 else np.array([1.0, 0.0, 0.0])
+        u = np.cross(up, d); u /= np.linalg.norm(u)
+        w = np.cross(d, u)
+        front = normal @ d > 0
+        idx = np.nonzero(front)[0]
+        px = np.clip(((cent[idx] @ u / radius + 1) / 2 * res).astype(int), 0, res - 1)
+        py = np.clip(((cent[idx] @ w / radius + 1) / 2 * res).astype(int), 0, res - 1)
+        depth = cent[idx] @ d                      # larger = closer to the camera
+        pix = py * res + px
+        order = np.lexsort((-depth, pix))          # per pixel, closest face first
+        first = np.ones(len(order), bool)
+        first[1:] = pix[order][1:] != pix[order][:-1]
+        visible = idx[order[first]]
+        vis_seg = face_seg[visible][informative[visible]]
+        if len(vis_seg) == 0:
+            score = 0.0
+        else:
+            _, c = np.unique(vis_seg, return_counts=True)
+            score = float(np.sqrt(c).sum())
+        views.append((d, len(visible), score))      # occupied pixels = silhouette
+    largest = max(v[1] for v in views)
+    best = max((v for v in views if v[1] >= min_silhouette * largest), key=lambda v: v[2])[0]
+    return [round(float(x), 4) for x in best]
+
+
 def write_ply(path, vertices, faces, labels, comments):
     header = "ply\nformat binary_little_endian 1.0\n"
     header += "".join(f"comment metadata {k} {v}\n" for k, v in comments.items() if v not in (None, ""))
@@ -296,6 +375,7 @@ def main():
             vertices=int(len(V)), faces=int(len(F)), edgeVertices=int(labels.sum()),
             scars=scars.get(sid), surfaceArea=a.get("surface_area"), volume=a.get("raw_volume"),
             labelSource=label_source,
+            view=best_view(V, F, labels),
         )
         # Thumbnails are rendered with the app afterwards (see README); include if present
         if (args.out / f"thumbs/{sid}.webp").exists():

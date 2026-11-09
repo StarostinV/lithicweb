@@ -8,7 +8,7 @@ import { confirmUnsavedChanges } from '../utils/confirmUnsavedChanges.js';
  * Override with ?collection=<base url> for testing another build.
  */
 export const DEFAULT_COLLECTION_URL =
-    'https://huggingface.co/datasets/StarostinV/lithic-collection-preview/resolve/a90fc589923712f765a862d9beeb015021b5af65/';
+    'https://huggingface.co/datasets/StarostinV/lithic-collection-preview/resolve/9c230c61ab9c7179cf442018791b03f79ad62984/';
 
 const CACHE_NAME = 'lithic-collection-v1';
 
@@ -388,6 +388,11 @@ export class CollectionPanel {
                 fraction => this._setProgress(id, fraction));
             const fileName = `${item.id}.ply`;
             await this.meshLoader.loadFile(new File([blob], fileName, { type: 'application/octet-stream' }));
+            // Start from the side that shows the most annotation (chosen when building the collection)
+            if (item.view) {
+                this.meshView.scene?.resetCamera?.(item.view);
+                this.meshView.scene?.updateLightFromCamera?.();   // light the side we look at
+            }
             const fileNameSpan = document.getElementById('fileName');
             if (fileNameSpan) {
                 fileNameSpan.textContent = fileName;
