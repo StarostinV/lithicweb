@@ -31,6 +31,14 @@ Usage
 -----
     python build_collection.py --out OUT_DIR [--per-site N] [--sites a,b]
 """
+import os
+
+# One numerical thread per process: the build parallelises over meshes, and
+# per-process BLAS/OpenMP pools would oversubscribe the cores many times over.
+# Must be set before numpy is imported.
+for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
+
 import argparse
 import glob
 import json
