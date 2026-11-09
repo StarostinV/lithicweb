@@ -192,11 +192,17 @@ export class CollectionPanel {
 
     _renderSources() {
         if (!this.el.sources) return;
-        this.el.sources.innerHTML = this.catalogue.sites.filter(s => s.source).map(s => `
-            <li>
-                <a href="https://doi.org/${escapeHtml(s.source.doi)}" target="_blank" rel="noopener">${escapeHtml(s.source.title)}</a>
-                <span>${escapeHtml(s.source.authors)} · ${escapeHtml(s.source.license)}</span>
-            </li>`).join('');
+        // One entry per source dataset (newer catalogues); older ones list per site
+        const sources = this.catalogue.sources
+            || this.catalogue.sites.filter(s => s.source).map(s => ({ ...s.source }));
+        this.el.sources.innerHTML = sources.map(src => {
+            const title = escapeHtml(src.title);
+            const link = src.doi
+                ? `<a href="https://doi.org/${escapeHtml(src.doi)}" target="_blank" rel="noopener">${title}</a>`
+                : `<span class="collection-source-title">${title}</span>`;
+            const count = src.count ? ` · ${src.count} meshes` : '';
+            return `<li>${link}<span>${escapeHtml(src.authors)} · ${escapeHtml(src.license)}${count}</span></li>`;
+        }).join('');
     }
 
     _setSite(siteId) {

@@ -199,6 +199,12 @@
     text-decoration: underline;
 }
 
+.collection-sources .collection-source-title {
+    display: block;
+    color: var(--gray-700, #374151);
+    font-size: 12px;
+}
+
 .collection-sources span {
     display: block;
     color: var(--gray-500);

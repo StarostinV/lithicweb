@@ -107,6 +107,61 @@ SITES = {
                     license="CC-BY-4.0"),
     ),
 }
+# Further sites in the public (--full) collection. Neither the source records
+# nor the papers give coordinates, so these positions are approximate and
+# labelled as such; no numeric dating is given in the records.
+_MULLER = dict(title="3D Models and Code for the Analysis of Later Acheulean Southern Levantine Handaxes",
+               authors="Muller, A.; Grosman, L.", doi="10.5281/zenodo.14534846", license="CC-BY-4.0")
+PUBLIC_SITES = {
+    "maayan_barukh": dict(name="Ma'ayan Barukh", context="Maayan Barukh", region="Upper Galilee, Israel",
+                          lat=33.24, lon=35.61, coordinates="approximate (not given in the source record)",
+                          period="Late Acheulean", dating=None, datingKa=None, source=_MULLER),
+    "nahal_zihor": dict(name="Nahal Zihor", context="Nahal Zihor", region="Negev, Israel",
+                        lat=30.10, lon=34.95, coordinates="approximate (not given in the source record)",
+                        period="Late Acheulean", dating=None, datingKa=None, source=_MULLER),
+    "revadim": dict(name="Revadim", context="Revadim", region="Southern coastal plain, Israel",
+                    lat=31.78, lon=34.82, coordinates="approximate (not given in the source record)",
+                    period="Late Acheulean", dating=None, datingKa=None, source=_MULLER),
+    "jaljulia": dict(name="Jaljulia", context="Jaljulia", region="Central coastal plain, Israel",
+                     lat=32.15, lon=34.95, coordinates="approximate (not given in the source record)",
+                     period="Late Acheulean", dating=None, datingKa=None, source=_MULLER),
+    "experimental": dict(name="Experimental", context="Experimental", region=None,
+                         lat=None, lon=None, coordinates="none (experimental replicas)", period=None,
+                         dating=None, datingKa=None, source=None),
+}
+
+# Rights per source dataset (the h5 'Dataset' attribute). Only datasets with
+# publish=True go into the public collection; each published artifact cites
+# its dataset. Cleared on 9 Nov 2026: A. Falcucci's sets and those he co-authors
+# (Lombao et al. 2023), Liu et al. and Muller & Grosman (public CC-BY-4.0 Zenodo
+# releases containing all our pieces, verified by file list). Excluded until
+# cleared: Hallinan & Cascalheira (release not identified).
+_OAP = {k: s["source"] for k, s in SITES.items()}
+DATASETS = {
+    "Falcucci et al. 2023 + Linsel et al": dict(publish=True, label="Falcucci & Peresani (Open Aurignacian Project, vol. 1)", source=_OAP["fumane"]),
+    "Falcucci et al. 2023": dict(publish=True, label="Falcucci & Peresani (Open Aurignacian Project, vol. 1)", source=_OAP["fumane"]),
+    "Falcucci and Moroni 2024": dict(publish=True, label="Falcucci & Moroni (Open Aurignacian Project, vol. 2)", source=_OAP["castelcivita"]),
+    "Falcucci and Moroni 2025": dict(publish=True, label="Falcucci & Moroni (Open Aurignacian Project, vol. 3)", source=_OAP["cala"]),
+    "Falcucci et al. 2025": dict(publish=True, label="Falcucci et al. (Open Aurignacian Project, vol. 4)", source=_OAP["bombrini"]),
+    "Liu et al. in preparation": dict(publish=True, label="Liu et al. 2026", source=dict(
+        title="3D Lithic Meshes and Metadata for 'Reconstructing the sequentiality of adjacent flake removal scars "
+              "on lithic 3D models: A curvature-based computational approach'",
+        authors="Liu, C.; Valletta, F.; Baena, J.; Falcucci, A.", doi="10.5281/zenodo.18261894", license="CC-BY-4.0")),
+    "Muller et al": dict(publish=True, label="Muller & Grosman", source=_MULLER),
+    "Falcucci et al. in prep": dict(publish=True, label="Falcucci et al. (in preparation)", source=dict(
+        title="Experimental bladelet cores (in preparation), released here with the authors' permission",
+        authors="Falcucci, A. et al.", doi=None, license="CC-BY-4.0")),
+    "This study": dict(publish=True, label="NeuroLithic experimental set", source=dict(
+        title="Experimental replicas (A. Falcucci), released with this collection",
+        authors="Falcucci, A.", doi=None, license="CC-BY-4.0")),
+    "Lombao et al. 2023": dict(publish=True, label="Lombao et al. 2023", source=dict(
+        title="Experimental cores for 'Unravelling technological behaviors through core reduction intensity. The case "
+              "of the early Protoaurignacian assemblage from Fumane Cave' (meshes released here with the authors' "
+              "permission; research compendium cited)",
+        authors="Lombao, D.; Falcucci, A.; Moos, E.; Peresani, M.", doi="10.5281/zenodo.10066814", license="CC-BY-4.0")),
+    "Hallinan and Cascalheira": dict(publish=False, label="Hallinan & Cascalheira", source=None),
+}
+
 # Everything else in all_data.h5, for the local --all mock only: these sets are
 # not cleared for publication, have no verified coordinates or dating, and
 # must never be uploaded. Israeli site positions are approximate placeholders.
@@ -335,12 +390,15 @@ def write_ply(path, vertices, faces, labels, comments):
         f.write(frec.tobytes())
 
 
-def select(h5, per_site, sites, table):
-    """Pick up to per_site meshes per site, alternating types, smallest first."""
+def select(h5, per_site, sites, table, publishable_only=True):
+    """Pick up to per_site meshes per site, alternating types, smallest first;
+    with publishable_only, skip datasets not cleared for publication."""
     context_to_site = {s["context"]: k for k, s in table.items()}
     by_site = {}
     for key in h5:
         a = h5[key].attrs
+        if publishable_only and not DATASETS.get(clean(a["Dataset"]), {}).get("publish"):
+            continue
         site = context_to_site.get(clean(a["Contex"]))
         if site in sites:
             by_site.setdefault(site, []).append((clean(a["Type"]), h5[key]["vertices"].shape[0], key))
@@ -361,9 +419,11 @@ def select(h5, per_site, sites, table):
 def dataset_card(catalogue):
     """Hugging Face dataset card: license, contents and sources."""
     sources = "\n".join(
-        f"- {s['source']['authors']} {s['source']['title']}. https://doi.org/{s['source']['doi']} "
-        f"({s['source']['license']})" for s in catalogue["sites"])
+        f"- {s['authors']} {s['title']}." + (f" https://doi.org/{s['doi']}" if s.get("doi") else "")
+        + f" ({s['license']}; {s['count']} meshes)" for s in catalogue["sources"])
     approx = [s["name"] for s in catalogue["sites"] if s["coordinates"].startswith("approximate")]
+    n_sites = sum(1 for s in catalogue["sites"] if s["id"] != "experimental")
+    experimental = " and an experimental set" if any(s["id"] == "experimental" for s in catalogue["sites"]) else ""
     note = f" Approximate locations: {', '.join(approx)}." if approx else ""
     return f"""---
 license: cc-by-4.0
@@ -373,7 +433,7 @@ tags: [archaeology, lithics, 3d, mesh, segmentation]
 
 # {catalogue['name']}
 
-{len(catalogue['items'])} annotated 3D meshes of lithic artifacts from {len(catalogue['sites'])} sites, browsed by the
+{len(catalogue['items'])} annotated 3D meshes of lithic artifacts ({n_sites} sites{experimental}), browsed by the
 Collection tab of the NeuroLithic web client. Each mesh is a binary PLY with
 per-vertex scar-boundary labels (`labels`, 1 = edge) drawn by the NeuroLithic
 team; `catalogue.json` lists artifacts, sites and metadata; `thumbs/` holds
@@ -381,12 +441,26 @@ preview images.
 
 ## Sources
 
-Raw scans:
+Raw scans (each artifact's `source` in catalogue.json names its dataset):
 
 {sources}
 
-Site coordinates and dating are quoted from these records.{note}
+Site coordinates and dating are quoted from the source records where they give them.{note}
 """
+
+
+def merge_sources(sources):
+    """Merge datasets that cite the same record (same label and DOI) into one
+    entry; 'ids' lists the dataset names an artifact's 'source' may take."""
+    merged = {}
+    for src in sources:
+        key = (src["label"], src.get("doi"))
+        if key in merged:
+            merged[key]["count"] += src["count"]
+            merged[key]["ids"].append(src["id"])
+        else:
+            merged[key] = {**src, "ids": [src["id"]]}
+    return list(merged.values())
 
 
 # Per-process state for the worker pool (set by _init_worker)
@@ -414,7 +488,8 @@ def build_item(job):
     except RuntimeError as err:
         return dict(error=str(err), id=sid)
 
-    src = table[site].get("source") or {}
+    ds = DATASETS.get(a.get("Dataset"), {})
+    src = ds.get("source") or table[site].get("source") or {}
     rel = f"meshes/{site}/{sid}.ply"
     out_path = out / rel
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -425,7 +500,8 @@ def build_item(job):
     })
 
     item = dict(
-        id=sid, site=site, type=a["Type"], dataset=a.get("Dataset"),
+        id=sid, site=site, type=a["Type"], dataset=ds.get("label", a.get("Dataset")),
+        source=a.get("Dataset"),
         file=rel, bytes=out_path.stat().st_size,
         vertices=int(len(V)), faces=int(len(F)), edgeVertices=int(labels.sum()),
         scars=_W["scars"].get(sid), surfaceArea=a.get("surface_area"), volume=a.get("raw_volume"),
@@ -454,16 +530,23 @@ def main():
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--per-site", type=int, default=12)
     ap.add_argument("--sites", default=",".join(SITES))
+    ap.add_argument("--full", action="store_true",
+                    help="every mesh from datasets cleared for publication (DATASETS), all sites")
     ap.add_argument("--all", action="store_true",
                     help="LOCAL MOCK ONLY: every mesh in the h5, including sets not cleared for publication")
     ap.add_argument("--workers", type=int, default=8)
     args = ap.parse_args()
-    table = {**SITES, **MOCK_SITES} if args.all else SITES
-    sites = list(table) if args.all else [s for s in args.sites.split(",") if s]
-    per_site = 10 ** 9 if args.all else args.per_site
+    if args.all:
+        table = {**SITES, **MOCK_SITES}
+    elif args.full:
+        table = {**SITES, **PUBLIC_SITES}
+    else:
+        table = SITES
+    sites = list(table) if (args.all or args.full) else [s for s in args.sites.split(",") if s]
+    per_site = 10 ** 9 if (args.all or args.full) else args.per_site
 
     with h5py.File(H5, "r") as h5:
-        jobs = select(h5, per_site, sites, table)
+        jobs = select(h5, per_site, sites, table, publishable_only=not args.all)
     items, failed = [], []
     from multiprocessing import Pool
     with Pool(args.workers, initializer=_init_worker, initargs=(args.out, table)) as pool:
@@ -477,13 +560,20 @@ def main():
             print(f"[{n}/{len(jobs)}] {item.pop('_log')}", flush=True)
             items.append(item)
 
+    used = {}
+    for item in items:
+        used[item["source"]] = used.get(item["source"], 0) + 1
+    sources = merge_sources([dict(id=k, label=DATASETS[k]["label"], count=n, **DATASETS[k]["source"])
+                             for k, n in used.items() if DATASETS.get(k, {}).get("source")])
     catalogue = dict(
-        name="Lithic collection (MOCK, local only)" if args.all else "Lithic collection (preview)",
+        name=("Lithic collection (MOCK, local only)" if args.all
+              else "Lithic collection" if args.full else "Lithic collection (preview)"),
         version=1,
         generated=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         description="Annotated 3D meshes of lithic artifacts. Edge annotations by the Neurolithic team; "
                     "raw scans from the cited sources.",
         sites=[dict(id=k, **{f: v for f, v in s.items() if f != "context"}) for k, s in table.items() if k in sites],
+        sources=sources,
         items=items,
     )
     (args.out / "catalogue.json").write_text(json.dumps(catalogue, indent=1, ensure_ascii=False))
