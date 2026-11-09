@@ -85,8 +85,6 @@ export class CollectionPanel {
 
         const param = new URLSearchParams(window.location.search).get('collection');
         this.baseUrl = (param || DEFAULT_COLLECTION_URL).replace(/\/?$/, '/');
-        // Timeline variant under evaluation: 'tags' (default) or 'lines'
-        this.timelineVariant = new URLSearchParams(window.location.search).get('timeline') === 'lines' ? 'lines' : 'tags';
 
         this.catalogue = null;
         this.sites = new Map();
@@ -187,7 +185,7 @@ export class CollectionPanel {
 
     _renderSources() {
         if (!this.el.sources) return;
-        this.el.sources.innerHTML = this.catalogue.sites.map(s => `
+        this.el.sources.innerHTML = this.catalogue.sites.filter(s => s.source).map(s => `
             <li>
                 <a href="https://doi.org/${escapeHtml(s.source.doi)}" target="_blank" rel="noopener">${escapeHtml(s.source.title)}</a>
                 <span>${escapeHtml(s.source.authors)} · ${escapeHtml(s.source.license)}</span>
@@ -279,9 +277,8 @@ export class CollectionPanel {
             const marker = L.marker([site.lat, site.lon], {
                 icon: L.divIcon({
                     className: 'collection-marker',
-                    html: this.timelineVariant === 'lines'
-                        ? `<span style="background:${this._siteColor(site.id)}">${n}</span>`
-                        : `<span>${n}</span>`,
+                    // Same colour as the site's line on the timeline (grey when undated)
+                    html: `<span style="background:${this._siteColor(site.id)}">${n}</span>`,
                     iconSize: [34, 34],
                     iconAnchor: [17, 17],
                 }),
@@ -342,13 +339,13 @@ export class CollectionPanel {
             site.dating,
             `${n} artifact${n === 1 ? '' : 's'} in this collection`,
         ].filter(Boolean).map(r => `<div>${escapeHtml(r)}</div>`).join('');
-        const approx = site.coordinates?.startsWith('approximate')
+        const approx = /approximate|mock/.test(site.coordinates || '')
             ? '<div class="collection-popup-note">Location approximate</div>' : '';
         return `
             <div class="collection-popup">
                 <strong>${escapeHtml(site.name)}</strong>
                 ${rows}${approx}
-                <a href="https://doi.org/${escapeHtml(site.source.doi)}" target="_blank" rel="noopener">Source data (${escapeHtml(site.source.license)})</a>
+                ${site.source ? `<a href="https://doi.org/${escapeHtml(site.source.doi)}" target="_blank" rel="noopener">Source data (${escapeHtml(site.source.license)})</a>` : ''}
             </div>`;
     }
 
@@ -377,14 +374,11 @@ export class CollectionPanel {
     // ------------------------------------------------------------------
 
     /**
-     * Dating timeline on one shared ka cal BP axis (older on the left).
-     * Two variants, chosen with ?timeline=tags|lines while we compare them:
-     * - tags: a translucent band per dated site, overlaps read darker, and a
-     *   small name tag above each band's midpoint (stacked when they collide);
-     * - lines: a thin coloured line per site, packed into lanes that are
-     *   reused when ranges do not overlap; map markers take the same colours.
-     * Hovering an age highlights the sites covering it; clicking pins the age
-     * as a filter.
+     * Dating timeline on one shared ka cal BP axis (older on the left): a
+     * thin line per dated site in the site's colour, packed into lanes that
+     * are reused when ranges do not overlap, so the panel stays compact as
+     * sites are added. Hovering an age highlights the sites covering it;
+     * clicking pins the age as a filter.
      */
     _renderTimeline() {
         const el = this.el.timeline;
@@ -408,32 +402,20 @@ export class CollectionPanel {
             ticks.push(`<span class="collection-timeline-tick" style="left:${pct(ka)}%">${ka}</span>`);
         }
 
-        let plotHtml;
-        let tagsHtml = '';
-        if (this.timelineVariant === 'lines') {
-            // Greedy lane packing, left (older) to right; a lane is free once
-            // its last range has ended (with a small gap)
-            const lanes = [];
-            const laneOf = new Map();
-            for (const s of [...dated].sort((x, y) => y.datingKa[0] - x.datingKa[0])) {
-                let lane = lanes.findIndex(end => end - 0.3 >= s.datingKa[0]);
-                if (lane < 0) { lane = lanes.length; lanes.push(0); }
-                lanes[lane] = s.datingKa[1];
-                laneOf.set(s.id, lane);
-            }
-            plotHtml = dated.map(s => `
-                <span class="collection-timeline-range collection-timeline-line" data-site="${escapeHtml(s.id)}"
-                      style="left:${left(s)}%;width:${width(s)}%;top:${4 + laneOf.get(s.id) * 9}px;--site-color:${this._siteColor(s.id)}"></span>`).join('');
-            this._plotHeight = 8 + lanes.length * 9;
-        } else {
-            plotHtml = dated.map(s => `
-                <span class="collection-timeline-range collection-timeline-band" data-site="${escapeHtml(s.id)}"
-                      style="left:${left(s)}%;width:${width(s)}%"></span>`).join('');
-            tagsHtml = `<div class="collection-timeline-tags">${dated.map(s => `
-                <button type="button" class="collection-timeline-tag" data-site="${escapeHtml(s.id)}"
-                        style="left:${left(s) + width(s) / 2}%">${escapeHtml(this._shortName(s))}</button>`).join('')}</div>`;
-            this._plotHeight = 22;
+        // Greedy lane packing, left (older) to right; a lane is free once its
+        // last range has ended (with a small gap)
+        const lanes = [];
+        const laneOf = new Map();
+        for (const s of [...dated].sort((x, y) => y.datingKa[0] - x.datingKa[0])) {
+            let lane = lanes.findIndex(end => end - 0.3 >= s.datingKa[0]);
+            if (lane < 0) { lane = lanes.length; lanes.push(0); }
+            lanes[lane] = s.datingKa[1];
+            laneOf.set(s.id, lane);
         }
+        const plotHtml = dated.map(s => `
+            <span class="collection-timeline-line" data-site="${escapeHtml(s.id)}"
+                  style="left:${left(s)}%;width:${width(s)}%;top:${4 + laneOf.get(s.id) * 9}px;--site-color:${this._siteColor(s.id)}"></span>`).join('');
+        const plotHeight = 8 + lanes.length * 9;
 
         const undated = sites.filter(s => !Array.isArray(s.datingKa)).map(s => s.name);
         el.innerHTML = `
@@ -441,8 +423,7 @@ export class CollectionPanel {
                 <span class="collection-timeline-title">Dating <span>ka cal BP</span></span>
                 <span class="collection-timeline-readout"></span>
             </div>
-            ${tagsHtml}
-            <div class="collection-timeline-plot collection-timeline-${this.timelineVariant}" style="height:${this._plotHeight}px">
+            <div class="collection-timeline-plot" style="height:${plotHeight}px">
                 ${plotHtml}
                 <span class="collection-timeline-cursor hover-cursor"></span>
                 <span class="collection-timeline-cursor pinned-cursor"></span>
@@ -459,47 +440,22 @@ export class CollectionPanel {
         plot.addEventListener('mousemove', ev => this._previewTime(kaAt(ev)));
         plot.addEventListener('mouseleave', () => this._previewTime(null));
         plot.addEventListener('click', ev => this._setTime(kaAt(ev)));
-        el.querySelectorAll('.collection-timeline-tag').forEach(tag => {
-            const id = tag.dataset.site;
-            tag.addEventListener('mouseenter', () => this._highlightSite(id, true));
-            tag.addEventListener('mouseleave', () => this._highlightSite(id, false));
-            tag.addEventListener('click', () => this._setSite(this.filters.site === id ? '' : id));
-        });
         el.querySelector('.collection-timeline-readout').addEventListener('click', ev => {
             if (ev.target.closest('.collection-timeline-clear')) this._setTime(null);
         });
-        this._layoutTags();
         this._updateTimeline();
-    }
-
-    /** Stack tags that would overlap into rows above the band track. */
-    _layoutTags() {
-        const box = this.el.timeline?.querySelector('.collection-timeline-tags');
-        if (!box) return;
-        const tags = [...box.querySelectorAll('.collection-timeline-tag')];
-        const width = box.clientWidth;
-        if (!width) return;   // not laid out yet (map hidden); redone on show
-        const rows = [];
-        tags.map(tag => {
-            const center = parseFloat(tag.style.left) / 100 * width;
-            return { tag, x0: center - tag.offsetWidth / 2 - 3, x1: center + tag.offsetWidth / 2 + 3 };
-        }).sort((p, q) => p.x0 - q.x0).forEach(t => {
-            let row = rows.findIndex(end => end <= t.x0);
-            if (row < 0) { row = rows.length; rows.push(0); }
-            rows[row] = t.x1;
-            t.tag.style.bottom = `${row * 18}px`;
-        });
-        box.style.height = `${Math.max(1, rows.length) * 18}px`;
     }
 
     _shortName(site) {
         return site.name.replace(/^(Grotta|Riparo) (di |della |del |dei )?/, '');
     }
 
+    /** Colour shared by a site's timeline line and map marker; grey when undated. */
     _siteColor(siteId) {
         const palette = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#8b5cf6'];
-        const i = this.catalogue.sites.findIndex(s => s.id === siteId);
-        return palette[(i < 0 ? 0 : i) % palette.length];
+        const dated = this.catalogue.sites.filter(s => Array.isArray(s.datingKa));
+        const i = dated.findIndex(s => s.id === siteId);
+        return i < 0 ? '#9ca3af' : palette[i % palette.length];
     }
 
     _kaToPct(ka) {
@@ -553,7 +509,7 @@ export class CollectionPanel {
         const el = this.el.timeline;
         if (!el || !this._axis) return;
         const t = this.filters.timeKa;
-        el.querySelectorAll('.collection-timeline-range, .collection-timeline-tag').forEach(band => {
+        el.querySelectorAll('.collection-timeline-line').forEach(band => {
             const id = band.dataset.site;
             const site = this.sites.get(id);
             band.classList.toggle('selected', id === this.filters.site);
@@ -587,7 +543,6 @@ export class CollectionPanel {
                     this._fitted = true;
                 }
                 this._layoutLabels();
-                this._layoutTags();
             });
         }
     }

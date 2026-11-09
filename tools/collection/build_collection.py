@@ -97,7 +97,29 @@ SITES = {
                     license="CC-BY-4.0"),
     ),
 }
-CONTEXT_TO_SITE = {s["context"]: k for k, s in SITES.items()}
+# Everything else in all_data.h5, for the local --all mock only: these sets are
+# not cleared for publication, have no verified coordinates or dating, and
+# must never be uploaded. Israeli site positions are approximate placeholders.
+MOCK_SITES = {
+    "maayan_barukh": dict(name="Maayan Barukh", context="Maayan Barukh", region="Upper Galilee, Israel",
+                          lat=33.24, lon=35.61, coordinates="approximate (mock)", period=None,
+                          dating=None, datingKa=None, source=None),
+    "jaljulia": dict(name="Jaljulia", context="Jaljulia", region="Central Israel",
+                     lat=32.15, lon=34.95, coordinates="approximate (mock)", period=None,
+                     dating=None, datingKa=None, source=None),
+    "revadim": dict(name="Revadim", context="Revadim", region="Southern coastal plain, Israel",
+                    lat=31.78, lon=34.82, coordinates="approximate (mock)", period=None,
+                    dating=None, datingKa=None, source=None),
+    "nahal_zihor": dict(name="Nahal Zihor", context="Nahal Zihor", region="Negev, Israel",
+                        lat=30.10, lon=34.95, coordinates="approximate (mock)", period=None,
+                        dating=None, datingKa=None, source=None),
+    "open_air": dict(name="Open air (Hallinan and Cascalheira)", context="Open air", region=None,
+                     lat=None, lon=None, coordinates="unknown", period=None,
+                     dating=None, datingKa=None, source=None),
+    "experimental": dict(name="Experimental", context="Experimental", region=None,
+                         lat=None, lon=None, coordinates="none (experimental replicas)", period=None,
+                         dating=None, datingKa=None, source=None),
+}
 
 
 def norm(name):
@@ -288,12 +310,13 @@ def write_ply(path, vertices, faces, labels, comments):
         f.write(frec.tobytes())
 
 
-def select(h5, per_site, sites):
+def select(h5, per_site, sites, table):
     """Pick up to per_site meshes per site, alternating types, smallest first."""
+    context_to_site = {s["context"]: k for k, s in table.items()}
     by_site = {}
     for key in h5:
         a = h5[key].attrs
-        site = CONTEXT_TO_SITE.get(clean(a["Contex"]))
+        site = context_to_site.get(clean(a["Contex"]))
         if site in sites:
             by_site.setdefault(site, []).append((clean(a["Type"]), h5[key]["vertices"].shape[0], key))
     chosen = []
@@ -341,74 +364,108 @@ Site coordinates and dating are quoted from these records.{note}
 """
 
 
+# Per-process state for the worker pool (set by _init_worker)
+_W = {}
+
+
+def _init_worker(out, table):
+    _W.update(out=out, table=table, h5=h5py.File(H5, "r"), states=accepted_states(),
+              fumane={r["ID"]: r for r in csv.DictReader(open(FUMANE_CSV))},
+              scars={r["sample_id"]: int(r["n_scars_gt"]) for r in csv.DictReader(open(METRICS_CSV))})
+
+
+def build_item(job):
+    """Write one annotated PLY and return its catalogue entry (or an error)."""
+    site, key = job
+    out, table = _W["out"], _W["table"]
+    g = _W["h5"][key]
+    a = {k: clean(v) for k, v in g.attrs.items()}
+    sid = a["ID"]
+    try:
+        V = g["vertices"][:].astype(np.float32)
+        F = g["faces"][:].astype(np.int32)
+        labels, label_source = edge_labels_for(sid, len(V), F, g["labels"][:], _W["states"])
+        V, flipped = unmirror(sid, V, F)
+    except RuntimeError as err:
+        return dict(error=str(err), id=sid)
+
+    src = table[site].get("source") or {}
+    rel = f"meshes/{site}/{sid}.ply"
+    out_path = out / rel
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    write_ply(out_path, V, F, labels, {
+        "id": sid, "site": table[site]["name"], "type": a["Type"],
+        "dataset": a["Dataset"].replace(" ", "_") if a.get("Dataset") else None,
+        "source_doi": src.get("doi"), "license": src.get("license"),
+    })
+
+    item = dict(
+        id=sid, site=site, type=a["Type"], dataset=a.get("Dataset"),
+        file=rel, bytes=out_path.stat().st_size,
+        vertices=int(len(V)), faces=int(len(F)), edgeVertices=int(labels.sum()),
+        scars=_W["scars"].get(sid), surfaceArea=a.get("surface_area"), volume=a.get("raw_volume"),
+        labelSource=label_source,
+        view=best_view(V, F, labels),
+    )
+    # Thumbnails are rendered with the app afterwards (see README); include if present
+    if (out / f"thumbs/{sid}.webp").exists():
+        item["thumb"] = f"thumbs/{sid}.webp"
+
+    z = _W["fumane"].get(sid)
+    if z:
+        item.update(unit=z["Stratigraphic_unit"], rawMaterial=z["Raw_material"], blank=z["Blank"],
+                    technology=z["Technology"],
+                    dimensionsMm=[float(z[k]) for k in ("Length", "Width", "Thickness") if z[k] not in ("", "NA")])
+    else:
+        item.update(rawMaterial=a.get("Raw-Material"), technology=a.get("Technology"))
+    item = {k: v for k, v in item.items() if v not in (None, "", [])}
+    item["_log"] = (f"{sid:14s} {site:12s} {a['Type']:14s} {len(V):8d} v  {int(labels.sum()):6d} edges  "
+                    f"({label_source}{', un-mirrored' if flipped else ''})")
+    return item
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--per-site", type=int, default=12)
     ap.add_argument("--sites", default=",".join(SITES))
+    ap.add_argument("--all", action="store_true",
+                    help="LOCAL MOCK ONLY: every mesh in the h5, including sets not cleared for publication")
+    ap.add_argument("--workers", type=int, default=8)
     args = ap.parse_args()
-    sites = [s for s in args.sites.split(",") if s]
+    table = {**SITES, **MOCK_SITES} if args.all else SITES
+    sites = list(table) if args.all else [s for s in args.sites.split(",") if s]
+    per_site = 10 ** 9 if args.all else args.per_site
 
-    fumane = {r["ID"]: r for r in csv.DictReader(open(FUMANE_CSV))}
-    scars = {r["sample_id"]: int(r["n_scars_gt"]) for r in csv.DictReader(open(METRICS_CSV))}
-    states = accepted_states()
-    h5 = h5py.File(H5, "r")
-
-    items = []
-    for site, key in select(h5, args.per_site, sites):
-        g = h5[key]
-        a = {k: clean(v) for k, v in g.attrs.items()}
-        sid = a["ID"]
-        V = g["vertices"][:].astype(np.float32)
-        F = g["faces"][:].astype(np.int32)
-        labels, label_source = edge_labels_for(sid, len(V), F, g["labels"][:], states)
-        V, flipped = unmirror(sid, V, F)
-
-        rel = f"meshes/{site}/{sid}.ply"
-        out_path = args.out / rel
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        write_ply(out_path, V, F, labels, {
-            "id": sid, "site": SITES[site]["name"], "type": a["Type"],
-            "dataset": a["Dataset"].replace(" ", "_") if a.get("Dataset") else None,
-            "source_doi": SITES[site]["source"]["doi"], "license": SITES[site]["source"]["license"],
-        })
-
-        item = dict(
-            id=sid, site=site, type=a["Type"], dataset=a.get("Dataset"),
-            file=rel, bytes=out_path.stat().st_size,
-            vertices=int(len(V)), faces=int(len(F)), edgeVertices=int(labels.sum()),
-            scars=scars.get(sid), surfaceArea=a.get("surface_area"), volume=a.get("raw_volume"),
-            labelSource=label_source,
-            view=best_view(V, F, labels),
-        )
-        # Thumbnails are rendered with the app afterwards (see README); include if present
-        if (args.out / f"thumbs/{sid}.webp").exists():
-            item["thumb"] = f"thumbs/{sid}.webp"
-
-        z = fumane.get(sid)
-        if z:
-            item.update(unit=z["Stratigraphic_unit"], rawMaterial=z["Raw_material"], blank=z["Blank"],
-                        technology=z["Technology"],
-                        dimensionsMm=[float(z[k]) for k in ("Length", "Width", "Thickness") if z[k] not in ("", "NA")])
-        else:
-            item.update(rawMaterial=a.get("Raw-Material"), technology=a.get("Technology"))
-        items.append({k: v for k, v in item.items() if v not in (None, "", [])})
-        print(f"{sid:14s} {site:12s} {a['Type']:14s} {len(V):8d} v  {int(labels.sum()):6d} edges  "
-              f"({label_source}{', un-mirrored' if flipped else ''})")
+    with h5py.File(H5, "r") as h5:
+        jobs = select(h5, per_site, sites, table)
+    items, failed = [], []
+    from multiprocessing import Pool
+    with Pool(args.workers, initializer=_init_worker, initargs=(args.out, table)) as pool:
+        for n, item in enumerate(pool.imap(build_item, jobs, chunksize=1), 1):
+            if "error" in item:
+                failed.append(item)
+                print(f"[{n}/{len(jobs)}] SKIPPED {item['id']}: {item['error']}", flush=True)
+                if not args.all:
+                    raise SystemExit(item["error"])
+                continue
+            print(f"[{n}/{len(jobs)}] {item.pop('_log')}", flush=True)
+            items.append(item)
 
     catalogue = dict(
-        name="Lithic collection (preview)",
+        name="Lithic collection (MOCK, local only)" if args.all else "Lithic collection (preview)",
         version=1,
         generated=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         description="Annotated 3D meshes of lithic artifacts. Edge annotations by the Neurolithic team; "
                     "raw scans from the cited sources.",
-        sites=[dict(id=k, **{f: v for f, v in s.items() if f != "context"}) for k, s in SITES.items() if k in sites],
+        sites=[dict(id=k, **{f: v for f, v in s.items() if f != "context"}) for k, s in table.items() if k in sites],
         items=items,
     )
     (args.out / "catalogue.json").write_text(json.dumps(catalogue, indent=1, ensure_ascii=False))
-    (args.out / "README.md").write_text(dataset_card(catalogue))
+    if not args.all:
+        (args.out / "README.md").write_text(dataset_card(catalogue))
     total = sum(i["bytes"] for i in items) / 1e6
-    print(f"\n{len(items)} meshes, {total:.0f} MB -> {args.out}")
+    print(f"\n{len(items)} meshes, {total:.0f} MB -> {args.out}" + (f"; {len(failed)} skipped" if failed else ""))
 
 
 if __name__ == "__main__":
