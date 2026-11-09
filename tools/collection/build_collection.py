@@ -584,7 +584,7 @@ def main():
                              for k, n in used.items() if DATASETS.get(k, {}).get("source")])
     catalogue = dict(
         name=("Lithic collection (MOCK, local only)" if args.all
-              else "Lithic collection" if args.full else "Lithic collection (preview)"),
+              else "NeuroLithic corpus" if args.full else "Lithic collection (preview)"),
         version=1,
         generated=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         description="Annotated 3D meshes of lithic artifacts. Edge annotations by the Neurolithic team; "
