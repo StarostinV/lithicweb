@@ -116,3 +116,11 @@ credentials.json
 *.gz
 *.rar
 *.7z
+
+# -----------------------------------------------------------------------------
+# Artifact3-D golden fixtures
+# -----------------------------------------------------------------------------
+# Small fixtures are committed (gzip arrays); larger ones are regenerated
+# locally with tools/artifact3d/make_fixtures.py into local/.
+!tests/fixtures/artifact3d/**/*.gz
+tests/fixtures/artifact3d/local/
