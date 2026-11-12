@@ -25,6 +25,7 @@ const { majorityVertexLabels, nearestVertexLabels, faceLabelsFromVertices } = aw
 const { faceSegmentsToVertexSegments, normalizeEdges } = await import(path.join(ROOT, 'src/geometry/faceUnionFind.js'));
 const { computeInstanceSegmentationMetrics } = await import(path.join(ROOT, 'src/evaluation/MetricsComputer.js'));
 const { linearSumAssignment } = await import(path.join(ROOT, 'src/evaluation/HungarianAlgorithm.js'));
+const { standardizePositions } = await import(path.join(ROOT, 'src/geometry/standardizePositions.js'));
 
 const [plyPath, fixDir] = process.argv.slice(2);
 const jsonOut = process.argv.includes('--json') ? process.argv[process.argv.indexOf('--json') + 1] : null;
@@ -206,19 +207,31 @@ if (fx.meta.decimated) {
     pyFaces = GL2; aFaces = a.labels;
 }
 
-// ---- (b) full JS pipeline from the PLY
-const c1 = process.cpuUsage();
-const t1 = performance.now();
-const b = await segmentArtifact3D(mesh.positions, mesh.indices, {});
-report.b = { wallSeconds: (performance.now() - t1) / 1000, cpuSeconds: process.cpuUsage(c1).user / 1e6,
-    seconds: b.timings, info: { ...b.info, params: undefined }, faceSegments: b.nScars,
-    faceAgreementWithPython: agree(b.faceLabels, pyFaces),
-    matchedAgreementWithPython: matchedAgreement(b.faceLabels, pyFaces) };
+// ---- (b) full JS pipeline from the PLY. The web client centres the
+// positions (float32) on load (meshUtils -> standardizePositions); that is
+// what the browser segments, so (b) uses centred positions. b_uncentred runs
+// the raw file coordinates: with decimation, float32 rounding alone changes
+// the working mesh, which shows the method's sensitivity to it.
+async function runFull(pos) {
+    const c1 = process.cpuUsage();
+    const t1 = performance.now();
+    const r = await segmentArtifact3D(pos, mesh.indices, {});
+    return { r, out: { wallSeconds: (performance.now() - t1) / 1000, cpuSeconds: process.cpuUsage(c1).user / 1e6,
+        seconds: r.timings, info: { ...r.info, params: undefined }, faceSegments: r.nScars,
+        faceAgreementWithPython: agree(r.faceLabels, pyFaces),
+        matchedAgreementWithPython: matchedAgreement(r.faceLabels, pyFaces) } };
+}
+const centred = standardizePositions(Float32Array.from(mesh.positions));
+const { r: b, out: bOut } = await runFull(centred);
+report.b = bOut;
+const { r: bu, out: buOut } = await runFull(mesh.positions);
+report.b_uncentred = buOut;
 
 report.metrics = [
     evaluate('python_port', pyFaces, mesh, adj, gtSeg),
     evaluate('js_on_python_mesh', aFaces, mesh, adj, gtSeg),
     evaluate('js_full_pipeline', b.faceLabels, mesh, adj, gtSeg),
+    evaluate('js_full_pipeline_uncentred', bu.faceLabels, mesh, adj, gtSeg),
 ];
 console.log(JSON.stringify(report, null, 1));
 if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify(report, null, 1));
