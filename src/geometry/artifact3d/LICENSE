@@ -8,12 +8,14 @@ below, together with the notices that apply to its parts.
 
 Original work
 -------------
-Artifact3-D — Copyright (c) 2022 Leore Grosman, Computerized Archaeology
-Laboratory, The Hebrew University of Jerusalem.
+Artifact3-D (https://sourceforge.net/projects/artifact3-d/), developed at the
+Computerized Archaeology Laboratory, The Hebrew University of Jerusalem.
 Scar segmentation MATLAB code (ScarsCode): Eitan Richardson, The Hebrew
 University of Jerusalem, 2011.
 
-MIT License
+The Artifact3-D license (LICENSE.txt from the SourceForge project), verbatim:
+
+Copyright 2022 Leore Grosman
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
