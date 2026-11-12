@@ -1,0 +1,68 @@
+Artifact3-D scar segmentation — browser port (src/geometry/artifact3d)
+=====================================================================
+
+This directory is a JavaScript port of the scar-segmentation algorithm of
+Artifact3-D (ScarsCode/ScarsSegmentation), made via an intermediate Python
+port. It is distributed under the MIT License of Artifact3-D, reproduced
+below, together with the notices that apply to its parts.
+
+Original work
+-------------
+Artifact3-D — Copyright (c) 2022 Leore Grosman, Computerized Archaeology
+Laboratory, The Hebrew University of Jerusalem.
+Scar segmentation MATLAB code (ScarsCode): Eitan Richardson, The Hebrew
+University of Jerusalem, 2011.
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+What is NOT included
+--------------------
+- GCO-3.0 (the multi-label graph-cut library bundled with Artifact3-D) is
+  licensed for research purposes only. None of its code is ported, copied or
+  shipped here; the graph-cut stage is an independent Potts alpha-expansion.
+- Kolmogorov's maxflow library and PyMaxflow (GPL) are not used or copied;
+  maxflow.js is an independent implementation of the published
+  Boykov-Kolmogorov algorithm (IEEE PAMI 26(9), 2004).
+- CrestCODE (Yoshizawa et al.) is not used; crest lines are detected by
+  curvature non-maximum suppression, as in the Python port.
+
+Third-party code used at run time
+---------------------------------
+- meshoptimizer (decimation), Copyright (c) 2016-2026 Arseny Kapoulkine,
+  MIT License (npm package "meshoptimizer").
+
+numpyRandom.js reimplements numpy's SeedSequence / PCG64 / bounded-integer
+algorithms (numpy: BSD-3-Clause; PCG: M.E. O'Neill) from their published
+descriptions so the clustering seeds match the Python port.
+
+References (please cite)
+------------------------
+L. Grosman, A. Muller, G. Dag, H. Goldgeier, O. Harush, G. Herzlinger,
+K. Nebenhaus, F. Valetta, T. Yashuv, N. Dick (2022). Artifact3-D: New software
+for accurate, objective and efficient 3D analysis and documentation of
+archaeological artifacts. PLOS ONE 17(6): e0268401.
+https://doi.org/10.1371/journal.pone.0268401
+
+E. Richardson, L. Grosman, U. Smilansky, M. Werman (2014). Extracting scar and
+ridge features from 3D-scanned lithic artifacts. In: Archaeology in the
+Digital Era: Papers from the 40th Annual Conference of Computer Applications
+and Quantitative Methods in Archaeology (CAA), Amsterdam University Press,
+pp. 83-92. https://doi.org/10.1515/9789048519590-010
