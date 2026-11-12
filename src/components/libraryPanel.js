@@ -611,6 +611,7 @@ export class LibraryPanel {
     _getSourceIcon(source) {
         switch (source) {
             case 'model': return '<i class="fas fa-brain text-purple-500"></i>';
+            case 'artifact3d': return '<i class="fas fa-draw-polygon text-teal-500" title="Geometric baseline (Artifact3-D)"></i>';
             case 'cloud': return '<i class="fas fa-cloud-download-alt text-blue-500"></i>';
             default: return '<i class="fas fa-pen text-gray-500"></i>';
         }

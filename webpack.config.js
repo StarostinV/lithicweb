@@ -37,6 +37,11 @@ module.exports = (env, argv) => {
                         from: 'tests/fixtures/ply/test_annotated_mesh.ply',
                         to: 'demo/showcase.ply',
                     },
+                    // MIT notice + citations of the Artifact3-D port (geometric baseline)
+                    {
+                        from: 'src/geometry/artifact3d/LICENSE',
+                        to: 'licenses/artifact3d-LICENSE.txt',
+                    },
                     // ONNX models are loaded from Hugging Face at runtime (see
                     // src/inference/modelRegistry.js) and cached in IndexedDB — not bundled.
                     // Only the onnxruntime-web wasm runtime is served locally.

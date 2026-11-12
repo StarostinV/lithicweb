@@ -196,6 +196,8 @@ export class HistoryPanel {
             icon = '<i class="fas fa-eraser text-gray-500"></i>';
         } else if (action.type === 'model') {
             icon = '<i class="fas fa-brain text-purple-500"></i>';
+        } else if (action.type === 'artifact3d') {
+            icon = '<i class="fas fa-draw-polygon text-teal-500"></i>';
         } else if (action.type === 'cloud') {
             icon = '<i class="fas fa-cloud-download-alt text-blue-500"></i>';
         } else if (action.type === 'library-load') {

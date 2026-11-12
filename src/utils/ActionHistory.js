@@ -9,7 +9,7 @@ import { Annotation } from '../geometry/Annotation.js';
  * 
  * @typedef {Object} Action
  * @property {Annotation} annotation - The annotation state after this action
- * @property {string} type - Action type: 'draw', 'erase', 'model', 'cloud', 'library-load'
+ * @property {string} type - Action type: 'draw', 'erase', 'model', 'artifact3d', 'cloud', 'library-load'
  * @property {string} description - Auto-generated description
  * @property {string} [customDescription] - User-provided name
  * @property {number} timestamp - When the action was performed
@@ -75,7 +75,7 @@ export class ActionHistory {
         const annotation = new Annotation({
             edgeIndices: new Set(edgeIndices),
             arrows: arrows.map(a => ({ ...a })),
-            source: type === 'model' ? 'model' : type === 'cloud' ? 'cloud' : 'manual',
+            source: (type === 'model' || type === 'artifact3d' || type === 'cloud') ? type : 'manual',
             metadata: {
                 ...metadata,
                 name: annotationName,
@@ -99,6 +99,7 @@ export class ActionHistory {
             case 'draw': return 'Draw edges';
             case 'erase': return 'Erase edges';
             case 'model': return 'AI segmentation';
+            case 'artifact3d': return 'Geometric segmentation (Artifact3-D)';
             case 'cloud': return 'Cloud state';
             case 'library-load': return 'Load from library';
             default: return type;

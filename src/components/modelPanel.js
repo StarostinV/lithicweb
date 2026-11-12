@@ -29,7 +29,8 @@ import {
     facePredictionsToVertexValues,
     normalizeEdges,
 } from '../geometry/faceUnionFind.js';
-import { runClientPostprocessing } from '../utils/postprocess.js';
+import { runClientPostprocessing, faceSegmentsToEdgeLabels } from '../utils/postprocess.js';
+import { getSourceUnit, UNIT_DEFINITIONS } from '../utils/units.js';
 import { runLocalInference } from '../inference/runLocalInference.js';
 import { webgpuAvailable, isModelCached } from '../inference/onnxModel.js';
 import {
@@ -54,8 +55,19 @@ function formatDefault(meta, value) {
     return String(value);
 }
 
+/** Defaults of the geometric baseline (Artifact3-D) shown in the Model panel. */
+export const ARTIFACT3D_UI_DEFAULTS = Object.freeze({
+    targetFaces: 200000,
+    thresholdScale: 1.0,
+    minScarFaces: 50,
+    seed: 0,
+    dataCost: 10,
+    smoothCost: 100,
+    exactGraphCut: false,
+});
+
 export class ModelPanel {
-    constructor(meshView, connectionManager = null) {
+    constructor(meshView, connectionManager = null, userConfig = null) {
         this.meshView = meshView;
         this.connectionManager = connectionManager; // Kept for backward compatibility
         this.evaluationManager = null;
@@ -77,6 +89,12 @@ export class ModelPanel {
         this.customRepo = '';            // HF "org/repo[@rev]" when modelId === custom
         this.maxLocalFaces = 1_500_000;  // above this, fall back to server (if configured)
         this.lastProvider = null;        // real ONNX execution provider from the last run ('webgpu'|'wasm')
+
+        // Segmentation method: 'neural' (NeuroLithic model) | 'artifact3d' (geometric baseline)
+        this.userConfig = userConfig;
+        this.segMethod = 'neural';
+        this.a3dParams = { ...ARTIFACT3D_UI_DEFAULTS };
+        this._a3dRun = null;             // { cancel } while the Artifact3-D worker runs
 
         this.setupUI();
         this.setupEventListeners();
@@ -144,6 +162,24 @@ export class ModelPanel {
         this.inferenceProgress = document.getElementById('inferenceProgress');
         this.inferenceProgressLabel = document.getElementById('inferenceProgressLabel');
         this.inferenceProgressFill = document.getElementById('inferenceProgressFill');
+
+        // Method selector + geometric baseline (Artifact3-D) controls
+        this.segMethodSegment = document.getElementById('segMethodSegment');
+        this.neuralControls = document.getElementById('neuralControls');
+        this.a3dControls = document.getElementById('a3dControls');
+        this.postprocessSection = document.getElementById('postprocessSection');
+        this.cancelA3dBtn = document.getElementById('cancelA3dBtn');
+        this.a3dInputs = {
+            targetFaces: document.getElementById('a3dTargetFaces'),
+            thresholdScale: document.getElementById('a3dThresholdScale'),
+            minScarFaces: document.getElementById('a3dMinScarFaces'),
+            seed: document.getElementById('a3dSeed'),
+            dataCost: document.getElementById('a3dDataCost'),
+            smoothCost: document.getElementById('a3dSmoothCost'),
+            exactGraphCut: document.getElementById('a3dExactGraphCut'),
+        };
+        this._syncA3dInputs();
+        this._updateMethodUI();
         if (this.localInferenceToggle) this.localInferenceToggle.checked = this.localInference;
         this._populateModelSelect();
         this._syncPrecisionSegment();
@@ -306,6 +342,17 @@ export class ModelPanel {
                 this.connectionManager.openModal();
             });
         }
+
+        // Method selector (neural model | geometric baseline)
+        if (this.segMethodSegment) {
+            this.segMethodSegment.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-method]');
+                if (!btn || this.isLoading) return;
+                this.segMethod = btn.dataset.method;
+                this._updateMethodUI();
+            });
+        }
+        this._setupA3dListeners();
 
         // Upload and inference
         if (this.uploadToServerBtn) {
@@ -581,6 +628,9 @@ export class ModelPanel {
     }
 
     async runInference() {
+        if (this.segMethod === 'artifact3d') {
+            return this.runArtifact3D();
+        }
         // Client-side (in-browser) inference is the default; falls back to the server
         // path inside runLocalInferenceFlow() when unsupported or on error.
         if (this.localInference) {
@@ -770,7 +820,8 @@ export class ModelPanel {
     /** Show/hide server-only controls based on the in-browser inference toggle. */
     _updateInferenceModeUI() {
         if (this.uploadToServerBtn) {
-            this.uploadToServerBtn.style.display = this.localInference ? 'none' : '';
+            this.uploadToServerBtn.style.display =
+                (this.localInference || this.segMethod === 'artifact3d') ? 'none' : '';
         }
     }
 
@@ -999,9 +1050,14 @@ export class ModelPanel {
      * 
      * @param {Object} result - Inference result from server
      * @param {Array<number>} result.labels - Edge labels (0 or 1)
+     * @param {Object} [options]
+     * @param {string} [options.source='model'] - Annotation source ('model' | 'artifact3d')
+     * @param {string} [options.name] - Annotation name
+     * @param {Object} [options.inference] - Inference metadata to store instead of the model's
      * @returns {number} Number of edge vertices applied
      */
-    applyResults(result) {
+    applyResults(result, options = {}) {
+        const source = options.source || 'model';
         if (!result) {
             this.setStatus('No inference results to apply', 'error');
             return 0;
@@ -1029,7 +1085,11 @@ export class ModelPanel {
         const annotation = new Annotation({
             edgeIndices: edgeIndices,
             arrows: [],
-            metadata: {
+            metadata: source !== 'model' ? {
+                name: options.name || `${source} ${new Date().toLocaleString()}`,
+                source,
+                inference: options.inference || {},
+            } : {
                 name: `Model Prediction ${new Date().toLocaleString()}`,
                 source: 'model',
                 config: { ...this.config },
@@ -1052,18 +1112,18 @@ export class ModelPanel {
         });
 
         // Apply to mesh — fresh annotation ID prevents library overwrite
-        this.meshView.applyExternalAnnotation(annotation, 'model');
+        this.meshView.applyExternalAnnotation(annotation, source);
 
         // Emit ANNOTATION_IMPORTED for library auto-save
         eventBus.emit(Events.ANNOTATION_IMPORTED, {
             annotation: annotation,
-            source: 'model'
+            source
         });
 
         // Emit ANNOTATION_ACTIVE_CHANGED for UI updates (label, etc.)
         eventBus.emit(Events.ANNOTATION_ACTIVE_CHANGED, {
             name: annotation.name,
-            source: 'model'
+            source
         });
 
         // Automatically set this state as the prediction in evaluation manager
@@ -1107,10 +1167,195 @@ export class ModelPanel {
                 : '<i class="fas fa-upload"></i> Upload & Prepare';
         }
         
-        if (this.runInferenceBtn) {
-            this.runInferenceBtn.innerHTML = loading 
-                ? '<i class="fas fa-spinner fa-spin"></i> Running...'
+        this._updateRunButton();
+        if (this.segMethodSegment) {
+            for (const btn of this.segMethodSegment.querySelectorAll('[data-method]')) btn.disabled = loading;
+        }
+    }
+
+    /** Run-button label for the current method and loading state. @private */
+    _updateRunButton() {
+        if (!this.runInferenceBtn) return;
+        const a3d = this.segMethod === 'artifact3d';
+        if (this.isLoading) {
+            this.runInferenceBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+        } else {
+            this.runInferenceBtn.innerHTML = a3d
+                ? '<i class="fas fa-draw-polygon"></i> Run Artifact3-D'
                 : '<i class="fas fa-brain"></i> Run Inference';
+        }
+        if (this.cancelA3dBtn) {
+            this.cancelA3dBtn.style.display = (a3d && this.isLoading && this._a3dRun) ? '' : 'none';
+        }
+    }
+
+    // ============== Geometric baseline (Artifact3-D) ==============
+
+    /** Show the controls of the selected method. @private */
+    _updateMethodUI() {
+        const a3d = this.segMethod === 'artifact3d';
+        if (this.segMethodSegment) {
+            for (const btn of this.segMethodSegment.querySelectorAll('[data-method]')) {
+                btn.classList.toggle('active', btn.dataset.method === this.segMethod);
+            }
+        }
+        if (this.neuralControls) this.neuralControls.style.display = a3d ? 'none' : '';
+        if (this.a3dControls) this.a3dControls.style.display = a3d ? '' : 'none';
+        if (this.postprocessSection) this.postprocessSection.style.display = a3d ? 'none' : '';
+        for (const el of document.querySelectorAll('#modelPanel [data-method-only="neural"]')) {
+            el.style.display = a3d ? 'none' : '';
+        }
+        if (this.uploadToServerBtn) {
+            this.uploadToServerBtn.style.display = (a3d || this.localInference) ? 'none' : '';
+        }
+        this._updateRunButton();
+    }
+
+    /** Write this.a3dParams into the inputs. @private */
+    _syncA3dInputs() {
+        const p = this.a3dParams, el = this.a3dInputs;
+        if (!el) return;
+        if (el.targetFaces) el.targetFaces.value = String(p.targetFaces);
+        if (el.thresholdScale) el.thresholdScale.value = String(p.thresholdScale);
+        if (el.minScarFaces) el.minScarFaces.value = String(p.minScarFaces);
+        if (el.seed) el.seed.value = String(p.seed);
+        if (el.dataCost) el.dataCost.value = String(p.dataCost);
+        if (el.smoothCost) el.smoothCost.value = String(p.smoothCost);
+        if (el.exactGraphCut) el.exactGraphCut.checked = !!p.exactGraphCut;
+    }
+
+    /** Read and validate the inputs into this.a3dParams. @private */
+    _readA3dInputs() {
+        const el = this.a3dInputs || {};
+        const num = (input, fallback, lo, hi, int = false) => {
+            let x = input ? parseFloat(input.value) : NaN;
+            if (!Number.isFinite(x)) x = fallback;
+            if (int) x = Math.round(x);
+            return Math.min(hi, Math.max(lo, x));
+        };
+        const d = ARTIFACT3D_UI_DEFAULTS;
+        this.a3dParams = {
+            targetFaces: num(el.targetFaces, d.targetFaces, 1000, 1e7, true),
+            thresholdScale: num(el.thresholdScale, d.thresholdScale, 0.05, 20),
+            minScarFaces: num(el.minScarFaces, d.minScarFaces, 0, 1e6, true),
+            seed: num(el.seed, d.seed, 0, 2147483647, true),
+            dataCost: num(el.dataCost, d.dataCost, 0, 1e6),
+            smoothCost: num(el.smoothCost, d.smoothCost, 0, 1e7),
+            exactGraphCut: el.exactGraphCut ? !!el.exactGraphCut.checked : d.exactGraphCut,
+        };
+        return this.a3dParams;
+    }
+
+    /** @private */
+    _setupA3dListeners() {
+        for (const input of Object.values(this.a3dInputs || {})) {
+            if (input) input.addEventListener('change', () => { this._readA3dInputs(); this._syncA3dInputs(); });
+        }
+        const reroll = document.getElementById('a3dRerollBtn');
+        if (reroll) {
+            reroll.addEventListener('click', () => {
+                this._readA3dInputs();
+                this.a3dParams.seed = Math.floor(Math.random() * 1000000);
+                this._syncA3dInputs();
+            });
+        }
+        const advToggle = document.getElementById('a3dAdvancedToggle');
+        const advPanel = document.getElementById('a3dAdvancedPanel');
+        if (advToggle && advPanel) {
+            advToggle.addEventListener('click', () => {
+                advToggle.classList.toggle('expanded');
+                advPanel.classList.toggle('expanded');
+            });
+        }
+        const reset = document.getElementById('a3dResetBtn');
+        if (reset) {
+            reset.addEventListener('click', () => {
+                this.a3dParams = { ...ARTIFACT3D_UI_DEFAULTS };
+                this._syncA3dInputs();
+            });
+        }
+        if (this.cancelA3dBtn) {
+            this.cancelA3dBtn.addEventListener('click', () => {
+                if (this._a3dRun) this._a3dRun.cancel();
+            });
+        }
+    }
+
+    /**
+     * Run the geometric baseline (Artifact3-D scar segmentation) in a Web Worker
+     * and apply its scars through the same face-segments -> edges path as the model.
+     */
+    async runArtifact3D() {
+        if (!this.meshView || !this.meshView.positions || !this.meshView.indices) {
+            this.setStatus('Please load a mesh first', 'error');
+            return;
+        }
+        if (this._a3dRun) return;
+        const params = this._readA3dInputs();
+        const positions = this.meshView.positions;
+        const indices = this.meshView.indices;
+        const unit = getSourceUnit(this.meshView.metadata, this.userConfig);
+        const unitFactor = (unit && unit !== 'raw' && UNIT_DEFINITIONS[unit]) ? UNIT_DEFINITIONS[unit].factor : 1;
+        const workerParams = {
+            targetFaces: params.targetFaces,
+            thresholdScale: params.thresholdScale,
+            minScarFaces: params.minScarFaces,
+            seed: params.seed,
+            dataCost: params.dataCost,
+            smoothCost: params.smoothCost,
+            exactGraphCut: params.exactGraphCut,
+            unitFactor,
+        };
+
+        if (this.showingHeatmap) this._hideHeatmap();
+        const t0 = performance.now();
+        try {
+            const { runArtifact3DInWorker } = await import('../geometry/artifact3d/client.js');
+            this._a3dRun = runArtifact3DInWorker(positions, indices, workerParams, {
+                onProgress: (p) => {
+                    const detail = p.detail ? ` — ${p.detail}` : '';
+                    this._showProgress(`${p.label}${detail}`, p.overall);
+                },
+            });
+            this.setLoading(true);
+            this.setStatus(`Running Artifact3-D (${(indices.length / 3).toLocaleString()} faces, seed ${params.seed})…`, 'info');
+            this._showProgress('Starting…', 0);
+            const res = await this._a3dRun.promise;
+            this._showProgress('Applying scars…', 1);
+            const labels = faceSegmentsToEdgeLabels(res.faceLabels, this.meshView, 1);
+            const seconds = (performance.now() - t0) / 1000;
+            const edgeCount = this.applyResults({ labels }, {
+                source: 'artifact3d',
+                name: `Artifact3-D (seed ${params.seed}) ${new Date().toLocaleString()}`,
+                inference: {
+                    artifact3d: {
+                        inferredAt: Date.now(),
+                        method: 'Artifact3-D scar segmentation (browser port)',
+                        params: workerParams,
+                        unit: unit || 'mm',
+                        scars: res.nScars,
+                        workingFaces: res.info?.workingFaces,
+                        decimated: res.info?.decimated,
+                        seconds,
+                        timings: res.timings,
+                    },
+                },
+            });
+            const unitNote = (!unit || unit === 'raw') ? ' Coordinates assumed to be mm.' : '';
+            this.setStatus(
+                `Artifact3-D: ${res.nScars} scars, ${edgeCount} edge vertices in ${seconds.toFixed(1)} s.${unitNote}`,
+                'success');
+        } catch (e) {
+            if (e?.name === 'CancelledError') {
+                this.setStatus('Artifact3-D cancelled.', 'warning');
+            } else {
+                console.error('[ModelPanel] Artifact3-D failed:', e);
+                this.setStatus('Artifact3-D failed: ' + (e?.message || String(e)), 'error');
+            }
+        } finally {
+            this._a3dRun = null;
+            this._hideProgress();
+            this.setLoading(false);
         }
     }
 }

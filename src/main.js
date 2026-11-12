@@ -95,7 +95,7 @@ libraryPanel.setEvaluationManager(evaluationManager);
 const connectionManager = new ConnectionManager();
 
 // Model panel (AI inference) - with evaluation manager to auto-assign predictions
-const modelPanel = new ModelPanel(meshView, connectionManager);
+const modelPanel = new ModelPanel(meshView, connectionManager, userConfig);
 modelPanel.setEvaluationManager(evaluationManager);
 
 // Evaluation panel

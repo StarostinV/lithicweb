@@ -187,6 +187,7 @@ export class EvaluationPanel {
             const html = ['<option value="">-- Select --</option>'];
             for (const ann of annotations) {
                 const sourceIcon = ann.source === 'model' ? '\u{1F9E0} ' :
+                                   ann.source === 'artifact3d' ? '\u25B3 ' :
                                    ann.source === 'cloud' ? '\u2601 ' : '';
                 const name = ann.name || 'Untitled';
                 const selected = ann.id === selectedId ? ' selected' : '';

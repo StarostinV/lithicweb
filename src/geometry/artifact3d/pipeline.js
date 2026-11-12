@@ -1,3 +1,7 @@
+/*! Artifact3-D scar segmentation, browser port. MIT License. Artifact3-D (c) 2022
+ * Leore Grosman, Computerized Archaeology Laboratory, The Hebrew University of
+ * Jerusalem; scar segmentation code by Eitan Richardson, HUJI 2011. Full notice:
+ * licenses/artifact3d-LICENSE.txt */
 /**
  * Artifact3-D scar segmentation — browser port.
  *
@@ -61,6 +65,8 @@ import { faceAdjacencyPairs, uniqueEdges, CancelledError } from './topology.js';
  * @property {number} [curvatureSmoothing=10]
  * @property {number} [referenceEdgeLength=0.3462] mm; Cmax is rescaled to this edge length
  * @property {number} [unitFactor=1] multiply input coordinates by this to get mm
+ * @property {boolean} [exactGraphCut=false] use the Python port's graph construction
+ *   (Kolmogorov-Zabih reparametrisation; ~2x slower) instead of symmetric arcs
  */
 export const DEFAULT_PARAMS = Object.freeze({
     targetFaces: 200000,
@@ -73,6 +79,7 @@ export const DEFAULT_PARAMS = Object.freeze({
     curvatureSmoothing: 10,
     referenceEdgeLength: 0.3462,
     unitFactor: 1,
+    exactGraphCut: false,
 });
 
 /** Stage names and their share of the progress bar. */
@@ -157,6 +164,7 @@ export function segmentWorkingMesh(vRaw, f, params = {}, hooks = {}) {
     start('graphcut');
     const gc = alphaExpansionPotts(ML, graph.fp, graph.ew, {
         dataCost: p.dataCost, smoothCost: p.smoothCost, isCancelled,
+        symmetric: !p.exactGraphCut,
         onLabel: onStage ? ({ cycle, alpha, K }) => {
             // cycles are not known in advance (typically 2-4): approximate the bar
             const done = cycle + alpha / K;
