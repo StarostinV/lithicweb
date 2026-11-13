@@ -759,3 +759,12 @@
     font-size: 11px;
     color: var(--gray-500);
 }
+
+/* Tick labels under a discrete slider (Artifact3-D working resolution) */
+.a3d-slider-ticks {
+    display: flex;
+    justify-content: space-between;
+    margin: 2px 44px 0 2px;   /* right margin leaves room for the value label */
+    font-size: 10px;
+    color: var(--gray-500);
+}

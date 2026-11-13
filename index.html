@@ -1114,15 +1114,20 @@
                             <p class="method-license">Browser port distributed under the MIT License of Artifact3&#8209;D
                                 (<a href="licenses/artifact3d-LICENSE.txt" target="_blank" rel="noopener">licence and notices</a>).</p>
                             <div class="config-container">
-                                <div class="config-param" title="Meshes with more faces are decimated to this size first (the method was calibrated at 200k faces); the label result is transferred back to the full mesh.">
+                                <div class="config-param" title="Meshes with more faces are reduced to this size before segmentation and the result is transferred back to the full mesh. 200k is the calibrated default (the original Artifact3-D used 250k); fewer faces run faster but resolve fewer, coarser scars. Meshes already below the setting are used as they are.">
                                     <div class="config-param-header">
                                         <span class="config-param-label">Working resolution</span>
                                         <span class="config-param-default">Default: 200k faces</span>
                                     </div>
-                                    <select id="a3dTargetFaces" class="control-select">
-                                        <option value="200000" selected>200k faces (standard)</option>
-                                        <option value="100000">100k faces (preview, faster)</option>
-                                    </select>
+                                    <div class="slider-row">
+                                        <input type="range" id="a3dTargetFaces" class="styled-slider"
+                                               min="50000" max="250000" step="50000" value="200000"
+                                               aria-label="Working resolution in faces">
+                                        <span id="a3dTargetFacesValue" class="slider-value">200k</span>
+                                    </div>
+                                    <div class="a3d-slider-ticks" aria-hidden="true">
+                                        <span>50k</span><span>100k</span><span>150k</span><span>200k</span><span>250k</span>
+                                    </div>
                                 </div>
                                 <div class="config-param" title="Multiplies the curvature thresholds that decide what counts as a ridge (0.017 / 0.05 per mm). Lower: more, smaller scars; higher: fewer, larger scars.">
                                     <div class="config-param-header">

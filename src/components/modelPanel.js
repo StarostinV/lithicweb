@@ -171,6 +171,7 @@ export class ModelPanel {
         this.cancelA3dBtn = document.getElementById('cancelA3dBtn');
         this.a3dInputs = {
             targetFaces: document.getElementById('a3dTargetFaces'),
+            targetFacesValue: document.getElementById('a3dTargetFacesValue'),
             thresholdScale: document.getElementById('a3dThresholdScale'),
             minScarFaces: document.getElementById('a3dMinScarFaces'),
             seed: document.getElementById('a3dSeed'),
@@ -1211,11 +1212,20 @@ export class ModelPanel {
         this._updateRunButton();
     }
 
+    /** Show the working-resolution slider's value, e.g. "200k". @private */
+    _showA3dTargetFaces() {
+        const el = this.a3dInputs;
+        if (el?.targetFaces && el.targetFacesValue) {
+            el.targetFacesValue.textContent = `${Math.round(Number(el.targetFaces.value) / 1000)}k`;
+        }
+    }
+
     /** Write this.a3dParams into the inputs. @private */
     _syncA3dInputs() {
         const p = this.a3dParams, el = this.a3dInputs;
         if (!el) return;
         if (el.targetFaces) el.targetFaces.value = String(p.targetFaces);
+        this._showA3dTargetFaces();
         if (el.thresholdScale) el.thresholdScale.value = String(p.thresholdScale);
         if (el.minScarFaces) el.minScarFaces.value = String(p.minScarFaces);
         if (el.seed) el.seed.value = String(p.seed);
@@ -1251,6 +1261,7 @@ export class ModelPanel {
         for (const input of Object.values(this.a3dInputs || {})) {
             if (input) input.addEventListener('change', () => { this._readA3dInputs(); this._syncA3dInputs(); });
         }
+        this.a3dInputs?.targetFaces?.addEventListener('input', () => this._showA3dTargetFaces());
         const reroll = document.getElementById('a3dRerollBtn');
         if (reroll) {
             reroll.addEventListener('click', () => {
