@@ -13,14 +13,14 @@
  *
  * Please cite:
  *   L. Grosman, A. Muller, G. Dag, H. Goldgeier, O. Harush, G. Herzlinger,
- *   K. Nebenhaus, F. Valetta, T. Yashuv, N. Dick (2022). Artifact3-D: New
+ *   K. Nebenhaus, F. Valletta, T. Yashuv, N. Dick (2022). Artifact3-D: New
  *   software for accurate, objective and efficient 3D analysis and
  *   documentation of archaeological artifacts. PLOS ONE 17(6): e0268401.
  *   https://doi.org/10.1371/journal.pone.0268401
  *   E. Richardson, L. Grosman, U. Smilansky, M. Werman (2014). Extracting scar
  *   and ridge features from 3D-scanned lithic artifacts. In: Archaeology in
  *   the Digital Era (CAA 2012), Amsterdam University Press, pp. 83-92.
- *   https://doi.org/10.1515/9789048519590-010
+ *   https://doi.org/10.1017/9789048519590.010
  *
  * Stages (Python port module in brackets):
  *   0  mesh preparation: mm units, welding, outward winding, decimation to

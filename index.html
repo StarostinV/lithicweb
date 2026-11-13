@@ -1019,7 +1019,7 @@
                 <div class="panel-header-icon ai-icon"><i class="fas fa-brain"></i></div>
                 <div class="panel-header-text">
                     <h2>AI Model</h2>
-                    <span class="panel-subtitle">Neural network inference</span>
+                    <span class="panel-subtitle">Automatic segmentation</span>
                 </div>
                 <div class="panel-header-actions">
                     <div class="connection-indicator" id="connectionStatus" title="Not configured">
@@ -1101,11 +1101,24 @@
                         <div id="a3dControls" style="display: none;">
                             <p class="help-text">
                                 Classic curvature-based scar segmentation (crest lines, geodesic clustering,
-                                graph cut) from Artifact3-D (Grosman et al. 2022, <i>PLOS ONE</i> 17: e0268401;
-                                Richardson et al. 2014, CAA 2012). Runs in your browser, takes ~30&ndash;60&nbsp;s,
-                                and is generally less accurate than the neural model &mdash; a model-free second opinion.
-                                Assumes coordinates in mm (set the unit in Analysis if not).
+                                graph cut) of Artifact3&#8209;D<span class="method-cite">[1,&nbsp;2]</span>, ported to run
+                                in your browser. It takes typically 10&ndash;30&nbsp;s on a desktop computer and is
+                                generally less accurate than the neural model: a model-free second opinion.
+                                Coordinates are assumed to be in millimetres (set the unit in Analysis otherwise).
                             </p>
+                            <ol class="method-references">
+                                <li>Grosman L, Muller A, Dag I, Goldgeier H, Harush O, Herzlinger G, Nebenhaus K,
+                                    Valletta F, Yashuv T, Dick N (2022). Artifact3&#8209;D: New software for accurate,
+                                    objective and efficient 3D analysis and documentation of archaeological artifacts.
+                                    <i>PLOS ONE</i> 17(6): e0268401.
+                                    <a href="https://doi.org/10.1371/journal.pone.0268401" target="_blank" rel="noopener">doi:10.1371/journal.pone.0268401</a></li>
+                                <li>Richardson E, Grosman L, Smilansky U, Werman M (2014). Extracting scar and ridge
+                                    features from 3D-scanned lithic artifacts. In: <i>Archaeology in the Digital Era</i>
+                                    (CAA 2012), pp. 83&ndash;92. Amsterdam University Press.
+                                    <a href="https://doi.org/10.1017/9789048519590.010" target="_blank" rel="noopener">doi:10.1017/9789048519590.010</a></li>
+                            </ol>
+                            <p class="method-license">Browser port distributed under the MIT License of Artifact3&#8209;D
+                                (<a href="licenses/artifact3d-LICENSE.txt" target="_blank" rel="noopener">licence and notices</a>).</p>
                             <div class="config-container">
                                 <div class="config-param" title="Meshes with more faces are decimated to this size first (the method was calibrated at 200k faces); the label result is transferred back to the full mesh.">
                                     <div class="config-param-header">

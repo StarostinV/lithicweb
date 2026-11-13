@@ -41,7 +41,7 @@ The web page is deployed at [neurolithic.org](https://www.neurolithic.org/).
 ### Cloud & AI Integration
 - Upload/download meshes and annotations to a remote server
 - Run server-side model inference and visualize edge probability predictions
-- Geometric baseline: the classic Artifact3-D scar segmentation (curvature, crest lines, geodesic clustering, graph cut) runs in a Web Worker as a model-free second opinion — Grosman et al. 2022, *PLOS ONE* 17: e0268401; Richardson et al. 2014, CAA 2012. Port and notices in `src/geometry/artifact3d/` (MIT); stage tests against the Python port in `tests/unit/geometry/artifact3d/`, fixtures from `tools/artifact3d/make_fixtures.py`
+- Geometric baseline: the classic Artifact3-D scar segmentation (curvature, crest lines, geodesic clustering, graph cut) runs in a Web Worker as a model-free second opinion — Grosman et al. 2022, *PLOS ONE* 17(6): e0268401 ([doi:10.1371/journal.pone.0268401](https://doi.org/10.1371/journal.pone.0268401)); Richardson et al. 2014, *Archaeology in the Digital Era* (CAA 2012), pp. 83–92 ([doi:10.1017/9789048519590.010](https://doi.org/10.1017/9789048519590.010)). Port and notices in `src/geometry/artifact3d/` (MIT); stage tests against the Python port in `tests/unit/geometry/artifact3d/`, fixtures from `tools/artifact3d/make_fixtures.py`
 - Annotation library for saving and loading multiple annotations per mesh
 
 ## Tech Stack

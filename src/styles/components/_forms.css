@@ -709,3 +709,53 @@
     0%   { transform: translateX(-120%); }
     100% { transform: translateX(320%); }
 }
+
+/* Citations and references in method help text (e.g. Artifact3-D) */
+.method-cite {
+    font-size: 0.8em;
+    vertical-align: super;
+    line-height: 0;
+    margin-left: 1px;
+    color: var(--gray-500);
+}
+
+.method-references {
+    list-style: none;
+    counter-reset: method-ref;
+    margin: 4px 0 6px;
+    padding-left: 22px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--gray-500);
+}
+
+.method-references li {
+    position: relative;
+    margin-bottom: 4px;
+    counter-increment: method-ref;
+}
+
+/* Numbered [1], [2] to match the citation markers */
+.method-references li::before {
+    content: "[" counter(method-ref) "]";
+    position: absolute;
+    left: -22px;
+}
+
+.method-references a,
+.method-license a {
+    color: var(--primary-600, #4f46e5);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.method-references a:hover,
+.method-license a:hover {
+    text-decoration: underline;
+}
+
+.method-license {
+    margin: 0 0 10px;
+    font-size: 11px;
+    color: var(--gray-500);
+}
