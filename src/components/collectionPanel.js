@@ -1,6 +1,7 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { confirmUnsavedChanges } from '../utils/confirmUnsavedChanges.js';
+import { eventBus, Events } from '../utils/EventBus.js';
 
 /**
  * Base URL of the published collection (catalogue.json + meshes + thumbs),
@@ -180,8 +181,6 @@ export class CollectionPanel {
             sources: document.getElementById('collectionSources'),
             overlay: document.getElementById('collectionMapOverlay'),
             mapDiv: document.getElementById('collectionMap'),
-            showMap: document.getElementById('collectionShowMapBtn'),
-            hideMap: document.getElementById('collectionHideMapBtn'),
             timeline: document.getElementById('collectionTimeline'),
             labelsToggle: document.getElementById('collectionLabelsToggle'),
             sourceInput: document.getElementById('collectionSourceInput'),
@@ -205,8 +204,6 @@ export class CollectionPanel {
             this.filters.annotation = this.el.annotation.value;
             this._renderList();
         });
-        this.el.showMap?.addEventListener('click', () => this._setMapVisible(true));
-        this.el.hideMap?.addEventListener('click', () => this._setMapVisible(false));
         this.el.sourceLoad?.addEventListener('click', () => this.setSource(this.el.sourceInput.value));
         this.el.sourceInput?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') this.setSource(this.el.sourceInput.value);
@@ -232,8 +229,8 @@ export class CollectionPanel {
                 await this._loadCatalogue();
             }
         }
-        // Open on the map until a mesh has been loaded from the collection
-        this._setMapVisible(!this.activeId);
+        // The Collection tab is the map; loaded meshes are viewed from other tabs
+        this._setMapVisible(true);
     }
 
     /** Called when another tab is opened. */
@@ -813,7 +810,6 @@ export class CollectionPanel {
         this.el.overlay?.classList.toggle('visible', show_);
         // Hide the 3D view's floating tools while the map covers it
         document.body.classList.toggle('collection-map-open', show_);
-        this.el.showMap?.classList.toggle('hidden', show_ || !this.visible);
         if (show_ && this.map) {
             // The container was hidden; Leaflet must re-measure it, and the
             // first fit can only happen once it has a size
@@ -871,7 +867,8 @@ export class CollectionPanel {
             }
             this.activeId = id;
             this._setStatus('');
-            this._setMapVisible(false);
+            // Show the artifact: its metadata next to the 3D view (leaving this tab hides the map)
+            eventBus.emit(Events.SWITCH_PANEL, { panelId: 'metadataPanel' });
         } catch (err) {
             console.error('[Collection] Failed to load', id, err);
             this._setStatus(`Could not load ${id} (${err.message}).`, 'error');

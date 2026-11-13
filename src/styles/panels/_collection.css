@@ -302,26 +302,6 @@ body.sidebar-collapsed .collection-map-overlay {
     height: 100%;
 }
 
-.collection-hide-map {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    z-index: 1000;
-    padding: 8px 12px;
-    border: none;
-    border-radius: 8px;
-    background: white;
-    color: var(--gray-700, #374151);
-    font-size: 13px;
-    font-weight: 600;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-    cursor: pointer;
-}
-
-.collection-hide-map:hover {
-    color: var(--primary);
-}
-
 .collection-marker {
     background: none;
     border: none;
